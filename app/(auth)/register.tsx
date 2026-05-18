@@ -12,7 +12,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
@@ -25,6 +25,15 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const videoPlayer = useVideoPlayer(
+    require("../../public/home/eslesbulus.mp4"),
+    (p) => {
+      p.loop = true;
+      p.muted = true;
+      p.play();
+    }
+  );
 
   async function handleRegister() {
     if (!name || !email || !password) {
@@ -56,13 +65,11 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <Video
-        source={require("../../public/home/eslesbulus.mp4")}
+      <VideoView
+        player={videoPlayer}
         style={StyleSheet.absoluteFill}
-        resizeMode={ResizeMode.COVER}
-        isLooping
-        isMuted
-        shouldPlay
+        contentFit="cover"
+        nativeControls={false}
       />
 
       <LinearGradient
