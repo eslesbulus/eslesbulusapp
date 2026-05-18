@@ -5,12 +5,16 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Image,
+  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Alert,
   ScrollView,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -39,6 +43,7 @@ export default function RegisterScreen() {
         uid: user.uid,
         name: name.trim(),
         email: email.trim(),
+        photoURL: "",
         createdAt: serverTimestamp(),
         profileComplete: false,
       });
@@ -50,110 +55,163 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>EslesBulus</Text>
-        <Text style={styles.subtitle}>Hesap oluştur</Text>
+    <View style={styles.container}>
+      <Video
+        source={require("../../public/home/eslesbulus.mp4")}
+        style={StyleSheet.absoluteFill}
+        resizeMode={ResizeMode.COVER}
+        isLooping
+        isMuted
+        shouldPlay
+      />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Adın"
-          placeholderTextColor="#aaa"
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="E-posta"
-          placeholderTextColor="#aaa"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Şifre (en az 6 karakter)"
-          placeholderTextColor="#aaa"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+      <LinearGradient
+        colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
+        style={StyleSheet.absoluteFill}
+      />
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Kayıt Ol</Text>
-          )}
-        </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../public/eslesbulustransp.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-        <Link href="/(auth)/login" asChild>
-          <TouchableOpacity style={styles.linkButton}>
-            <Text style={styles.linkText}>Zaten hesabın var mı? Giriş yap</Text>
-          </TouchableOpacity>
-        </Link>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <BlurView intensity={25} tint="dark" style={styles.glassCard}>
+            <Text style={styles.cardTitle}>Hesap Oluştur</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Adın"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              value={name}
+              onChangeText={setName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="E-posta"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Şifre (en az 6 karakter)"
+              placeholderTextColor="rgba(255,255,255,0.5)"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.registerButtonText}>Kayıt Ol</Text>
+              )}
+            </TouchableOpacity>
+
+            <Link href="/(auth)/login" asChild>
+              <TouchableOpacity style={styles.loginLink}>
+                <Text style={styles.loginLinkText}>
+                  Zaten hesabın var mı?{" "}
+                  <Text style={styles.loginLinkBold}>Giriş Yap</Text>
+                </Text>
+              </TouchableOpacity>
+            </Link>
+          </BlurView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#000",
   },
-  inner: {
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 28,
-    justifyContent: "center",
-    paddingVertical: 60,
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 60,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 32,
   },
   logo: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#E91E63",
-    textAlign: "center",
-    marginBottom: 8,
+    width: 200,
+    height: 80,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
+  glassCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#fff",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "rgba(255,255,255,0.2)",
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 14,
-    backgroundColor: "#fafafa",
+    paddingVertical: 13,
+    fontSize: 15,
+    color: "#fff",
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  button: {
+  registerButton: {
     backgroundColor: "#E91E63",
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 15,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 4,
   },
-  buttonText: {
+  registerButtonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: 16,
   },
-  linkButton: {
-    marginTop: 20,
+  loginLink: {
+    marginTop: 16,
     alignItems: "center",
   },
-  linkText: {
-    color: "#E91E63",
-    fontSize: 15,
+  loginLinkText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  loginLinkBold: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });
