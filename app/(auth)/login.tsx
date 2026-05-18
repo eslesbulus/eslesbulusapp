@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -14,17 +14,15 @@ import {
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link, makeRedirectUri, useAuthRequest, ResponseType } from "expo-auth-session";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { Link } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
 
 WebBrowser.maybeCompleteAuthSession();
-
-const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
-const redirectUri = makeRedirectUri({ scheme: "eslesbulusapp" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -41,43 +39,44 @@ export default function LoginScreen() {
     }
   );
 
-  // Implicit flow — no PKCE, no native crypto module needed
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: GOOGLE_WEB_CLIENT_ID,
-      responseType: ResponseType.Token,
-      scopes: ["openid", "profile", "email"],
-      redirectUri,
-      usePKCE: false,
-    },
-    { authorizationEndpoint: GOOGLE_AUTH_ENDPOINT }
-  );
-
-  useEffect(() => {
-    if (response?.type === "success" && response.params.access_token) {
-      handleGoogleToken(response.params.access_token);
-    } else if (response?.type === "error") {
-      Alert.alert("Google ile giriş başarısız", response.error?.message ?? "Bilinmeyen hata");
-    }
-  }, [response]);
-
-  async function handleGoogleToken(accessToken: string) {
+  async function handleGoogleSignIn() {
     setGoogleLoading(true);
     try {
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      const { user } = await signInWithCredential(auth, credential);
+      const redirectUri = Linking.createURL("/");
+      const authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${GOOGLE_WEB_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=token` +
+        `&scope=openid%20profile%20email`;
 
-      const userRef = doc(db, "users", user.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          name: user.displayName ?? "",
-          email: user.email ?? "",
-          photoURL: user.photoURL ?? "",
-          createdAt: serverTimestamp(),
-          profileComplete: false,
-        });
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+      if (result.type === "success" && result.url) {
+        const fragment = result.url.split("#")[1] ?? "";
+        const params = new URLSearchParams(fragment);
+        const accessToken = params.get("access_token");
+
+        if (!accessToken) {
+          Alert.alert("Google ile giriş başarısız", "Token alınamadı.");
+          return;
+        }
+
+        const credential = GoogleAuthProvider.credential(null, accessToken);
+        const { user } = await signInWithCredential(auth, credential);
+
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            uid: user.uid,
+            name: user.displayName ?? "",
+            email: user.email ?? "",
+            photoURL: user.photoURL ?? "",
+            createdAt: serverTimestamp(),
+            profileComplete: false,
+          });
+        }
       }
     } catch (e: any) {
       Alert.alert("Google ile giriş başarısız", e.message);
@@ -131,18 +130,15 @@ export default function LoginScreen() {
           <Text style={styles.cardTitle}>Hoş Geldin</Text>
 
           <TouchableOpacity
-            style={[styles.googleButton, (!request || googleLoading) && styles.buttonDisabled]}
-            onPress={() => promptAsync()}
-            disabled={!request || googleLoading}
+            style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color="#333" />
             ) : (
               <>
-                <Image
-                  source={require("../../public/eslesbuluslogo.png")}
-                  style={styles.googleIcon}
-                />
+                <Text style={styles.googleIconText}>G</Text>
                 <Text style={styles.googleButtonText}>Google ile Devam Et</Text>
               </>
             )}
@@ -231,7 +227,11 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 10,
   },
-  googleIcon: { width: 20, height: 20, borderRadius: 10 },
+  googleIconText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#4285F4",
+  },
   googleButtonText: { fontSize: 15, fontWeight: "600", color: "#333" },
   divider: {
     flexDirection: "row",

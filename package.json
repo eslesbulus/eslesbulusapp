@@ -10,11 +10,8 @@
   },
   "dependencies": {
     "expo": "~54.0.33",
-    "expo-auth-session": "^55.0.16",
-    "expo-av": "^16.0.8",
     "expo-blur": "^55.0.14",
     "expo-constants": "~18.0.13",
-    "expo-crypto": "^55.0.15",
     "expo-image-picker": "^55.0.20",
     "expo-linear-gradient": "^55.0.14",
     "expo-linking": "~8.0.12",
