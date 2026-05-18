@@ -10,23 +10,21 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
-} from "firebase/auth";
-import * as Google from "expo-auth-session/providers/google";
+import { Link, makeRedirectUri, useAuthRequest, ResponseType } from "expo-auth-session";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import * as WebBrowser from "expo-web-browser";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
 
-const { height } = Dimensions.get("window");
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+const redirectUri = makeRedirectUri({ scheme: "eslesbulusapp" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -43,25 +41,34 @@ export default function LoginScreen() {
     }
   );
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-  });
+  // Implicit flow — no PKCE, no native crypto module needed
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: GOOGLE_WEB_CLIENT_ID,
+      responseType: ResponseType.Token,
+      scopes: ["openid", "profile", "email"],
+      redirectUri,
+      usePKCE: false,
+    },
+    { authorizationEndpoint: GOOGLE_AUTH_ENDPOINT }
+  );
 
   useEffect(() => {
-    if (response?.type === "success") {
-      handleGoogleCredential(response.params.id_token);
+    if (response?.type === "success" && response.params.access_token) {
+      handleGoogleToken(response.params.access_token);
+    } else if (response?.type === "error") {
+      Alert.alert("Google ile giriş başarısız", response.error?.message ?? "Bilinmeyen hata");
     }
   }, [response]);
 
-  async function handleGoogleCredential(idToken: string) {
+  async function handleGoogleToken(accessToken: string) {
     setGoogleLoading(true);
     try {
-      const credential = GoogleAuthProvider.credential(idToken);
+      const credential = GoogleAuthProvider.credential(null, accessToken);
       const { user } = await signInWithCredential(auth, credential);
 
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
-
       if (!snap.exists()) {
         await setDoc(userRef, {
           uid: user.uid,
@@ -124,7 +131,7 @@ export default function LoginScreen() {
           <Text style={styles.cardTitle}>Hoş Geldin</Text>
 
           <TouchableOpacity
-            style={styles.googleButton}
+            style={[styles.googleButton, (!request || googleLoading) && styles.buttonDisabled]}
             onPress={() => promptAsync()}
             disabled={!request || googleLoading}
           >
@@ -133,7 +140,7 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Image
-                  source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png" }}
+                  source={require("../../public/eslesbuluslogo.png")}
                   style={styles.googleIcon}
                 />
                 <Text style={styles.googleButtonText}>Google ile Devam Et</Text>
@@ -166,7 +173,7 @@ export default function LoginScreen() {
           />
 
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleEmailLogin}
             disabled={loading}
           >
@@ -192,24 +199,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
+  container: { flex: 1, backgroundColor: "#000" },
   keyboardView: {
     flex: 1,
     justifyContent: "flex-end",
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  logo: {
-    width: 200,
-    height: 80,
-  },
+  logoContainer: { alignItems: "center", marginBottom: 32 },
+  logo: { width: 200, height: 80 },
   glassCard: {
     borderRadius: 24,
     overflow: "hidden",
@@ -233,30 +231,16 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 10,
   },
-  googleIcon: {
-    width: 20,
-    height: 20,
-  },
-  googleButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-  },
+  googleIcon: { width: 20, height: 20, borderRadius: 10 },
+  googleButtonText: { fontSize: 15, fontWeight: "600", color: "#333" },
   divider: {
     flexDirection: "row",
     alignItems: "center",
     marginVertical: 18,
     gap: 10,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  dividerText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 13,
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.2)" },
+  dividerText: { color: "rgba(255,255,255,0.5)", fontSize: 13 },
   input: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
@@ -275,21 +259,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
-  loginButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  registerLink: {
-    marginTop: 16,
-    alignItems: "center",
-  },
-  registerLinkText: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
-  },
-  registerLinkBold: {
-    color: "#fff",
-    fontWeight: "700",
-  },
+  loginButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  buttonDisabled: { opacity: 0.6 },
+  registerLink: { marginTop: 16, alignItems: "center" },
+  registerLinkText: { color: "rgba(255,255,255,0.6)", fontSize: 14 },
+  registerLinkBold: { color: "#fff", fontWeight: "700" },
 });
