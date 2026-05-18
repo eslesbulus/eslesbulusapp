@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "PowerShell(\\(Get-Item \"C:\\\\Users\\\\efeha\\\\Documents\\\\eslesbulusapp\\\\.claude\\\\skills\\\\caveman\"\\).LinkType; \\(Get-Item \"C:\\\\Users\\\\efeha\\\\Documents\\\\eslesbulusapp\\\\.claude\\\\skills\\\\caveman\"\\).Target)",
+      "Skill(caveman)",
+      "Skill(caveman:*)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npx --version)",
+      "PowerShell($src = \"C:\\\\Users\\\\efeha\\\\Documents\\\\eslesbulusapp-temp\"; $dst = \"C:\\\\Users\\\\efeha\\\\Documents\\\\eslesbulusapp\"; Get-ChildItem $src | Where-Object { $_.Name -notin @\\('.agents', '.claude', 'skills-lock.json'\\) } | ForEach-Object { Copy-Item $_.FullName $dst -Recurse -Force }; Write-Output \"moved\")",
+      "Bash(gh --version)",
+      "Bash(gh auth *)"
+    ]
+  }
+}
