@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
@@ -25,6 +25,14 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
 
   const videoPlayer = useVideoPlayer(
     require("../../public/home/eslesbulus.mp4"),
@@ -65,12 +73,14 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <VideoView
-        player={videoPlayer}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        nativeControls={false}
-      />
+      {isFocused && (
+        <VideoView
+          player={videoPlayer}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          nativeControls={false}
+        />
+      )}
 
       <LinearGradient
         colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
@@ -198,7 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   registerButton: {
-    backgroundColor: "#E91E63",
+    backgroundColor: "#800020",
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
