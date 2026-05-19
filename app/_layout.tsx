@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { InteractionsProvider } from "@/context/InteractionsContext";
 import { BlockedUsersProvider } from "@/context/BlockedUsersContext";
+import { CoinsProvider } from "@/context/CoinsContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -53,7 +54,9 @@ export default function RootLayout() {
         <AuthProvider>
           <InteractionsProvider>
             <BlockedUsersProvider>
-              <RootNavigator />
+              <CoinsProvider>
+                <RootNavigator />
+              </CoinsProvider>
             </BlockedUsersProvider>
           </InteractionsProvider>
         </AuthProvider>

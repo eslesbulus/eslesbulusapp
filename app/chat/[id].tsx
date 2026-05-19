@@ -32,6 +32,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { getUserById, MockUser } from "@/constants/mockUsers";
+import { Gift } from "@/constants/gifts";
+import { GiftSheet } from "@/components/chat/GiftSheet";
+import { GiftAnimation } from "@/components/chat/GiftAnimation";
+import { EmojiPicker } from "@/components/chat/EmojiPicker";
 
 type Message = {
   id: string;
@@ -39,6 +43,7 @@ type Message = {
   fromMe: boolean;
   time: string;
   status?: "sent" | "delivered" | "read";
+  gift?: Gift; // if message is a gift
 };
 
 // Each conversation gets a different mock seed based on userId
@@ -73,10 +78,45 @@ export default function ChatDetailScreen() {
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
 
   useEffect(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
   }, []);
+
+  function handleSendGift(g: Gift) {
+    setActiveGiftAnim(g);
+    const msg: Message = {
+      id: `m_g_${Date.now()}`,
+      text: `🎁 ${g.name}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      status: "sent",
+      gift: g,
+    };
+    setMessages((prev) => [...prev, msg]);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+
+    // Mock reply with thanks after gift
+    setTimeout(() => setTyping(true), 1800);
+    setTimeout(() => {
+      setTyping(false);
+      const reply: Message = {
+        id: `m_gr_${Date.now()}`,
+        text: `Çok teşekkürler! ${g.emoji}😍`,
+        fromMe: false,
+        time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, reply]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    }, 3600);
+  }
+
+  function handlePickEmoji(emoji: string) {
+    setText((t) => t + emoji);
+  }
 
   function handleSend() {
     if (!text.trim() || !user) return;
@@ -225,7 +265,7 @@ export default function ChatDetailScreen() {
               multiline
               maxLength={500}
             />
-            <Pressable hitSlop={6} style={styles.emojiBtn}>
+            <Pressable hitSlop={6} style={styles.emojiBtn} onPress={() => { Keyboard.dismiss(); setEmojiOpen(true); }}>
               <Ionicons name="happy-outline" size={22} color={c.textMuted} />
             </Pressable>
           </View>
@@ -248,63 +288,98 @@ export default function ChatDetailScreen() {
       <Modal
         visible={attachOpen}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setAttachOpen(false)}
       >
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]}
           onPress={() => setAttachOpen(false)}
         />
-        <View style={[styles.attachSheet, { backgroundColor: c.card, paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
-          <View style={[styles.attachHandle, { backgroundColor: c.border }]} />
-          <Text style={[styles.attachTitle, { color: c.text }]}>Dosya Ekle</Text>
-          <View style={styles.attachGrid}>
-            {[
-              { icon: "camera", label: "Kamera", color: "#7C3AED" },
-              { icon: "images", label: "Galeri", color: "#2563EB" },
-              { icon: "videocam", label: "Video", color: "#DC2626" },
-              { icon: "document-text", label: "Dosya", color: "#D97706" },
-              { icon: "location", label: "Konum", color: "#16A34A" },
-              { icon: "musical-notes", label: "Müzik", color: "#DB2777" },
-            ].map((item) => (
-              <Pressable
-                key={item.label}
-                style={styles.attachItem}
-                onPress={async () => {
-                  setAttachOpen(false);
-                  if (item.icon === "camera") {
-                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                    if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
-                    const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
-                    if (!res.canceled) {
-                      const msg: Message = { id: `m_${Date.now()}`, text: "📷 Fotoğraf gönderildi", fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
-                      setMessages(p => [...p, msg]);
-                      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+        <View style={styles.attachWrap} pointerEvents="box-none">
+          <Animated.View
+            entering={FadeInUp.duration(240)}
+            style={[styles.attachSheet, { backgroundColor: c.card, paddingBottom: Math.max(insets.bottom + 12, 28) }]}
+          >
+            <View style={[styles.attachHandle, { backgroundColor: c.border }]} />
+            <Text style={[styles.attachTitle, { color: c.text }]}>Paylaş</Text>
+            <View style={styles.attachGrid}>
+              {[
+                { icon: "gift", label: "Hediye", color: "#EC4899" },
+                { icon: "camera", label: "Kamera", color: "#7C3AED" },
+                { icon: "images", label: "Galeri", color: "#2563EB" },
+                { icon: "videocam", label: "Video", color: "#DC2626" },
+                { icon: "document-text", label: "Dosya", color: "#D97706" },
+                { icon: "location", label: "Konum", color: "#16A34A" },
+              ].map((item) => (
+                <Pressable
+                  key={item.label}
+                  style={styles.attachItem}
+                  onPress={async () => {
+                    setAttachOpen(false);
+                    if (item.icon === "gift") {
+                      setTimeout(() => setGiftOpen(true), 220);
+                      return;
                     }
-                  } else if (item.icon === "images" || item.icon === "videocam") {
-                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
-                    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
-                    if (!res.canceled) {
-                      const label = item.icon === "videocam" ? "🎥 Video gönderildi" : "🖼 Fotoğraf gönderildi";
-                      const msg: Message = { id: `m_${Date.now()}`, text: label, fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
-                      setMessages(p => [...p, msg]);
-                      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                    if (item.icon === "camera") {
+                      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
+                      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                      if (!res.canceled) {
+                        const msg: Message = { id: `m_${Date.now()}`, text: "📷 Fotoğraf gönderildi", fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
+                        setMessages(p => [...p, msg]);
+                        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                      }
+                    } else if (item.icon === "images" || item.icon === "videocam") {
+                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                      if (!res.canceled) {
+                        const label = item.icon === "videocam" ? "🎥 Video gönderildi" : "🖼 Fotoğraf gönderildi";
+                        const msg: Message = { id: `m_${Date.now()}`, text: label, fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
+                        setMessages(p => [...p, msg]);
+                        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                      }
+                    } else {
+                      Alert.alert(item.label, "Bu özellik yakında eklenecek.");
                     }
-                  } else {
-                    Alert.alert(item.label, "Bu özellik yakında eklenecek.");
-                  }
-                }}
-              >
-                <View style={[styles.attachIconWrap, { backgroundColor: item.color }]}>
-                  <Ionicons name={item.icon as any} size={26} color="#fff" />
-                </View>
-                <Text style={[styles.attachLabel, { color: c.text }]}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+                  }}
+                >
+                  <View style={[styles.attachIconWrap, { backgroundColor: item.color }]}>
+                    <Ionicons name={item.icon as any} size={26} color="#fff" />
+                  </View>
+                  <Text style={[styles.attachLabel, { color: c.text }]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
         </View>
       </Modal>
+
+      {/* Emoji Picker */}
+      <EmojiPicker
+        visible={emojiOpen}
+        onClose={() => setEmojiOpen(false)}
+        onPick={handlePickEmoji}
+        colors={c}
+      />
+
+      {/* Gift Sheet */}
+      <GiftSheet
+        visible={giftOpen}
+        onClose={() => setGiftOpen(false)}
+        onSend={handleSendGift}
+        recipientName={user.name}
+        recipientPhoto={user.photo}
+        colors={c}
+      />
+
+      {/* Gift Animation Overlay */}
+      {activeGiftAnim && (
+        <GiftAnimation
+          gift={activeGiftAnim}
+          onDone={() => setActiveGiftAnim(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -357,29 +432,53 @@ function Bubble({
         </View>
       )}
 
-      <View
-        style={[
-          styles.bubble,
-          fromMe
-            ? { backgroundColor: c.primary, alignSelf: "flex-end" }
-            : { backgroundColor: c.surface, alignSelf: "flex-start" },
-          bubbleRadius,
-        ]}
-      >
-        <Text style={[styles.bubbleText, { color: fromMe ? "#fff" : c.text }]}>{msg.text}</Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]}>
-            {msg.time}
+      {msg.gift ? (
+        <View style={[styles.giftBubble, { backgroundColor: msg.gift.color + "22", borderColor: msg.gift.color }]}>
+          <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
+          <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.name}</Text>
+          <View style={styles.giftBubblePrice}>
+            <Ionicons name="logo-bitcoin" size={11} color="#F59E0B" />
+            <Text style={[styles.giftBubblePriceText, { color: c.textMuted }]}>{msg.gift.price}</Text>
+          </View>
+          <Text style={[styles.giftBubbleTag, { color: msg.gift.color }]}>
+            {fromMe ? "Hediye gönderdin" : "Sana hediye gönderdi"}
           </Text>
-          {fromMe && msg.status && (
-            <Ionicons
-              name={msg.status === "read" ? "checkmark-done" : "checkmark"}
-              size={14}
-              color={msg.status === "read" ? "#7DD3FC" : "rgba(255,255,255,0.7)"}
-            />
-          )}
+          <View style={styles.metaRow}>
+            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{msg.time}</Text>
+            {fromMe && msg.status && (
+              <Ionicons
+                name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                size={14}
+                color={msg.status === "read" ? "#7DD3FC" : c.textMuted}
+              />
+            )}
+          </View>
         </View>
-      </View>
+      ) : (
+        <View
+          style={[
+            styles.bubble,
+            fromMe
+              ? { backgroundColor: c.primary, alignSelf: "flex-end" }
+              : { backgroundColor: c.surface, alignSelf: "flex-start" },
+            bubbleRadius,
+          ]}
+        >
+          <Text style={[styles.bubbleText, { color: fromMe ? "#fff" : c.text }]}>{msg.text}</Text>
+          <View style={styles.metaRow}>
+            <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]}>
+              {msg.time}
+            </Text>
+            {fromMe && msg.status && (
+              <Ionicons
+                name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                size={14}
+                color={msg.status === "read" ? "#7DD3FC" : "rgba(255,255,255,0.7)"}
+              />
+            )}
+          </View>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -539,6 +638,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
 
+  attachWrap: { flex: 1, justifyContent: "flex-end" },
   attachSheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -578,4 +678,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   attachLabel: { fontSize: 12, fontWeight: "500" },
+
+  // Gift bubble
+  giftBubble: {
+    maxWidth: "78%",
+    padding: 14,
+    paddingTop: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: "center",
+    marginHorizontal: 4,
+    gap: 4,
+  },
+  giftBubbleEmoji: { fontSize: 56 },
+  giftBubbleName: { fontSize: 15, fontWeight: "800", marginTop: 4 },
+  giftBubblePrice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(245,158,11,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 2,
+  },
+  giftBubblePriceText: { fontSize: 12, fontWeight: "600" },
+  giftBubbleTag: { fontSize: 11.5, fontWeight: "700", marginTop: 4 },
 });
