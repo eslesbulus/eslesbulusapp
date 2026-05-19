@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { InteractionsProvider } from "@/context/InteractionsContext";
+import { BlockedUsersProvider } from "@/context/BlockedUsersContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -44,7 +45,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <InteractionsProvider>
-            <RootNavigator />
+            <BlockedUsersProvider>
+              <RootNavigator />
+            </BlockedUsersProvider>
           </InteractionsProvider>
         </AuthProvider>
       </ThemeProvider>

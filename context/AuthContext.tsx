@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 
 export type UserProfile = {
@@ -11,6 +11,8 @@ export type UserProfile = {
   birthDate?: string;
   gender?: string;
   bio?: string;
+  city?: string;
+  photos?: string[];
   interests?: string[];
   profileComplete: boolean;
 };
@@ -22,6 +24,7 @@ type AuthContextType = {
   isDevAdmin: boolean;
   signInAsDevAdmin: () => void;
   signOut: () => Promise<void>;
+  updateProfile: (fields: Partial<Omit<UserProfile, "uid" | "email">>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   isDevAdmin: false,
   signInAsDevAdmin: () => {},
   signOut: async () => {},
+  updateProfile: async () => {},
 });
 
 const DEV_ADMIN_USER = {
@@ -97,9 +101,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fbSignOut(auth);
   }
 
+  async function updateProfile(fields: Partial<Omit<UserProfile, "uid" | "email">>) {
+    if (isDevAdmin) {
+      setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
+      return;
+    }
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.uid), fields as Record<string, unknown>);
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut }}
+      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,23 +1,28 @@
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  Image,
   ScrollView,
-  Alert,
+  Image,
   Pressable,
+  Alert,
+  Switch,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useBlockedUsers } from "@/context/BlockedUsersContext";
 
 export default function ProfileScreen() {
   const { user, profile, isDevAdmin, signOut } = useAuth();
   const { theme, mode, toggle } = useTheme();
+  const { blockedUsers } = useBlockedUsers();
+  const router = useRouter();
   const c = theme.colors;
 
   function calcAge(birthDate?: string): string {
@@ -25,13 +30,12 @@ export default function ProfileScreen() {
     const parts = birthDate.split(".");
     if (parts.length !== 3) return "";
     const dob = new Date(+parts[2], +parts[1] - 1, +parts[0]);
-    const diff = Date.now() - dob.getTime();
-    const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+    const age = Math.floor((Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
     return isNaN(age) ? "" : `${age}`;
   }
 
   function handleLogout() {
-    Alert.alert("Çıkış", "Çıkış yapmak istediğine emin misin?", [
+    Alert.alert("Çıkış Yap", "Hesabından çıkış yapmak istediğine emin misin?", [
       { text: "İptal", style: "cancel" },
       { text: "Çıkış Yap", style: "destructive", onPress: () => signOut() },
     ]);
@@ -40,151 +44,281 @@ export default function ProfileScreen() {
   const age = calcAge(profile?.birthDate);
   const displayName = profile?.name ?? user?.displayName ?? "Kullanıcı";
   const photo = profile?.photoURL;
+  const extraPhotos = profile?.photos ?? [];
+  const photoCount = (photo ? 1 : 0) + extraPhotos.length;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
       >
+        {/* ── Hero Header ── */}
         <LinearGradient
           colors={[c.primary, c.primaryDark]}
-          style={styles.headerGradient}
+          style={styles.hero}
         >
-          <View style={styles.headerActions}>
-            <Pressable onPress={toggle} style={styles.headerBtn} hitSlop={8}>
+          {/* Dark mode toggle sağ üst */}
+          <View style={styles.heroActions}>
+            <Pressable onPress={toggle} style={styles.heroBtn} hitSlop={8}>
               <Ionicons
                 name={mode === "dark" ? "sunny-outline" : "moon-outline"}
                 size={20}
                 color="#fff"
               />
             </Pressable>
-            <Pressable style={styles.headerBtn} hitSlop={8}>
-              <Ionicons name="settings-outline" size={20} color="#fff" />
-            </Pressable>
           </View>
 
-          <View style={styles.photoWrapper}>
+          {/* Avatar */}
+          <Pressable onPress={() => router.push("/profile/edit")} style={styles.avatarWrap}>
             {photo ? (
-              <Image source={{ uri: photo }} style={styles.photo} />
+              <Image source={{ uri: photo }} style={styles.avatar} />
             ) : (
-              <View style={styles.photoFallback}>
-                <Text style={styles.photoFallbackText}>
-                  {displayName[0]?.toUpperCase() ?? "?"}
-                </Text>
+              <View style={[styles.avatarFallback]}>
+                <Text style={styles.avatarInitial}>{displayName[0]?.toUpperCase() ?? "?"}</Text>
               </View>
             )}
-          </View>
-          <Text style={styles.name}>
+            <View style={styles.avatarEditBadge}>
+              <Ionicons name="camera" size={14} color="#fff" />
+            </View>
+          </Pressable>
+
+          <Text style={styles.heroName}>
             {displayName}
             {age ? `, ${age}` : ""}
           </Text>
+
+          {profile?.city ? (
+            <View style={styles.heroCityRow}>
+              <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.heroCity}>{profile.city}</Text>
+            </View>
+          ) : null}
+
           {isDevAdmin && (
             <View style={styles.devBadge}>
               <Ionicons name="code-slash" size={11} color="#fff" />
               <Text style={styles.devBadgeText}>DEV ADMIN</Text>
             </View>
           )}
-          {profile?.gender && !isDevAdmin && (
-            <Text style={styles.gender}>{profile.gender}</Text>
-          )}
+
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <StatItem label="Fotoğraf" value={String(photoCount)} />
+            <View style={styles.statDivider} />
+            <StatItem label="İlgi Alanı" value={String(profile?.interests?.length ?? 0)} />
+            <View style={styles.statDivider} />
+            <StatItem
+              label="Üyelik"
+              value={profile?.profileComplete ? "Standart" : "Eksik"}
+            />
+          </View>
         </LinearGradient>
 
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.body}>
-          {profile?.bio ? (
-            <Section title="Hakkında" c={c}>
-              <Text style={[styles.bioText, { color: c.text }]}>{profile.bio}</Text>
-            </Section>
-          ) : null}
+        {/* ── Profili Düzenle Butonu ── */}
+        <Animated.View entering={FadeInDown.delay(60).duration(350)} style={styles.editBtnWrap}>
+          <Pressable
+            onPress={() => router.push("/profile/edit")}
+            style={[styles.editBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <Ionicons name="create-outline" size={18} color={c.primary} />
+            <Text style={[styles.editBtnText, { color: c.primary }]}>Profili Düzenle</Text>
+          </Pressable>
+        </Animated.View>
 
-          {profile?.interests && profile.interests.length > 0 && (
-            <Section title="İlgi Alanları" c={c}>
-              <View style={styles.interestsGrid}>
-                {profile.interests.map((item) => (
-                  <View
-                    key={item}
-                    style={[styles.chip, { backgroundColor: c.surface, borderColor: c.border }]}
-                  >
-                    <Text style={[styles.chipText, { color: c.primary }]}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            </Section>
-          )}
+        {/* ── Bio ── */}
+        {profile?.bio ? (
+          <Animated.View entering={FadeInDown.delay(100).duration(350)} style={[styles.bioCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.bioText, { color: c.text }]}>{profile.bio}</Text>
+          </Animated.View>
+        ) : null}
 
-          <Section title="Hesap" c={c}>
-            <Row icon="mail-outline" label="E-posta" value={user?.email ?? "—"} c={c} />
-            <Row
-              icon="diamond-outline"
-              label="Üyelik"
-              value={profile?.profileComplete ? "Standart" : "Tamamlanmamış"}
+        {/* ── Hesap Ayarları ── */}
+        <Animated.View entering={FadeInDown.delay(140).duration(350)}>
+          <SectionHeader title="Hesap" c={c} />
+          <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            <RowItem
+              icon="mail-outline"
+              label="E-posta"
+              value={user?.email ?? "—"}
               c={c}
             />
-          </Section>
+            <Divider c={c} />
+            <RowItem
+              icon="diamond-outline"
+              label="Üyelik Planı"
+              value="Standart"
+              c={c}
+            />
+          </View>
+        </Animated.View>
 
-          <TouchableOpacity
-            style={[styles.logoutButton, { borderColor: c.primary }]}
+        {/* ── Görünüm ── */}
+        <Animated.View entering={FadeInDown.delay(180).duration(350)}>
+          <SectionHeader title="Görünüm" c={c} />
+          <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={styles.rowItem}>
+              <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
+                <Ionicons name="moon-outline" size={18} color={c.primary} />
+              </View>
+              <Text style={[styles.rowLabel, { color: c.text }]}>Karanlık Mod</Text>
+              <Switch
+                value={mode === "dark"}
+                onValueChange={toggle}
+                trackColor={{ false: c.border, true: c.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Gizlilik ve Güvenlik ── */}
+        <Animated.View entering={FadeInDown.delay(220).duration(350)}>
+          <SectionHeader title="Gizlilik ve Güvenlik" c={c} />
+          <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            <NavRow
+              icon="shield-checkmark-outline"
+              label="Gizlilik Politikası"
+              onPress={() => router.push("/profile/privacy-policy")}
+              c={c}
+            />
+            <Divider c={c} />
+            <NavRow
+              icon="ban-outline"
+              label="Engellenen Kullanıcılar"
+              badge={blockedUsers.length > 0 ? String(blockedUsers.length) : undefined}
+              onPress={() => router.push("/profile/blocked-users")}
+              c={c}
+            />
+          </View>
+        </Animated.View>
+
+        {/* ── Destek ── */}
+        <Animated.View entering={FadeInDown.delay(260).duration(350)}>
+          <SectionHeader title="Destek" c={c} />
+          <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            <NavRow
+              icon="help-circle-outline"
+              label="Yardım Merkezi"
+              onPress={() => Alert.alert("Yardım", "destek@eslesbulus.com")}
+              c={c}
+            />
+            <Divider c={c} />
+            <NavRow
+              icon="flag-outline"
+              label="Sorun Bildir"
+              onPress={() => Alert.alert("Sorun Bildir", "destek@eslesbulus.com adresine yazabilirsin.")}
+              c={c}
+            />
+            <Divider c={c} />
+            <NavRow
+              icon="information-circle-outline"
+              label="Uygulama Hakkında"
+              value="v1.0.0"
+              onPress={() => {}}
+              c={c}
+            />
+          </View>
+        </Animated.View>
+
+        {/* ── Çıkış ── */}
+        <Animated.View entering={FadeInDown.delay(300).duration(350)} style={styles.logoutWrap}>
+          <Pressable
             onPress={handleLogout}
+            style={[styles.logoutBtn, { borderColor: "#E53935" }]}
           >
-            <Ionicons name="log-out-outline" size={18} color={c.primary} />
-            <Text style={[styles.logoutText, { color: c.primary }]}>Çıkış Yap</Text>
-          </TouchableOpacity>
+            <Ionicons name="log-out-outline" size={18} color="#E53935" />
+            <Text style={[styles.logoutText, { color: "#E53935" }]}>Çıkış Yap</Text>
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Section({ title, c, children }: { title: string; c: any; children: React.ReactNode }) {
+function SectionHeader({ title, c }: { title: string; c: any }) {
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: c.textMuted }]}>{title}</Text>
-      <View style={[styles.sectionBody, { backgroundColor: c.card, borderColor: c.border }]}>
-        {children}
+    <Text style={[styles.sectionHeader, { color: c.textMuted }]}>{title}</Text>
+  );
+}
+
+function StatItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statItem}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Divider({ c }: { c: any }) {
+  return <View style={[styles.divider, { backgroundColor: c.border }]} />;
+}
+
+function RowItem({ icon, label, value, c }: { icon: any; label: string; value: string; c: any }) {
+  return (
+    <View style={styles.rowItem}>
+      <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
+        <Ionicons name={icon} size={18} color={c.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, { color: c.text }]}>{label}</Text>
+        <Text style={[styles.rowValue, { color: c.textMuted }]}>{value}</Text>
       </View>
     </View>
   );
 }
 
-function Row({
+function NavRow({
   icon,
   label,
   value,
+  badge,
+  onPress,
   c,
 }: {
   icon: any;
   label: string;
-  value: string;
+  value?: string;
+  badge?: string;
+  onPress: () => void;
   c: any;
 }) {
   return (
-    <View style={styles.row}>
-      <Ionicons name={icon} size={18} color={c.textMuted} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.rowLabel, { color: c.textMuted }]}>{label}</Text>
-        <Text style={[styles.rowValue, { color: c.text }]}>{value}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.rowItem, pressed && { opacity: 0.6 }]}>
+      <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
+        <Ionicons name={icon} size={18} color={c.primary} />
       </View>
-    </View>
+      <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>{label}</Text>
+      {value ? <Text style={[styles.rowValue, { color: c.textMuted }]}>{value}</Text> : null}
+      {badge ? (
+        <View style={[styles.badge, { backgroundColor: c.primary }]}>
+          <Text style={styles.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
+      <Ionicons name="chevron-forward" size={16} color={c.textMuted} style={{ marginLeft: 4 }} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  headerGradient: {
+
+  hero: {
     alignItems: "center",
     paddingTop: 16,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-  headerActions: {
+  heroActions: {
     position: "absolute",
     top: 12,
     right: 16,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
   },
-  headerBtn: {
+  heroBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -192,26 +326,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  photoWrapper: {
+
+  avatarWrap: { position: "relative", marginTop: 16, marginBottom: 12 },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: "rgba(255,255,255,0.8)" },
+  avatarFallback: {
     width: 100,
     height: 100,
     borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.25)",
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.8)",
-    overflow: "hidden",
-    marginBottom: 12,
-    marginTop: 16,
-  },
-  photo: { width: "100%", height: "100%" },
-  photoFallback: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
-  photoFallbackText: { fontSize: 40, color: "#fff", fontWeight: "bold" },
-  name: { fontSize: 22, fontWeight: "800", color: "#fff" },
-  gender: { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 4 },
+  avatarInitial: { fontSize: 40, color: "#fff", fontWeight: "bold" },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+
+  heroName: { fontSize: 22, fontWeight: "800", color: "#fff" },
+  heroCityRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3 },
+  heroCity: { fontSize: 13, color: "rgba(255,255,255,0.8)" },
   devBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -223,42 +368,95 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   devBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
-  body: { padding: 16, paddingTop: 20 },
-  section: { marginBottom: 18 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+
+  statsRow: {
+    flexDirection: "row",
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.2)",
+    width: "100%",
+    paddingHorizontal: 24,
   },
-  sectionBody: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-  },
-  bioText: { fontSize: 15, lineHeight: 22 },
-  interestsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 13, fontWeight: "600" },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
-  rowLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 },
-  rowValue: { fontSize: 14, fontWeight: "500", marginTop: 2 },
-  logoutButton: {
-    marginTop: 8,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 14,
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 20, fontWeight: "800", color: "#fff" },
+  statLabel: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.2)", marginVertical: 4 },
+
+  editBtnWrap: { paddingHorizontal: 16, marginTop: 16 },
+  editBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    paddingVertical: 13,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  logoutText: { fontWeight: "700", fontSize: 15 },
+  editBtnText: { fontWeight: "700", fontSize: 15 },
+
+  bioCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  bioText: { fontSize: 15, lineHeight: 22 },
+
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginTop: 24,
+    marginBottom: 8,
+    marginHorizontal: 20,
+  },
+
+  group: {
+    marginHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  divider: { height: 1, marginLeft: 56 },
+
+  rowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowLabel: { fontSize: 15, fontWeight: "500" },
+  rowValue: { fontSize: 13 },
+
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    minWidth: 20,
+    alignItems: "center",
+  },
+  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+
+  logoutWrap: { paddingHorizontal: 16, marginTop: 24 },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  logoutText: { fontSize: 15, fontWeight: "700" },
 });
