@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { getUserById, MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { ReportSheet } from "@/components/common/ReportSheet";
 
 const SCREEN_W = Dimensions.get("window").width;
 const HERO_H = SCREEN_W * 1.15;
@@ -41,6 +42,7 @@ export default function UserDetail() {
   const user = useMemo(() => (id ? getUserById(id) : undefined), [id]);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [toast, setToast] = useState<{ user: MockUser; text: string; emoji: string } | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler({
@@ -114,11 +116,20 @@ export default function UserDetail() {
         </View>
       </Pressable>
 
-      <Pressable hitSlop={10} style={[styles.moreBtn, { top: insets.top + 8 }]}>
+      <Pressable hitSlop={10} style={[styles.moreBtn, { top: insets.top + 8 }]} onPress={() => setReportOpen(true)}>
         <View style={styles.iconBg}>
           <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
         </View>
       </Pressable>
+
+      <ReportSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        type="user"
+        targetName={user?.name}
+        targetId={user?.id}
+        targetPhoto={user?.photo}
+      />
 
       <Animated.ScrollView
         onScroll={onScroll}

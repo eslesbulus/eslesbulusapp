@@ -164,6 +164,18 @@ export default function ProfileScreen() {
           </Animated.View>
         ) : null}
 
+        {/* ── Fotoğraflar ── */}
+        {(photo || extraPhotos.length > 0) && (
+          <Animated.View entering={FadeInDown.delay(120).duration(350)}>
+            <SectionHeader title={`Fotoğraflar (${photoCount})`} c={c} />
+            <View style={[styles.photosGrid, { paddingHorizontal: 16 }]}>
+              {[...(photo ? [photo] : []), ...extraPhotos].slice(0, 6).map((uri, i) => (
+                <Image key={i} source={{ uri }} style={[styles.photoGridItem]} />
+              ))}
+            </View>
+          </Animated.View>
+        )}
+
         {/* ── Hesap Ayarları ── */}
         <Animated.View entering={FadeInDown.delay(140).duration(350)}>
           <SectionHeader title="Hesap" c={c} />
@@ -192,7 +204,7 @@ export default function ProfileScreen() {
               <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
                 <Ionicons name="moon-outline" size={18} color={c.primary} />
               </View>
-              <Text style={[styles.rowLabel, { color: c.text }]}>Karanlık Mod</Text>
+              <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>Karanlık Mod</Text>
               <Switch
                 value={mode === "dark"}
                 onValueChange={toggle}
@@ -569,6 +581,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+
+  photosGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginBottom: 8,
+  },
+  photoGridItem: {
+    width: "31.5%",
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: "#222",
+  },
 
   reportModal: { flex: 1 },
   reportHeader: {

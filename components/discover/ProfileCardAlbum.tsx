@@ -14,7 +14,6 @@ import { useTheme } from "@/context/ThemeContext";
 import { MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
-import { ReportSheet } from "@/components/common/ReportSheet";
 
 type Props = {
   user: MockUser;
@@ -29,12 +28,13 @@ const CARD_H = CARD_W * 1.45;
 
 export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   const { theme } = useTheme();
-  const { hasSent } = useInteractions();
+  const { hasSent, isLiked, toggleLike } = useInteractions();
   const c = theme.colors;
   const sent = hasSent(user.id);
+  const liked = isLiked(user.id);
 
-  const [reportOpen, setReportOpen] = useState(false);
   const scale = useSharedValue(1);
+  const heartScale = useSharedValue(1);
   const justSent = useSharedValue(0);
 
   useEffect(() => {
@@ -47,6 +47,16 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   }, [sent]);
 
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const heartAnim = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
+
+  function handleLike() {
+    heartScale.value = withSequence(
+      withTiming(0.8, { duration: 80 }),
+      withSpring(1.3, { damping: 5, stiffness: 300 }),
+      withSpring(1, { damping: 10 })
+    );
+    toggleLike(user);
+  }
 
   return (
     <Pressable
@@ -69,24 +79,6 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
         </View>
       )}
 
-      {/* 3-nokta menüsü */}
-      <Pressable
-        onPress={() => setReportOpen(true)}
-        style={styles.moreBtn}
-        hitSlop={6}
-      >
-        <Ionicons name="ellipsis-vertical" size={16} color="#fff" />
-      </Pressable>
-
-      <ReportSheet
-        visible={reportOpen}
-        onClose={() => setReportOpen(false)}
-        type="user"
-        targetName={user.name}
-        targetId={user.id}
-        targetPhoto={user.photo}
-      />
-
       <View style={styles.statusRow}>
         <View
           style={[
@@ -105,6 +97,15 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
             {user.name}, {user.age}
           </Text>
           {user.verified && <VerifiedBadge size={13} />}
+          <Pressable onPress={handleLike} hitSlop={8} style={styles.heartBtn}>
+            <Animated.View style={heartAnim}>
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={17}
+                color={liked ? "#FF4D6D" : "rgba(255,255,255,0.9)"}
+              />
+            </Animated.View>
+          </Pressable>
         </View>
         <View style={styles.cityRow}>
           <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.85)" />
@@ -173,17 +174,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   vipText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  moreBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 999,
-    padding: 5,
-  },
   statusRow: {
     position: "absolute",
-    top: 40,
+    top: 10,
     right: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -196,7 +189,18 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   statusText: { color: "#fff", fontSize: 10, fontWeight: "600" },
   info: { position: "absolute", left: 10, right: 10, bottom: 10 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1 },
+  heartBtn: {
+    marginLeft: "auto",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   name: { color: "#fff", fontSize: 15, fontWeight: "700" },
   cityRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: 2 },
   city: { color: "rgba(255,255,255,0.85)", fontSize: 11 },
