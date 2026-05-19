@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "321088428409",
+    "project_id": "eslesbulusapp",
+    "storage_bucket": "eslesbulusapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:321088428409:android:6cf833ddb9866d8d0177a8",
+        "android_client_info": {
+          "package_name": "com.eslesbulus.eslesbulusapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "321088428409-v4j1o6c7uh2kdk9u1hcr8ruv4s796tbd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eslesbulus.eslesbulusapp",
+            "certificate_hash": "ada4bb331877e8879e5726a5737406243e0607c9"
+          }
+        },
+        {
+          "client_id": "321088428409-ibvlhagkga7otp56agoam0sjvijsbpo8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHkUl9wqaHwqLQORDL199oxQGTMHpk5oo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "321088428409-devthbfvik530hof385fqt3ua37p9spp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
