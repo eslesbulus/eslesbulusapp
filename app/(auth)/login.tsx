@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,20 +14,35 @@ import {
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link } from "expo-router";
-import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
-import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/config/firebase";
-import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
+import { Link, useFocusEffect } from "expo-router";
+// TODO: Google Sign-In — native module, Expo Go'da çalışmaz. APK build'de aktif et.
+// import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+// import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from "firebase/auth";
+// import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+// import { auth, db } from "@/config/firebase";
+// import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
+import { useAuth } from "@/context/AuthContext";
 
-GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+// DEV admin bypass — Firebase'i atlar, sadece test için
+const DEV_ADMIN_EMAIL = "admin";
+const DEV_ADMIN_PASSWORD = "admin";
+
+// GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
 
 export default function LoginScreen() {
+  const { signInAsDevAdmin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  // const [googleLoading, setGoogleLoading] = useState(false); // TODO: Google Sign-In
+
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
 
   const videoPlayer = useVideoPlayer(
     require("../../public/home/eslesbulus.mp4"),
@@ -38,38 +53,36 @@ export default function LoginScreen() {
     }
   );
 
-  async function handleGoogleSignIn() {
-    setGoogleLoading(true);
-    try {
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
-
-      if (!idToken) throw new Error("ID token alınamadı.");
-
-      const credential = GoogleAuthProvider.credential(idToken);
-      const { user } = await signInWithCredential(auth, credential);
-
-      const userRef = doc(db, "users", user.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          name: user.displayName ?? "",
-          email: user.email ?? "",
-          photoURL: user.photoURL ?? "",
-          createdAt: serverTimestamp(),
-          profileComplete: false,
-        });
-      }
-    } catch (e: any) {
-      if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
-      if (e.code === statusCodes.IN_PROGRESS) return;
-      Alert.alert("Google ile giriş başarısız", e.message);
-    } finally {
-      setGoogleLoading(false);
-    }
-  }
+  // TODO: Google Sign-In — APK build'de aktif et
+  // async function handleGoogleSignIn() {
+  //   setGoogleLoading(true);
+  //   try {
+  //     await GoogleSignin.hasPlayServices();
+  //     const userInfo = await GoogleSignin.signIn();
+  //     const idToken = userInfo.data?.idToken;
+  //     if (!idToken) throw new Error("ID token alınamadı.");
+  //     const credential = GoogleAuthProvider.credential(idToken);
+  //     const { user } = await signInWithCredential(auth, credential);
+  //     const userRef = doc(db, "users", user.uid);
+  //     const snap = await getDoc(userRef);
+  //     if (!snap.exists()) {
+  //       await setDoc(userRef, {
+  //         uid: user.uid,
+  //         name: user.displayName ?? "",
+  //         email: user.email ?? "",
+  //         photoURL: user.photoURL ?? "",
+  //         createdAt: serverTimestamp(),
+  //         profileComplete: false,
+  //       });
+  //     }
+  //   } catch (e: any) {
+  //     if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
+  //     if (e.code === statusCodes.IN_PROGRESS) return;
+  //     Alert.alert("Google ile giriş başarısız", e.message);
+  //   } finally {
+  //     setGoogleLoading(false);
+  //   }
+  // }
 
   async function handleEmailLogin() {
     if (!email || !password) {
@@ -77,23 +90,28 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-    } catch (e: any) {
-      Alert.alert("Giriş başarısız", e.message);
-    } finally {
+    if (email.trim() === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
+      signInAsDevAdmin();
       setLoading(false);
+      return;
     }
+    setLoading(false);
+    Alert.alert(
+      "Giriş başarısız",
+      "Email/şifre girişi kapalı. Google ile giriş yap veya test için admin/admin kullan."
+    );
   }
 
   return (
     <View style={styles.container}>
-      <VideoView
-        player={videoPlayer}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        nativeControls={false}
-      />
+      {isFocused && (
+        <VideoView
+          player={videoPlayer}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          nativeControls={false}
+        />
+      )}
 
       <LinearGradient
         colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
@@ -115,6 +133,7 @@ export default function LoginScreen() {
         <BlurView intensity={25} tint="dark" style={styles.glassCard}>
           <Text style={styles.cardTitle}>Hoş Geldin</Text>
 
+          {/* TODO: Google Sign-In — APK build'de aktif et
           <TouchableOpacity
             style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
             onPress={handleGoogleSignIn}
@@ -135,6 +154,7 @@ export default function LoginScreen() {
             <Text style={styles.dividerText}>veya</Text>
             <View style={styles.dividerLine} />
           </View>
+          */}
 
           <TextInput
             style={styles.input}
@@ -235,7 +255,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   loginButton: {
-    backgroundColor: "#E91E63",
+    backgroundColor: "#800020",
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
