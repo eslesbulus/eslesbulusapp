@@ -10,7 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Modal,
+  Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,6 +72,7 @@ export default function ChatDetailScreen() {
   );
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
 
   useEffect(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
@@ -147,10 +151,10 @@ export default function ChatDetailScreen() {
           </View>
         </Pressable>
 
-        <Pressable hitSlop={8} style={styles.headerBtn}>
+        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.id}?type=video`)}>
           <Ionicons name="videocam-outline" size={22} color={c.text} />
         </Pressable>
-        <Pressable hitSlop={8} style={styles.headerBtn}>
+        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.id}?type=voice`)}>
           <Ionicons name="call-outline" size={20} color={c.text} />
         </Pressable>
       </View>
@@ -208,7 +212,7 @@ export default function ChatDetailScreen() {
 
         {/* Input */}
         <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: Math.max(insets.bottom - 6, 8) }]}>
-          <Pressable hitSlop={6} style={styles.iconBtn}>
+          <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setAttachOpen(true); }}>
             <Ionicons name="add-circle" size={28} color={c.primary} />
           </Pressable>
           <View style={[styles.inputWrap, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -239,6 +243,68 @@ export default function ChatDetailScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Attachment Sheet */}
+      <Modal
+        visible={attachOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAttachOpen(false)}
+      >
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]}
+          onPress={() => setAttachOpen(false)}
+        />
+        <View style={[styles.attachSheet, { backgroundColor: c.card, paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
+          <View style={[styles.attachHandle, { backgroundColor: c.border }]} />
+          <Text style={[styles.attachTitle, { color: c.text }]}>Dosya Ekle</Text>
+          <View style={styles.attachGrid}>
+            {[
+              { icon: "camera", label: "Kamera", color: "#7C3AED" },
+              { icon: "images", label: "Galeri", color: "#2563EB" },
+              { icon: "videocam", label: "Video", color: "#DC2626" },
+              { icon: "document-text", label: "Dosya", color: "#D97706" },
+              { icon: "location", label: "Konum", color: "#16A34A" },
+              { icon: "musical-notes", label: "Müzik", color: "#DB2777" },
+            ].map((item) => (
+              <Pressable
+                key={item.label}
+                style={styles.attachItem}
+                onPress={async () => {
+                  setAttachOpen(false);
+                  if (item.icon === "camera") {
+                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                    if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
+                    const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                    if (!res.canceled) {
+                      const msg: Message = { id: `m_${Date.now()}`, text: "📷 Fotoğraf gönderildi", fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
+                      setMessages(p => [...p, msg]);
+                      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                    }
+                  } else if (item.icon === "images" || item.icon === "videocam") {
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                    if (!res.canceled) {
+                      const label = item.icon === "videocam" ? "🎥 Video gönderildi" : "🖼 Fotoğraf gönderildi";
+                      const msg: Message = { id: `m_${Date.now()}`, text: label, fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
+                      setMessages(p => [...p, msg]);
+                      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                    }
+                  } else {
+                    Alert.alert(item.label, "Bu özellik yakında eklenecek.");
+                  }
+                }}
+              >
+                <View style={[styles.attachIconWrap, { backgroundColor: item.color }]}>
+                  <Ionicons name={item.icon as any} size={26} color="#fff" />
+                </View>
+                <Text style={[styles.attachLabel, { color: c.text }]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -472,4 +538,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 2,
   },
+
+  attachSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  attachHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  attachTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 20,
+  },
+  attachGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    justifyContent: "space-between",
+    paddingBottom: 4,
+  },
+  attachItem: {
+    width: "30%",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  attachIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachLabel: { fontSize: 12, fontWeight: "500" },
 });

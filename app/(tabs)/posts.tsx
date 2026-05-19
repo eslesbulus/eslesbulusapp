@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -106,11 +107,18 @@ export default function PostsScreen() {
         transparent
         onRequestClose={() => setNewPostModal(false)}
       >
+        {/* Backdrop — tap outside closes */}
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)" }]}
+          onPress={() => setNewPostModal(false)}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalOverlay}
+          pointerEvents="box-none"
         >
-          <View
+          <Pressable
+            onPress={() => {}}
             style={[
               styles.newPostSheet,
               { backgroundColor: c.card, paddingBottom: insets.bottom + 12 },
@@ -184,7 +192,7 @@ export default function PostsScreen() {
                 <Text style={[styles.mediaBtnText, { color: c.primary }]}>Video</Text>
               </Pressable>
             </View>
-          </View>
+          </Pressable>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -216,7 +224,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
   },
   newPostSheet: {
     borderTopLeftRadius: 24,

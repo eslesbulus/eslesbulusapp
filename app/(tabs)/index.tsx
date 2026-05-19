@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Platform,
   Pressable,
 } from "react-native";
@@ -113,7 +112,7 @@ export default function DiscoverScreen() {
       >
         <StoriesBar
           onPressUser={(u) => router.push(`/story/${u.id}`)}
-          onPressAdd={() => Alert.alert("Hikaye ekle", "Yakında.")}
+          onPressAdd={() => router.push("/story/create")}
         />
 
         <VipSection onPressUser={openProfile} />

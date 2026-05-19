@@ -14,6 +14,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  runOnJS,
   Easing,
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
@@ -45,6 +46,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
   const { blockUser } = useBlockedUsers();
 
   const [step, setStep] = useState<"menu" | "reasons" | "done">("menu");
+  const [mounted, setMounted] = useState(visible);
 
   const translateY = useSharedValue(H);
   const backdrop = useSharedValue(0);
@@ -57,11 +59,14 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
   useEffect(() => {
     if (visible) {
       setStep("menu");
+      setMounted(true);
       backdrop.value = withTiming(1, { duration: 240, easing: Easing.out(Easing.quad) });
       translateY.value = withTiming(0, { duration: 340, easing: Easing.out(Easing.exp) });
     } else {
       backdrop.value = withTiming(0, { duration: 200 });
-      translateY.value = withTiming(H, { duration: 240, easing: Easing.in(Easing.cubic) });
+      translateY.value = withTiming(H, { duration: 240, easing: Easing.in(Easing.cubic) }, (done) => {
+        if (done) runOnJS(setMounted)(false);
+      });
     }
   }, [visible]);
 
@@ -87,7 +92,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
     }, 1000);
   }
 
-  if (!visible && translateY.value >= H) return null;
+  if (!mounted) return null;
 
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
