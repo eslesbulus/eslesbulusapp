@@ -220,10 +220,10 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "flex-end",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingBottom: 40,
-    paddingTop: 80,
+    paddingTop: 40,
   },
   logoContainer: { alignItems: "center", marginBottom: 32 },
   logo: { width: 200, height: 80 },
