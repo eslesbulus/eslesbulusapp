@@ -78,9 +78,28 @@ export default function ChatDetailScreen() {
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
-  const [giftOpen, setGiftOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState<"emoji" | "gift" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
+  const inputRef = useRef<TextInput>(null);
+  const panelOpen = panelTab !== null;
+
+  function togglePanel() {
+    if (panelOpen) {
+      setPanelTab(null);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      Keyboard.dismiss();
+      setPanelTab("emoji");
+    }
+  }
+
+  function switchTab(t: "emoji" | "gift") {
+    setPanelTab(t);
+  }
+
+  function handleInputFocus() {
+    if (panelOpen) setPanelTab(null);
+  }
 
   useEffect(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
@@ -251,23 +270,25 @@ export default function ChatDetailScreen() {
         />
 
         {/* Input */}
-        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: Math.max(insets.bottom - 6, 8) }]}>
-          <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setAttachOpen(true); }}>
+        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom - 6, 8) }]}>
+          <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setPanelTab(null); setAttachOpen(true); }}>
             <Ionicons name="add-circle" size={28} color={c.primary} />
           </Pressable>
           <View style={[styles.inputWrap, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <Pressable hitSlop={6} style={styles.emojiInsideBtn} onPress={togglePanel}>
+              <PanelToggleIcon panelOpen={panelOpen} tab={panelTab} mutedColor={c.textMuted} primaryColor={c.primary} />
+            </Pressable>
             <TextInput
+              ref={inputRef}
               style={[styles.input, { color: c.text }]}
               placeholder="Mesaj"
               placeholderTextColor={c.textMuted}
               value={text}
               onChangeText={setText}
+              onFocus={handleInputFocus}
               multiline
               maxLength={500}
             />
-            <Pressable hitSlop={6} style={styles.emojiBtn} onPress={() => { Keyboard.dismiss(); setEmojiOpen(true); }}>
-              <Ionicons name="happy-outline" size={22} color={c.textMuted} />
-            </Pressable>
           </View>
           {text.trim().length > 0 ? (
             <Pressable
@@ -282,6 +303,42 @@ export default function ChatDetailScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Inline Emoji/Gift Panel — replaces keyboard space */}
+        {panelOpen && (
+          <Animated.View
+            entering={FadeIn.duration(160)}
+            style={[styles.panel, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 8) }]}
+          >
+            {/* Tabs */}
+            <View style={[styles.panelTabs, { borderBottomColor: c.border }]}>
+              <Pressable onPress={() => switchTab("emoji")} style={styles.panelTabBtn}>
+                <Ionicons name="happy-outline" size={20} color={panelTab === "emoji" ? c.primary : c.textMuted} />
+                <Text style={[styles.panelTabLabel, { color: panelTab === "emoji" ? c.primary : c.textMuted }]}>Emoji</Text>
+                {panelTab === "emoji" && <View style={[styles.panelTabUnderline, { backgroundColor: c.primary }]} />}
+              </Pressable>
+              <Pressable onPress={() => switchTab("gift")} style={styles.panelTabBtn}>
+                <Ionicons name="gift-outline" size={20} color={panelTab === "gift" ? c.primary : c.textMuted} />
+                <Text style={[styles.panelTabLabel, { color: panelTab === "gift" ? c.primary : c.textMuted }]}>Hediye</Text>
+                {panelTab === "gift" && <View style={[styles.panelTabUnderline, { backgroundColor: c.primary }]} />}
+              </Pressable>
+            </View>
+
+            {/* Content */}
+            <View style={styles.panelContent}>
+              {panelTab === "emoji" ? (
+                <EmojiPicker onPick={handlePickEmoji} colors={c} />
+              ) : (
+                <GiftSheet
+                  onSend={(g) => { handleSendGift(g); setPanelTab(null); }}
+                  recipientName={user.name}
+                  recipientPhoto={user.photo}
+                  colors={c}
+                />
+              )}
+            </View>
+          </Animated.View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Attachment Sheet */}
@@ -304,22 +361,18 @@ export default function ChatDetailScreen() {
             <Text style={[styles.attachTitle, { color: c.text }]}>Paylaş</Text>
             <View style={styles.attachGrid}>
               {[
-                { icon: "gift", label: "Hediye", color: "#EC4899" },
                 { icon: "camera", label: "Kamera", color: "#7C3AED" },
                 { icon: "images", label: "Galeri", color: "#2563EB" },
                 { icon: "videocam", label: "Video", color: "#DC2626" },
                 { icon: "document-text", label: "Dosya", color: "#D97706" },
                 { icon: "location", label: "Konum", color: "#16A34A" },
+                { icon: "musical-notes", label: "Müzik", color: "#DB2777" },
               ].map((item) => (
                 <Pressable
                   key={item.label}
                   style={styles.attachItem}
                   onPress={async () => {
                     setAttachOpen(false);
-                    if (item.icon === "gift") {
-                      setTimeout(() => setGiftOpen(true), 220);
-                      return;
-                    }
                     if (item.icon === "camera") {
                       const { status } = await ImagePicker.requestCameraPermissionsAsync();
                       if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
@@ -354,24 +407,6 @@ export default function ChatDetailScreen() {
           </Animated.View>
         </View>
       </Modal>
-
-      {/* Emoji Picker */}
-      <EmojiPicker
-        visible={emojiOpen}
-        onClose={() => setEmojiOpen(false)}
-        onPick={handlePickEmoji}
-        colors={c}
-      />
-
-      {/* Gift Sheet */}
-      <GiftSheet
-        visible={giftOpen}
-        onClose={() => setGiftOpen(false)}
-        onSend={handleSendGift}
-        recipientName={user.name}
-        recipientPhoto={user.photo}
-        colors={c}
-      />
 
       {/* Gift Animation Overlay */}
       {activeGiftAnim && (
@@ -479,6 +514,37 @@ function Bubble({
           </View>
         </View>
       )}
+    </Animated.View>
+  );
+}
+
+function PanelToggleIcon({
+  panelOpen,
+  tab,
+  mutedColor,
+  primaryColor,
+}: {
+  panelOpen: boolean;
+  tab: "emoji" | "gift" | null;
+  mutedColor: string;
+  primaryColor: string;
+}) {
+  // Animated swap: when panel open shows current tab's icon in primary color;
+  // when closed shows smiley in muted.
+  if (panelOpen) {
+    return (
+      <Animated.View key={tab} entering={FadeIn.duration(180)}>
+        <Ionicons
+          name={tab === "gift" ? "gift" : "happy"}
+          size={22}
+          color={primaryColor}
+        />
+      </Animated.View>
+    );
+  }
+  return (
+    <Animated.View key="closed" entering={FadeIn.duration(180)}>
+      <Ionicons name="happy-outline" size={22} color={mutedColor} />
     </Animated.View>
   );
 }
@@ -622,13 +688,43 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 22,
-    paddingLeft: 14,
-    paddingRight: 6,
+    paddingLeft: 6,
+    paddingRight: 14,
     paddingVertical: 4,
     minHeight: 40,
   },
   input: { flex: 1, fontSize: 15, maxHeight: 100, paddingVertical: 7 },
   emojiBtn: { padding: 6 },
+  emojiInsideBtn: { padding: 6, paddingLeft: 8 },
+
+  panel: {
+    minHeight: 320,
+    maxHeight: 380,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  panelTabs: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  panelTabBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingVertical: 12,
+    position: "relative",
+  },
+  panelTabLabel: { fontSize: 13.5, fontWeight: "600" },
+  panelTabUnderline: {
+    position: "absolute",
+    bottom: 0,
+    left: 24,
+    right: 24,
+    height: 2,
+    borderRadius: 1,
+  },
+  panelContent: { flex: 1 },
   sendBtn: {
     width: 38,
     height: 38,

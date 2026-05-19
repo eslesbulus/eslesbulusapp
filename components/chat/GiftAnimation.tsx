@@ -4,16 +4,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSequence,
   withTiming,
-  withDelay,
   withSpring,
+  withDelay,
   runOnJS,
   Easing,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { Gift } from "@/constants/gifts";
 
-const { width: W, height: H } = Dimensions.get("window");
+const { height: H } = Dimensions.get("window");
 
 type Props = {
   gift: Gift;
@@ -22,43 +22,52 @@ type Props = {
 
 export function GiftAnimation({ gift, onDone }: Props) {
   const scale = useSharedValue(0);
-  const translateY = useSharedValue(120);
+  const ty = useSharedValue(60);
   const rotate = useSharedValue(0);
   const glow = useSharedValue(0);
   const fade = useSharedValue(1);
 
   useEffect(() => {
-    // Big entrance, hover, then float up & fade
-    scale.value = withSequence(
-      withSpring(1.6, { damping: 8, stiffness: 110 }),
-      withDelay(400, withTiming(1.2, { duration: 200 })),
-      withDelay(900, withTiming(0.4, { duration: 600, easing: Easing.in(Easing.cubic) }))
-    );
-    translateY.value = withSequence(
-      withSpring(0, { damping: 12, stiffness: 120 }),
-      withDelay(1300, withTiming(-H * 0.5, { duration: 600, easing: Easing.in(Easing.cubic) }))
-    );
-    rotate.value = withSequence(
-      withTiming(-15, { duration: 250 }),
-      withTiming(15, { duration: 250 }),
-      withTiming(-8, { duration: 250 }),
-      withTiming(0, { duration: 250 })
-    );
-    glow.value = withSequence(
-      withTiming(1, { duration: 300 }),
-      withDelay(900, withTiming(0, { duration: 600 }))
-    );
-    fade.value = withDelay(
-      1700,
-      withTiming(0, { duration: 250 }, (done) => {
+    // Entrance
+    scale.value = withSpring(1.35, { damping: 9, stiffness: 110 });
+    ty.value = withSpring(0, { damping: 12, stiffness: 120 });
+    rotate.value = withTiming(-8, { duration: 320, easing: Easing.inOut(Easing.ease) });
+    glow.value = withTiming(1, { duration: 280 });
+
+    // Settle wobble
+    const settle = setTimeout(() => {
+      rotate.value = withTiming(8, { duration: 280 });
+    }, 320);
+
+    const settle2 = setTimeout(() => {
+      rotate.value = withTiming(0, { duration: 240 });
+    }, 600);
+
+    // Exit
+    const exit = setTimeout(() => {
+      scale.value = withTiming(0.5, { duration: 500, easing: Easing.in(Easing.cubic) });
+      ty.value = withTiming(-H * 0.45, { duration: 500, easing: Easing.in(Easing.cubic) });
+      glow.value = withTiming(0, { duration: 400 });
+      fade.value = withTiming(0, { duration: 500 }, (done) => {
         if (done) runOnJS(onDone)();
-      })
-    );
+      });
+    }, 1400);
+
+    return () => {
+      clearTimeout(settle);
+      clearTimeout(settle2);
+      clearTimeout(exit);
+      cancelAnimation(scale);
+      cancelAnimation(ty);
+      cancelAnimation(rotate);
+      cancelAnimation(glow);
+      cancelAnimation(fade);
+    };
   }, []);
 
   const giftStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: translateY.value },
+      { translateY: ty.value },
       { scale: scale.value },
       { rotate: `${rotate.value}deg` },
     ],
@@ -66,25 +75,22 @@ export function GiftAnimation({ gift, onDone }: Props) {
   }));
 
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value * 0.7,
-    transform: [{ scale: 1 + glow.value * 0.3 }],
+    opacity: glow.value * 0.6,
+    transform: [{ scale: 1 + glow.value * 0.2 }],
   }));
 
   const overlayStyle = useAnimatedStyle(() => ({
-    opacity: fade.value * 0.65,
+    opacity: fade.value * 0.55,
   }));
 
-  // Particles
-  const particles = gift.particles ?? ["✨", "✨", "✨", "✨"];
+  // Limit particles to 4 max; use static stagger to avoid Math.random on shared values
+  const particles = (gift.particles ?? ["✨", "✨", "✨", "✨"]).slice(0, 4);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Dark overlay */}
       <Animated.View style={[StyleSheet.absoluteFill, overlayStyle, { backgroundColor: "#000" }]} />
 
-      {/* Center stage */}
       <View style={styles.center}>
-        {/* Glow */}
         <Animated.View style={[styles.glowWrap, glowStyle]}>
           <LinearGradient
             colors={[gift.color, "transparent"]}
@@ -94,12 +100,10 @@ export function GiftAnimation({ gift, onDone }: Props) {
           />
         </Animated.View>
 
-        {/* Particles */}
         {particles.map((p, i) => (
           <Particle key={i} emoji={p} index={i} total={particles.length} />
         ))}
 
-        {/* Main gift */}
         <Animated.View style={[styles.giftWrap, giftStyle]}>
           <Text style={styles.giftEmoji}>{gift.emoji}</Text>
           <Text style={styles.giftName}>{gift.name}</Text>
@@ -109,28 +113,44 @@ export function GiftAnimation({ gift, onDone }: Props) {
   );
 }
 
-function Particle({ emoji, index, total }: { emoji: string; index: number; total: number }) {
+function Particle({
+  emoji,
+  index,
+  total,
+}: {
+  emoji: string;
+  index: number;
+  total: number;
+}) {
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   const op = useSharedValue(0);
   const sc = useSharedValue(0);
 
   useEffect(() => {
-    const angle = (index / total) * Math.PI * 2;
-    const distance = 130 + Math.random() * 50;
+    const angle = (index / Math.max(total, 1)) * Math.PI * 2;
+    const distance = 140;
     const targetX = Math.cos(angle) * distance;
     const targetY = Math.sin(angle) * distance;
+    const delay = 220 + index * 40;
 
-    op.value = withSequence(
-      withDelay(200, withTiming(1, { duration: 180 })),
-      withDelay(800, withTiming(0, { duration: 400 }))
-    );
-    sc.value = withSequence(
-      withDelay(200, withSpring(1, { damping: 10, stiffness: 130 })),
-      withDelay(800, withTiming(0.5, { duration: 400 }))
-    );
-    tx.value = withDelay(200, withTiming(targetX, { duration: 900, easing: Easing.out(Easing.cubic) }));
-    ty.value = withDelay(200, withTiming(targetY, { duration: 900, easing: Easing.out(Easing.cubic) }));
+    op.value = withDelay(delay, withTiming(1, { duration: 180 }));
+    sc.value = withDelay(delay, withSpring(1, { damping: 11, stiffness: 130 }));
+    tx.value = withDelay(delay, withTiming(targetX, { duration: 800, easing: Easing.out(Easing.cubic) }));
+    ty.value = withDelay(delay, withTiming(targetY, { duration: 800, easing: Easing.out(Easing.cubic) }));
+
+    const fadeOut = setTimeout(() => {
+      op.value = withTiming(0, { duration: 350 });
+      sc.value = withTiming(0.5, { duration: 350 });
+    }, delay + 700);
+
+    return () => {
+      clearTimeout(fadeOut);
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(op);
+      cancelAnimation(sc);
+    };
   }, []);
 
   const pStyle = useAnimatedStyle(() => ({
@@ -156,21 +176,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   giftWrap: { alignItems: "center" },
-  giftEmoji: { fontSize: 130, textShadowColor: "rgba(255,255,255,0.4)", textShadowRadius: 30 },
+  giftEmoji: {
+    fontSize: 120,
+    textShadowColor: "rgba(255,255,255,0.4)",
+    textShadowRadius: 24,
+  },
   giftName: {
     fontSize: 22,
     fontWeight: "800",
     color: "#fff",
-    marginTop: 8,
+    marginTop: 6,
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 8,
   },
   glowWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  glow: {
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-  },
+  glow: { width: 300, height: 300, borderRadius: 150 },
   particle: { position: "absolute" },
-  particleText: { fontSize: 32 },
+  particleText: { fontSize: 28 },
 });
