@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +9,13 @@ import {
   Alert,
   Switch,
   Platform,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +32,11 @@ export default function ProfileScreen() {
   const router = useRouter();
   const c = theme.colors;
 
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportPhoto, setReportPhoto] = useState<string | null>(null);
+  const [reportSending, setReportSending] = useState(false);
+
   function calcAge(birthDate?: string): string {
     if (!birthDate) return "";
     const parts = birthDate.split(".");
@@ -32,6 +44,36 @@ export default function ProfileScreen() {
     const dob = new Date(+parts[2], +parts[1] - 1, +parts[0]);
     const age = Math.floor((Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
     return isNaN(age) ? "" : `${age}`;
+  }
+
+  async function handleReportPickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setReportPhoto(result.assets[0].uri);
+    }
+  }
+
+  async function handleReportSend() {
+    if (!reportText.trim()) {
+      Alert.alert("Hata", "Lütfen sorunu açıkla.");
+      return;
+    }
+    setReportSending(true);
+    await new Promise((r) => setTimeout(r, 1200));
+    setReportSending(false);
+    setReportModalOpen(false);
+    setReportText("");
+    setReportPhoto(null);
+    Alert.alert("Teşekkürler", "Sorun bildiriminiz alındı, en kısa sürede inceleyeceğiz.");
   }
 
   function handleLogout() {
@@ -58,17 +100,6 @@ export default function ProfileScreen() {
           colors={[c.primary, c.primaryDark]}
           style={styles.hero}
         >
-          {/* Dark mode toggle sağ üst */}
-          <View style={styles.heroActions}>
-            <Pressable onPress={toggle} style={styles.heroBtn} hitSlop={8}>
-              <Ionicons
-                name={mode === "dark" ? "sunny-outline" : "moon-outline"}
-                size={20}
-                color="#fff"
-              />
-            </Pressable>
-          </View>
-
           {/* Avatar */}
           <Pressable onPress={() => router.push("/profile/edit")} style={styles.avatarWrap}>
             {photo ? (
@@ -207,7 +238,7 @@ export default function ProfileScreen() {
             <NavRow
               icon="flag-outline"
               label="Sorun Bildir"
-              onPress={() => Alert.alert("Sorun Bildir", "destek@eslesbulus.com adresine yazabilirsin.")}
+              onPress={() => setReportModalOpen(true)}
               c={c}
             />
             <Divider c={c} />
@@ -220,6 +251,97 @@ export default function ProfileScreen() {
             />
           </View>
         </Animated.View>
+
+        {/* ── Sorun Bildir Modal ── */}
+        <Modal
+          visible={reportModalOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setReportModalOpen(false)}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={[styles.reportModal, { backgroundColor: c.background }]}>
+              {/* Modal Header */}
+              <View style={[styles.reportHeader, { borderBottomColor: c.border }]}>
+                <Pressable
+                  onPress={() => setReportModalOpen(false)}
+                  hitSlop={12}
+                  style={styles.reportClose}
+                >
+                  <Ionicons name="close" size={24} color={c.text} />
+                </Pressable>
+                <Text style={[styles.reportTitle, { color: c.text }]}>Sorun Bildir</Text>
+                <Pressable
+                  onPress={handleReportSend}
+                  disabled={reportSending || !reportText.trim()}
+                  style={[
+                    styles.reportSendBtn,
+                    { backgroundColor: reportText.trim() ? c.primary : c.border },
+                  ]}
+                >
+                  {reportSending ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.reportSendText}>Gönder</Text>
+                  )}
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 20 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Text style={[styles.reportLabel, { color: c.textMuted }]}>
+                  Sorununu açıkla (max 500 karakter)
+                </Text>
+                <TextInput
+                  value={reportText}
+                  onChangeText={(t) => setReportText(t.slice(0, 500))}
+                  placeholder="Uygulamada karşılaştığın sorunu anlat..."
+                  placeholderTextColor={c.textMuted}
+                  multiline
+                  numberOfLines={6}
+                  style={[
+                    styles.reportInput,
+                    { backgroundColor: c.surface, color: c.text, borderColor: c.border },
+                  ]}
+                />
+                <Text style={[styles.reportCharCount, { color: c.textMuted }]}>
+                  {reportText.length}/500
+                </Text>
+
+                <Text style={[styles.reportLabel, { color: c.textMuted, marginTop: 20 }]}>
+                  Ekran görüntüsü (isteğe bağlı)
+                </Text>
+                {reportPhoto ? (
+                  <View style={styles.reportPhotoWrap}>
+                    <Image source={{ uri: reportPhoto }} style={styles.reportPhotoPreview} />
+                    <Pressable
+                      onPress={() => setReportPhoto(null)}
+                      style={[styles.reportPhotoRemove, { backgroundColor: c.primary }]}
+                    >
+                      <Ionicons name="close" size={14} color="#fff" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={handleReportPickPhoto}
+                    style={[
+                      styles.reportPhotoBtn,
+                      { backgroundColor: c.surface, borderColor: c.border },
+                    ]}
+                  >
+                    <Ionicons name="image-outline" size={28} color={c.primary} />
+                    <Text style={[styles.reportPhotoBtnText, { color: c.primary }]}>
+                      Fotoğraf Ekle
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
         {/* ── Çıkış ── */}
         <Animated.View entering={FadeInDown.delay(300).duration(350)} style={styles.logoutWrap}>
@@ -447,6 +569,65 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+
+  reportModal: { flex: 1 },
+  reportHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  reportClose: { padding: 4 },
+  reportTitle: { fontSize: 17, fontWeight: "700" },
+  reportSendBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  reportSendText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  reportLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  reportInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    textAlignVertical: "top",
+    minHeight: 130,
+  },
+  reportCharCount: { fontSize: 11, textAlign: "right", marginTop: 4 },
+  reportPhotoWrap: { position: "relative", alignSelf: "flex-start" },
+  reportPhotoPreview: { width: 120, height: 120, borderRadius: 14 },
+  reportPhotoRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportPhotoBtn: {
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderRadius: 14,
+    height: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  reportPhotoBtnText: { fontWeight: "700", fontSize: 14 },
 
   logoutWrap: { paddingHorizontal: 16, marginTop: 24 },
   logoutBtn: {

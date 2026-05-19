@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { MockPost } from "@/constants/mockPosts";
+import { ReportSheet } from "@/components/common/ReportSheet";
 
 const { width: W } = Dimensions.get("window");
 
@@ -28,6 +29,7 @@ type Props = {
 export function PostCard({ post, colors: c, onPressComment }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes);
+  const [reportOpen, setReportOpen] = useState(false);
   const scale = useSharedValue(1);
   const router = useRouter();
 
@@ -62,10 +64,19 @@ export function PostCard({ post, colors: c, onPressComment }: Props) {
             {post.userAge} · {post.userCity} · {post.createdAt}
           </Text>
         </View>
-        <Pressable style={styles.moreBtn} hitSlop={8}>
+        <Pressable style={styles.moreBtn} hitSlop={8} onPress={() => setReportOpen(true)}>
           <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
         </Pressable>
       </Pressable>
+
+      <ReportSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        type="post"
+        targetName={post.userName}
+        targetId={post.userId}
+        targetPhoto={post.userPhoto}
+      />
 
       {/* Text */}
       {post.text ? (

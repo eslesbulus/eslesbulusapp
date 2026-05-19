@@ -84,10 +84,17 @@ export default function EditProfileScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
+  const MAX_INTERESTS = 5;
+
   const toggleInterest = useCallback((item: string) => {
-    setInterests((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
+    setInterests((prev) => {
+      if (prev.includes(item)) return prev.filter((i) => i !== item);
+      if (prev.length >= MAX_INTERESTS) {
+        Alert.alert("Limit", `En fazla ${MAX_INTERESTS} ilgi alanı seçebilirsin.`);
+        return prev;
+      }
+      return [...prev, item];
+    });
   }, []);
 
   async function handleSave() {
@@ -267,7 +274,9 @@ export default function EditProfileScreen() {
 
         {/* İlgi Alanları */}
         <Animated.View entering={FadeInDown.delay(220).duration(350)} style={styles.section}>
-          <Text style={[styles.label, { color: c.textMuted }]}>İlgi Alanları</Text>
+          <Text style={[styles.label, { color: c.textMuted }]}>
+            İlgi Alanları ({interests.length}/{MAX_INTERESTS})
+          </Text>
           <View style={styles.interestsGrid}>
             {INTERESTS_LIST.map((item) => {
               const active = interests.includes(item);

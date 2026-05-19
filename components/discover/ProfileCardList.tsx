@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
 import { MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { ReportSheet } from "@/components/common/ReportSheet";
 
 type Props = {
   user: MockUser;
@@ -16,6 +18,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
   const { hasSent } = useInteractions();
   const c = theme.colors;
   const sent = hasSent(user.id);
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <Pressable
@@ -70,29 +73,43 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
         ) : null}
       </View>
 
-      <Pressable
-        onPress={() => {
-          if (sent) return;
-          onPressHi(user);
-        }}
-        disabled={sent}
-        style={({ pressed }) => [
-          styles.hiBtn,
-          sent
-            ? { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }
-            : { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
-        ]}
-        hitSlop={8}
-      >
-        {sent ? (
-          <>
-            <Ionicons name="checkmark-circle" size={14} color={c.online} />
-            <Text style={[styles.hiText, { color: c.text }]}>Gönderildi</Text>
-          </>
-        ) : (
-          <Text style={styles.hiText}>Hi 👋</Text>
-        )}
-      </Pressable>
+      <View style={styles.rightActions}>
+        <Pressable
+          onPress={() => {
+            if (sent) return;
+            onPressHi(user);
+          }}
+          disabled={sent}
+          style={({ pressed }) => [
+            styles.hiBtn,
+            sent
+              ? { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }
+              : { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
+          ]}
+          hitSlop={8}
+        >
+          {sent ? (
+            <>
+              <Ionicons name="checkmark-circle" size={14} color={c.online} />
+              <Text style={[styles.hiText, { color: c.text }]}>Gönderildi</Text>
+            </>
+          ) : (
+            <Text style={styles.hiText}>Hi 👋</Text>
+          )}
+        </Pressable>
+        <Pressable onPress={() => setReportOpen(true)} hitSlop={8} style={styles.moreBtn}>
+          <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
+        </Pressable>
+      </View>
+
+      <ReportSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        type="user"
+        targetName={user.name}
+        targetId={user.id}
+        targetPhoto={user.photo}
+      />
     </Pressable>
   );
 }
@@ -136,6 +153,10 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, fontWeight: "500" },
   sep: { width: 3, height: 3, borderRadius: 2, opacity: 0.5 },
   bio: { fontSize: 12, marginTop: 4 },
+  rightActions: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
   hiBtn: {
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -145,4 +166,5 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   hiText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  moreBtn: { padding: 4 },
 });

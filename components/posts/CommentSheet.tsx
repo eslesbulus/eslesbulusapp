@@ -22,8 +22,8 @@ import Animated, {
   withTiming,
   withSpring,
   withSequence,
-  runOnJS,
   FadeIn,
+  FadeInDown,
   Easing,
 } from "react-native-reanimated";
 import { MockPost, MockComment } from "@/constants/mockPosts";
@@ -42,6 +42,7 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [comments, setComments] = useState<MockComment[]>([]);
+  const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList>(null);
@@ -58,14 +59,21 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
     opacity: backdrop.value,
   }));
 
-  // Animate in/out
+  // Sheet open: smooth ease-out deceleration (native-feeling)
+  // Sheet close: quick ease-in acceleration
   useEffect(() => {
     if (visible) {
-      backdrop.value = withTiming(1, { duration: 200 });
-      translateY.value = withSpring(0, { damping: 22, stiffness: 180 });
+      backdrop.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.quad) });
+      translateY.value = withTiming(0, {
+        duration: 360,
+        easing: Easing.out(Easing.exp),
+      });
     } else {
-      backdrop.value = withTiming(0, { duration: 180 });
-      translateY.value = withTiming(H, { duration: 220, easing: Easing.in(Easing.cubic) });
+      backdrop.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.quad) });
+      translateY.value = withTiming(H, {
+        duration: 260,
+        easing: Easing.in(Easing.cubic),
+      });
     }
   }, [visible]);
 
@@ -75,6 +83,7 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
       setComments(post.comments);
       setText("");
       setLikedIds(new Set());
+      setNewCommentIds(new Set());
     }
   }, [post?.id]);
 
@@ -89,6 +98,7 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
       createdAt: "şimdi",
     };
     setComments((prev) => [...prev, newComment]);
+    setNewCommentIds((prev) => new Set([...prev, newComment.id]));
     setText("");
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
   }
@@ -163,13 +173,13 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
                 <Text style={[styles.emptyHint, { color: c.textMuted }]}>İlk yorum yapan sen ol</Text>
               </Animated.View>
             }
-            renderItem={({ item, index }) => (
+            renderItem={({ item }) => (
               <CommentRow
                 item={item}
                 liked={likedIds.has(item.id)}
                 onLike={() => toggleLikeComment(item.id)}
                 colors={c}
-                index={index}
+                isNew={newCommentIds.has(item.id)}
               />
             )}
           />
@@ -206,13 +216,13 @@ function CommentRow({
   liked,
   onLike,
   colors: c,
-  index,
+  isNew,
 }: {
   item: MockComment;
   liked: boolean;
   onLike: () => void;
   colors: any;
-  index: number;
+  isNew?: boolean;
 }) {
   const heartScale = useSharedValue(1);
 
@@ -229,7 +239,10 @@ function CommentRow({
   }
 
   return (
-    <Animated.View entering={FadeIn.delay(index * 30).duration(220)} style={styles.commentRow}>
+    <Animated.View
+      entering={isNew ? FadeInDown.duration(280).springify().damping(18) : undefined}
+      style={styles.commentRow}
+    >
       <Image source={{ uri: item.userPhoto }} style={styles.commentAvatar} />
       <View style={styles.commentBody}>
         <Text style={styles.commentLine}>

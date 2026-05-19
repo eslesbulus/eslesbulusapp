@@ -140,32 +140,60 @@ export default function StoryScreen() {
   }, [paused, inputActive]);
 
   // Pan: yatay → user değiştir, dikey aşağı → kapat
+  // 0=undecided, 1=horizontal, 2=vertical
+  const panDir = useSharedValue<0 | 1 | 2>(0);
   const panX = useSharedValue(0);
   const panY = useSharedValue(0);
 
   const pan = Gesture.Pan()
-    .activeOffsetX([-15, 15])
-    .activeOffsetY([-15, 15])
+    .minDistance(8)
+    .onBegin(() => {
+      "worklet";
+      panDir.value = 0;
+      panX.value = 0;
+      panY.value = 0;
+    })
     .onUpdate((e) => {
-      panX.value = e.translationX;
-      panY.value = Math.max(e.translationY, 0);
+      "worklet";
+      if (panDir.value === 0) {
+        const absX = Math.abs(e.translationX);
+        const absY = Math.abs(e.translationY);
+        if (absX > 12 || absY > 12) {
+          panDir.value = absX >= absY ? 1 : 2;
+        }
+      }
+      if (panDir.value === 1) {
+        panX.value = e.translationX;
+        panY.value = 0;
+      } else if (panDir.value === 2) {
+        panX.value = 0;
+        panY.value = Math.max(e.translationY, 0);
+      }
     })
     .onEnd((e) => {
-      // Dikey aşağı kapatma
-      if (e.translationY > 120 || e.velocityY > 1200) {
-        runOnJS(close)();
+      "worklet";
+      if (panDir.value === 2) {
+        if (e.translationY > 120 || e.velocityY > 1200) {
+          runOnJS(close)();
+          return;
+        }
+        panX.value = withTiming(0, { duration: 220, easing: EASE });
+        panY.value = withTiming(0, { duration: 220, easing: EASE });
         return;
       }
 
       const goNext = e.translationX < -SCREEN_W * 0.22 || e.velocityX < -700;
       const goPrev = e.translationX > SCREEN_W * 0.22 || e.velocityX > 700;
 
+      // Programatik geçişten önce pan değerlerini sıfırla
+      panX.value = 0;
+      panY.value = 0;
+
       if (goNext && userIdx < STORY_USERS.length - 1) {
         runOnJS(slideOutTo)("left");
       } else if (goPrev && userIdx > 0) {
         runOnJS(slideOutTo)("right");
       } else {
-        // geri snap
         panX.value = withTiming(0, { duration: 220, easing: EASE });
         panY.value = withTiming(0, { duration: 220, easing: EASE });
       }

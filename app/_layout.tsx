@@ -30,11 +30,18 @@ function RootNavigator() {
     }
   }, [user, profile, loading, segments]);
 
-  const { mode } = useTheme();
+  const { mode, theme } = useTheme();
+  const bgColor = theme.colors.background;
   return (
     <>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
-      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: "fade",
+          contentStyle: { backgroundColor: bgColor },
+        }}
+      />
     </>
   );
 }

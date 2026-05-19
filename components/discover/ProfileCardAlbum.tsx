@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { ReportSheet } from "@/components/common/ReportSheet";
 
 type Props = {
   user: MockUser;
@@ -31,6 +33,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   const c = theme.colors;
   const sent = hasSent(user.id);
 
+  const [reportOpen, setReportOpen] = useState(false);
   const scale = useSharedValue(1);
   const justSent = useSharedValue(0);
 
@@ -65,6 +68,24 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
           <Text style={styles.vipText}>VIP</Text>
         </View>
       )}
+
+      {/* 3-nokta menüsü */}
+      <Pressable
+        onPress={() => setReportOpen(true)}
+        style={styles.moreBtn}
+        hitSlop={6}
+      >
+        <Ionicons name="ellipsis-vertical" size={16} color="#fff" />
+      </Pressable>
+
+      <ReportSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        type="user"
+        targetName={user.name}
+        targetId={user.id}
+        targetPhoto={user.photo}
+      />
 
       <View style={styles.statusRow}>
         <View
@@ -152,9 +173,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   vipText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  statusRow: {
+  moreBtn: {
     position: "absolute",
     top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 999,
+    padding: 5,
+  },
+  statusRow: {
+    position: "absolute",
+    top: 40,
     right: 10,
     flexDirection: "row",
     alignItems: "center",
