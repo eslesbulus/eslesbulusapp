@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
@@ -89,12 +91,14 @@ export default function RegisterScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
         >
           <View style={styles.logoContainer}>
             <Image
@@ -154,6 +158,7 @@ export default function RegisterScreen() {
             </Link>
           </BlurView>
         </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </View>
   );

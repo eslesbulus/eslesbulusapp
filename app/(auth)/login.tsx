@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
@@ -120,17 +123,26 @@ export default function LoginScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
       >
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../../public/eslesbulustransp.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../../public/eslesbulustransp.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
 
-        <BlurView intensity={25} tint="dark" style={styles.glassCard}>
+            <BlurView intensity={25} tint="dark" style={styles.glassCard}>
           <Text style={styles.cardTitle}>Hoş Geldin</Text>
 
           {/* TODO: Google Sign-In — APK build'de aktif et
@@ -195,6 +207,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </Link>
         </BlurView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </View>
   );
@@ -202,11 +216,14 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  keyboardView: {
-    flex: 1,
+  keyboardView: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "flex-end",
     paddingHorizontal: 20,
     paddingBottom: 40,
+    paddingTop: 80,
   },
   logoContainer: { alignItems: "center", marginBottom: 32 },
   logo: { width: 200, height: 80 },

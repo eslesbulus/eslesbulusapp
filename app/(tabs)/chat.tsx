@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, FlatList, Image, Pressable } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { MOCK_USERS, MockUser } from "@/constants/mockUsers";
 
@@ -30,6 +31,7 @@ const CHAT_LIST: ChatPreview[] = MOCK_USERS.slice(0, 6).map((u, i) => ({
 export default function ChatScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
+  const router = useRouter();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
@@ -47,6 +49,7 @@ export default function ChatScreen() {
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInRight.delay(index * 50).duration(300)}>
             <Pressable
+              onPress={() => router.push(`/chat/${item.user.id}`)}
               style={({ pressed }) => [
                 styles.item,
                 {

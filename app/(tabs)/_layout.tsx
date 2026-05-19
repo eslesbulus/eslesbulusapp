@@ -62,7 +62,6 @@ export default function TabsLayout() {
             <TabIcon
               name={focused ? "add-circle" : "add-circle-outline"}
               color={color}
-              size={32}
             />
           ),
         }}
