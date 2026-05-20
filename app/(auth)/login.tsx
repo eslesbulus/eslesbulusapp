@@ -13,31 +13,32 @@ import {
   ScrollView,
   Keyboard,
   TouchableWithoutFeedback,
+  Pressable,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, useFocusEffect } from "expo-router";
-// TODO: Google Sign-In — native module, Expo Go'da çalışmaz. APK build'de aktif et.
-// import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
-// import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from "firebase/auth";
-// import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-// import { auth, db } from "@/config/firebase";
-// import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+} from "firebase/auth";
+import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { palette } from "@/constants/theme";
+import { firebaseAuthErrorMessage } from "@/constants/firebaseErrors";
 
-// DEV admin bypass — Firebase'i atlar, sadece test için
 const DEV_ADMIN_EMAIL = "admin";
 const DEV_ADMIN_PASSWORD = "admin";
-
-// GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
 
 export default function LoginScreen() {
   const { signInAsDevAdmin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  // const [googleLoading, setGoogleLoading] = useState(false); // TODO: Google Sign-In
 
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -56,53 +57,44 @@ export default function LoginScreen() {
     }
   );
 
-  // TODO: Google Sign-In — APK build'de aktif et
-  // async function handleGoogleSignIn() {
-  //   setGoogleLoading(true);
-  //   try {
-  //     await GoogleSignin.hasPlayServices();
-  //     const userInfo = await GoogleSignin.signIn();
-  //     const idToken = userInfo.data?.idToken;
-  //     if (!idToken) throw new Error("ID token alınamadı.");
-  //     const credential = GoogleAuthProvider.credential(idToken);
-  //     const { user } = await signInWithCredential(auth, credential);
-  //     const userRef = doc(db, "users", user.uid);
-  //     const snap = await getDoc(userRef);
-  //     if (!snap.exists()) {
-  //       await setDoc(userRef, {
-  //         uid: user.uid,
-  //         name: user.displayName ?? "",
-  //         email: user.email ?? "",
-  //         photoURL: user.photoURL ?? "",
-  //         createdAt: serverTimestamp(),
-  //         profileComplete: false,
-  //       });
-  //     }
-  //   } catch (e: any) {
-  //     if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
-  //     if (e.code === statusCodes.IN_PROGRESS) return;
-  //     Alert.alert("Google ile giriş başarısız", e.message);
-  //   } finally {
-  //     setGoogleLoading(false);
-  //   }
-  // }
-
   async function handleEmailLogin() {
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       Alert.alert("Hata", "E-posta ve şifre boş bırakılamaz.");
       return;
     }
     setLoading(true);
+
+    // DEV bypass
     if (email.trim() === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
       signInAsDevAdmin();
       setLoading(false);
       return;
     }
-    setLoading(false);
-    Alert.alert(
-      "Giriş başarısız",
-      "Email/şifre girişi kapalı. Google ile giriş yap veya test için admin/admin kullan."
-    );
+
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // Routing handled by AuthContext + RootNavigator
+    } catch (e: any) {
+      Alert.alert("Giriş başarısız", firebaseAuthErrorMessage(e.code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert("E-posta gerekli", "Şifreni sıfırlamak için önce e-postanı yaz.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      Alert.alert(
+        "Sıfırlama bağlantısı gönderildi",
+        `${email.trim()} adresine şifre sıfırlama linki gönderdik.`
+      );
+    } catch (e: any) {
+      Alert.alert("Hata", firebaseAuthErrorMessage(e.code));
+    }
   }
 
   return (
@@ -117,7 +109,7 @@ export default function LoginScreen() {
       )}
 
       <LinearGradient
-        colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
+        colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.85)"]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -134,79 +126,100 @@ export default function LoginScreen() {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            <View style={styles.logoContainer}>
+            <Animated.View entering={FadeInUp.duration(500)} style={styles.logoContainer}>
               <Image
                 source={require("../../public/eslesbulustransp.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
-            </View>
+            </Animated.View>
 
-            <BlurView intensity={25} tint="dark" style={styles.glassCard}>
-          <Text style={styles.cardTitle}>Hoş Geldin</Text>
+            <Animated.View entering={FadeInDown.delay(120).duration(500)}>
+              <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+                <Text style={styles.cardTitle}>Hoş Geldin</Text>
+                <Text style={styles.cardSub}>Giriş yap, eşleşmen başlasın</Text>
 
-          {/* TODO: Google Sign-In — APK build'de aktif et
-          <TouchableOpacity
-            style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
-            onPress={handleGoogleSignIn}
-            disabled={googleLoading}
-          >
-            {googleLoading ? (
-              <ActivityIndicator color="#333" />
-            ) : (
-              <>
-                <Text style={styles.googleIconText}>G</Text>
-                <Text style={styles.googleButtonText}>Google ile Devam Et</Text>
-              </>
-            )}
-          </TouchableOpacity>
+                {/* Email */}
+                <View style={styles.inputWrap}>
+                  <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="E-posta"
+                    placeholderTextColor="rgba(255,255,255,0.45)"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    value={email}
+                    onChangeText={setEmail}
+                  />
+                </View>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>veya</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          */}
+                {/* Password */}
+                <View style={styles.inputWrap}>
+                  <Ionicons name="lock-closed-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, { paddingRight: 40 }]}
+                    placeholder="Şifre"
+                    placeholderTextColor="rgba(255,255,255,0.45)"
+                    secureTextEntry={!showPwd}
+                    autoComplete="password"
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                  <Pressable
+                    onPress={() => setShowPwd((s) => !s)}
+                    hitSlop={8}
+                    style={styles.pwdToggle}
+                  >
+                    <Ionicons
+                      name={showPwd ? "eye-off-outline" : "eye-outline"}
+                      size={18}
+                      color="rgba(255,255,255,0.55)"
+                    />
+                  </Pressable>
+                </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="E-posta"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Şifre"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+                <Pressable onPress={handleForgotPassword} style={styles.forgotWrap}>
+                  <Text style={styles.forgotText}>Şifremi unuttum</Text>
+                </Pressable>
 
-          <TouchableOpacity
-            style={[styles.loginButton, loading && styles.buttonDisabled]}
-            onPress={handleEmailLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Giriş Yap</Text>
-            )}
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                  onPress={handleEmailLogin}
+                  disabled={loading}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Giriş Yap</Text>
+                  )}
+                </TouchableOpacity>
 
-          <Link href="/(auth)/register" asChild>
-            <TouchableOpacity style={styles.registerLink}>
-              <Text style={styles.registerLinkText}>
-                Hesabın yok mu?{" "}
-                <Text style={styles.registerLinkBold}>Kayıt Ol</Text>
-              </Text>
-            </TouchableOpacity>
-          </Link>
-        </BlurView>
+                {/* Divider for future Google */}
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>ya da</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <View style={styles.googleDisabledWrap}>
+                  <Ionicons name="logo-google" size={18} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.googleDisabledText}>
+                    Google ile giriş — yakında
+                  </Text>
+                </View>
+
+                <Link href="/(auth)/register" asChild>
+                  <TouchableOpacity style={styles.registerLink} activeOpacity={0.7}>
+                    <Text style={styles.registerLinkText}>
+                      Hesabın yok mu?{" "}
+                      <Text style={styles.registerLinkBold}>Kayıt Ol</Text>
+                    </Text>
+                  </TouchableOpacity>
+                </Link>
+              </BlurView>
+            </Animated.View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -221,66 +234,115 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingBottom: 40,
     paddingTop: 40,
   },
-  logoContainer: { alignItems: "center", marginBottom: 32 },
+  logoContainer: { alignItems: "center", marginBottom: 28 },
   logo: { width: 200, height: 80 },
+
   glassCard: {
-    borderRadius: 24,
+    borderRadius: 26,
     overflow: "hidden",
     padding: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   cardTitle: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: "#fff",
     textAlign: "center",
-    marginBottom: 20,
+    letterSpacing: -0.5,
   },
-  googleButton: {
-    flexDirection: "row",
+  cardSub: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 22,
+  },
+
+  inputWrap: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  inputIcon: {
+    position: "absolute",
+    left: 14,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: "center",
+    zIndex: 1,
+    height: 48,
+    lineHeight: 48,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    paddingLeft: 42,
+    paddingRight: 14,
+    height: 48,
+    fontSize: 15,
+    color: "#fff",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  pwdToggle: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    height: 48,
+    width: 32,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingVertical: 13,
-    gap: 10,
   },
-  googleIconText: { fontSize: 16, fontWeight: "800", color: "#4285F4" },
-  googleButtonText: { fontSize: 15, fontWeight: "600", color: "#333" },
+
+  forgotWrap: { alignSelf: "flex-end", marginTop: 2, marginBottom: 14 },
+  forgotText: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+
+  primaryButton: {
+    backgroundColor: palette.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 2,
+    shadowColor: palette.primary,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 15.5 },
+  buttonDisabled: { opacity: 0.6 },
+
   divider: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 18,
     gap: 10,
+    marginVertical: 18,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.2)" },
-  dividerText: { color: "rgba(255,255,255,0.5)", fontSize: 13 },
-  input: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: "#fff",
-    marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  loginButton: {
-    backgroundColor: "#800020",
-    borderRadius: 12,
-    paddingVertical: 15,
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
+  dividerText: { color: "rgba(255,255,255,0.45)", fontSize: 12 },
+
+  googleDisabledWrap: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  loginButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  buttonDisabled: { opacity: 0.6 },
-  registerLink: { marginTop: 16, alignItems: "center" },
-  registerLinkText: { color: "rgba(255,255,255,0.6)", fontSize: 14 },
+  googleDisabledText: { fontSize: 13, color: "rgba(255,255,255,0.55)", fontWeight: "500" },
+
+  registerLink: { marginTop: 18, alignItems: "center" },
+  registerLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },
   registerLinkBold: { color: "#fff", fontWeight: "700" },
 });
