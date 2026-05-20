@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,6 +14,17 @@ import { Gift } from "@/constants/gifts";
 
 const { height: H } = Dimensions.get("window");
 
+// Convert "#RRGGBB" → "rgba(r, g, b, a)" with given alpha.
+// Safer than hex+alpha string on some Android variants.
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace("#", "");
+  const safe = m.length === 6 ? m : "888888";
+  const r = parseInt(safe.slice(0, 2), 16);
+  const g = parseInt(safe.slice(2, 4), 16);
+  const b = parseInt(safe.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 type Props = {
   gift: Gift;
   onDone: () => void;
@@ -28,13 +38,11 @@ export function GiftAnimation({ gift, onDone }: Props) {
   const fade = useSharedValue(1);
 
   useEffect(() => {
-    // Entrance
     scale.value = withSpring(1.35, { damping: 9, stiffness: 110 });
     ty.value = withSpring(0, { damping: 12, stiffness: 120 });
     rotate.value = withTiming(-8, { duration: 320, easing: Easing.inOut(Easing.ease) });
     glow.value = withTiming(1, { duration: 280 });
 
-    // Settle wobble
     const settle = setTimeout(() => {
       rotate.value = withTiming(8, { duration: 280 });
     }, 320);
@@ -43,7 +51,6 @@ export function GiftAnimation({ gift, onDone }: Props) {
       rotate.value = withTiming(0, { duration: 240 });
     }, 600);
 
-    // Exit
     const exit = setTimeout(() => {
       scale.value = withTiming(0.5, { duration: 500, easing: Easing.in(Easing.cubic) });
       ty.value = withTiming(-H * 0.45, { duration: 500, easing: Easing.in(Easing.cubic) });
@@ -75,7 +82,7 @@ export function GiftAnimation({ gift, onDone }: Props) {
   }));
 
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value * 0.6,
+    opacity: glow.value * 0.45,
     transform: [{ scale: 1 + glow.value * 0.2 }],
   }));
 
@@ -83,22 +90,22 @@ export function GiftAnimation({ gift, onDone }: Props) {
     opacity: fade.value * 0.55,
   }));
 
-  // Limit particles to 4 max; use static stagger to avoid Math.random on shared values
   const particles = (gift.particles ?? ["✨", "✨", "✨", "✨"]).slice(0, 4);
+  const glowColor = hexToRgba(gift.color, 1);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Animated.View style={[StyleSheet.absoluteFill, overlayStyle, { backgroundColor: "#000" }]} />
 
       <View style={styles.center}>
-        <Animated.View style={[styles.glowWrap, glowStyle]}>
-          <LinearGradient
-            colors={[gift.color, "transparent"]}
-            style={styles.glow}
-            start={{ x: 0.5, y: 0.5 }}
-            end={{ x: 1, y: 1 }}
-          />
-        </Animated.View>
+        {/* Solid color glow disc (no LinearGradient — was crashing on Android) */}
+        <Animated.View
+          style={[
+            styles.glow,
+            glowStyle,
+            { backgroundColor: glowColor },
+          ]}
+        />
 
         {particles.map((p, i) => (
           <Particle key={i} emoji={p} index={i} total={particles.length} />
@@ -128,7 +135,8 @@ function Particle({
   const sc = useSharedValue(0);
 
   useEffect(() => {
-    const angle = (index / Math.max(total, 1)) * Math.PI * 2;
+    const safeTotal = Math.max(total, 1);
+    const angle = (index / safeTotal) * Math.PI * 2;
     const distance = 140;
     const targetX = Math.cos(angle) * distance;
     const targetY = Math.sin(angle) * distance;
@@ -189,8 +197,12 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 8,
   },
-  glowWrap: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  glow: { width: 300, height: 300, borderRadius: 150 },
+  glow: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+  },
   particle: { position: "absolute" },
   particleText: { fontSize: 28 },
 });

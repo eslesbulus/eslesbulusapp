@@ -15,6 +15,15 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useCoins } from "@/context/CoinsContext";
 import { GIFTS, Gift } from "@/constants/gifts";
 
+function hexToRgba(hex: string, alpha: number) {
+  const m = hex.replace("#", "");
+  const safe = m.length === 6 ? m : "888888";
+  const r = parseInt(safe.slice(0, 2), 16);
+  const g = parseInt(safe.slice(2, 4), 16);
+  const b = parseInt(safe.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const { width: W } = Dimensions.get("window");
 
 type Props = {
@@ -106,7 +115,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
                 <Text style={[styles.giftName, { color: c.text }]} numberOfLines={1}>
                   {g.name}
                 </Text>
-                <View style={[styles.priceRow, { backgroundColor: g.color + "22" }]}>
+                <View style={[styles.priceRow, { backgroundColor: hexToRgba(g.color, 0.13) }]}>
                   <Ionicons name="logo-bitcoin" size={10} color="#F59E0B" />
                   <Text style={[styles.priceText, { color: g.color }]}>{g.price}</Text>
                 </View>

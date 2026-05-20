@@ -37,6 +37,15 @@ import { GiftSheet } from "@/components/chat/GiftSheet";
 import { GiftAnimation } from "@/components/chat/GiftAnimation";
 import { EmojiPicker } from "@/components/chat/EmojiPicker";
 
+function hexToRgba(hex: string, alpha: number) {
+  const m = hex.replace("#", "");
+  const safe = m.length === 6 ? m : "888888";
+  const r = parseInt(safe.slice(0, 2), 16);
+  const g = parseInt(safe.slice(2, 4), 16);
+  const b = parseInt(safe.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 type Message = {
   id: string;
   text: string;
@@ -80,6 +89,7 @@ export default function ChatDetailScreen() {
   const [attachOpen, setAttachOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
+  const [giftAnimKey, setGiftAnimKey] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const panelOpen = panelTab !== null;
 
@@ -106,6 +116,7 @@ export default function ChatDetailScreen() {
   }, []);
 
   function handleSendGift(g: Gift) {
+    setGiftAnimKey((k) => k + 1);
     setActiveGiftAnim(g);
     const msg: Message = {
       id: `m_g_${Date.now()}`,
@@ -411,6 +422,7 @@ export default function ChatDetailScreen() {
       {/* Gift Animation Overlay */}
       {activeGiftAnim && (
         <GiftAnimation
+          key={giftAnimKey}
           gift={activeGiftAnim}
           onDone={() => setActiveGiftAnim(null)}
         />
@@ -468,7 +480,7 @@ function Bubble({
       )}
 
       {msg.gift ? (
-        <View style={[styles.giftBubble, { backgroundColor: msg.gift.color + "22", borderColor: msg.gift.color }]}>
+        <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
           <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.name}</Text>
           <View style={styles.giftBubblePrice}>
