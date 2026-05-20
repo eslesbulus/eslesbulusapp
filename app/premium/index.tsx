@@ -153,8 +153,8 @@ export default function PremiumScreen() {
         hitSlop={14}
         style={[styles.closeBtn, { top: insets.top + 10 }]}
       >
-        <View style={styles.closeBtnInner}>
-          <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
+        <View style={[styles.closeBtnInner, { backgroundColor: `${c.text}14` }]}>
+          <Ionicons name="close" size={20} color={c.text} />
         </View>
       </Pressable>
 
@@ -308,7 +308,7 @@ export default function PremiumScreen() {
         style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}
       >
         <LinearGradient
-          colors={["rgba(10,8,7,0)", "rgba(10,8,7,0.98)"]}
+          colors={[`${c.background}00`, c.background]}
           style={styles.bottomFade}
           pointerEvents="none"
         />
