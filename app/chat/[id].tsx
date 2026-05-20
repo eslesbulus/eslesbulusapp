@@ -27,6 +27,7 @@ import Animated, {
   withTiming,
   withSequence,
   withDelay,
+  withSpring,
   Easing,
   SharedValue,
 } from "react-native-reanimated";
@@ -541,9 +542,49 @@ function PanelToggleIcon({
   mutedColor: string;
   primaryColor: string;
 }) {
-  // Animated swap: when panel open shows current tab's icon in primary color;
-  // when closed shows smiley in muted.
+  // Auto-cycle icon between emoji + gift when panel closed, with pop animation
+  const [cycle, setCycle] = useState<"emoji" | "gift">("emoji");
+  const popScale = useSharedValue(1);
+  const popRot = useSharedValue(0);
+  const burst = useSharedValue(0);
+
+  useEffect(() => {
+    if (panelOpen) return; // pause cycle when panel open
+    const interval = setInterval(() => {
+      // Pop animation
+      popScale.value = withSequence(
+        withTiming(0.6, { duration: 120, easing: Easing.in(Easing.quad) }),
+        withSpring(1.35, { damping: 6, stiffness: 220 }),
+        withSpring(1, { damping: 10, stiffness: 180 })
+      );
+      popRot.value = withSequence(
+        withTiming(-25, { duration: 140 }),
+        withTiming(20, { duration: 140 }),
+        withTiming(0, { duration: 180 })
+      );
+      burst.value = withSequence(
+        withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 280 })
+      );
+      // Swap mid-pop (during smallest scale)
+      setTimeout(() => {
+        setCycle((c) => (c === "emoji" ? "gift" : "emoji"));
+      }, 120);
+    }, 2400);
+    return () => clearInterval(interval);
+  }, [panelOpen]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: popScale.value }, { rotate: `${popRot.value}deg` }],
+  }));
+
+  const burstStyle = useAnimatedStyle(() => ({
+    opacity: burst.value,
+    transform: [{ scale: 0.5 + burst.value * 0.9 }],
+  }));
+
   if (panelOpen) {
+    // Static when open — shows current tab
     return (
       <Animated.View key={tab} entering={FadeIn.duration(180)}>
         <Ionicons
@@ -554,10 +595,25 @@ function PanelToggleIcon({
       </Animated.View>
     );
   }
+
+  // Closed: cycling with pop animation
   return (
-    <Animated.View key="closed" entering={FadeIn.duration(180)}>
-      <Ionicons name="happy-outline" size={22} color={mutedColor} />
-    </Animated.View>
+    <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+      {/* Burst dots */}
+      <Animated.View pointerEvents="none" style={[burstStyle, { position: "absolute" }]}>
+        <View style={{ flexDirection: "row", gap: 14 }}>
+          <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: primaryColor }} />
+          <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: primaryColor }} />
+        </View>
+      </Animated.View>
+      <Animated.View style={iconStyle}>
+        <Ionicons
+          name={cycle === "gift" ? "gift" : "happy"}
+          size={22}
+          color={cycle === "gift" ? primaryColor : mutedColor}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
