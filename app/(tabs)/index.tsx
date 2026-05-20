@@ -6,6 +6,7 @@ import {
   ScrollView,
   Platform,
   Pressable,
+  Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, Layout } from "react-native-reanimated";
@@ -13,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { useInteractions } from "@/context/InteractionsContext";
+import { usePremium, DAILY_HI_LIMIT } from "@/context/PremiumContext";
 import { MOCK_USERS, MockUser } from "@/constants/mockUsers";
 import {
   Filters,
@@ -33,6 +35,7 @@ import { NotificationsPopup } from "@/components/discover/NotificationsPopup";
 export default function DiscoverScreen() {
   const { theme, mode } = useTheme();
   const { sendRandomHi } = useInteractions();
+  const { canSendHi, useHi } = usePremium();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
@@ -62,7 +65,20 @@ export default function DiscoverScreen() {
     return out;
   }, [users, viewMode]);
 
-  function handlePressHi(user: MockUser) {
+  async function handlePressHi(user: MockUser) {
+    if (!canSendHi) {
+      Alert.alert(
+        "Günlük Limit Doldu",
+        `Bugün ${DAILY_HI_LIMIT} hi mesajı hakkını kullandın. Premium üyelikle sınırsız gönder!`,
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Premium Al 👑", onPress: () => router.push("/premium") },
+        ]
+      );
+      return;
+    }
+    const allowed = await useHi();
+    if (!allowed) return;
     const sent = sendRandomHi(user.id);
     setToast({ seq: Date.now(), user, text: sent.text, emoji: sent.emoji });
   }

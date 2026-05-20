@@ -32,6 +32,7 @@ import Animated, {
   SharedValue,
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { getUserById, MockUser } from "@/constants/mockUsers";
 import { Gift } from "@/constants/gifts";
 import { GiftSheet } from "@/components/chat/GiftSheet";
@@ -74,10 +75,11 @@ function buildMockChat(user: MockUser): Message[] {
 }
 
 export default function ChatDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const user = getUserById(id ?? "");
   const router = useRouter();
   const { theme, mode } = useTheme();
+  const { balance: tokenBalance, spend: spendTokens } = useCoins();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
@@ -85,7 +87,8 @@ export default function ChatDetailScreen() {
   const [messages, setMessages] = useState<Message[]>(() =>
     user ? buildMockChat(user) : []
   );
-  const [text, setText] = useState("");
+  // draft param ile gelen öneri mesajını başlangıç metni olarak kullan
+  const [text, setText] = useState(draft ? decodeURIComponent(draft as string) : "");
   const [typing, setTyping] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | null>(null);
@@ -149,8 +152,25 @@ export default function ChatDetailScreen() {
     setText((t) => t + emoji);
   }
 
-  function handleSend() {
+  async function handleSend() {
     if (!text.trim() || !user) return;
+
+    // Jeton kontrolü
+    if (tokenBalance < TOKENS_PER_MESSAGE) {
+      Alert.alert(
+        "Jeton Yetersiz 🪙",
+        `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+        ]
+      );
+      return;
+    }
+
+    const spent = await spendTokens(TOKENS_PER_MESSAGE);
+    if (!spent) return;
+
     const msg: Message = {
       id: `m_${Date.now()}`,
       text: text.trim(),
@@ -220,6 +240,15 @@ export default function ChatDetailScreen() {
               {typing ? "yazıyor..." : user.online ? "çevrimiçi" : `son görülme ${user.lastActive ?? "bilinmiyor"}`}
             </Text>
           </View>
+        </Pressable>
+
+        {/* Jeton bakiyesi */}
+        <Pressable
+          hitSlop={8}
+          style={styles.tokenPill}
+          onPress={() => router.push("/premium/coins")}
+        >
+          <Text style={styles.tokenPillText}>🪙 {tokenBalance}</Text>
         </Pressable>
 
         <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.id}?type=video`)}>
@@ -683,6 +712,16 @@ const styles = StyleSheet.create({
   headerName: { fontSize: 15, fontWeight: "700" },
   headerStatus: { fontSize: 11.5, marginTop: 1 },
   headerBtn: { padding: 8 },
+  tokenPill: {
+    backgroundColor: "rgba(245,158,11,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.3)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginRight: 2,
+  },
+  tokenPillText: { fontSize: 12, fontWeight: "700", color: "#F59E0B" },
 
   list: { paddingHorizontal: 10, paddingVertical: 12 },
 

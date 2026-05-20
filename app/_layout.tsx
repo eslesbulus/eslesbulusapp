@@ -8,6 +8,7 @@ import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { InteractionsProvider } from "@/context/InteractionsContext";
 import { BlockedUsersProvider } from "@/context/BlockedUsersContext";
 import { CoinsProvider } from "@/context/CoinsContext";
+import { PremiumProvider } from "@/context/PremiumContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -54,13 +55,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthProvider>
-          <InteractionsProvider>
-            <BlockedUsersProvider>
-              <CoinsProvider>
-                <RootNavigator />
-              </CoinsProvider>
-            </BlockedUsersProvider>
-          </InteractionsProvider>
+          <PremiumProvider>
+            <InteractionsProvider>
+              <BlockedUsersProvider>
+                <CoinsProvider>
+                  <RootNavigator />
+                </CoinsProvider>
+              </BlockedUsersProvider>
+            </InteractionsProvider>
+          </PremiumProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
