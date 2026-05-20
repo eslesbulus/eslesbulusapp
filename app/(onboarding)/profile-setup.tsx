@@ -122,7 +122,13 @@ export default function ProfileSetupScreen() {
   }
 
   function goNext() {
-    if (step === "photo") setStep("info");
+    if (step === "photo") {
+      if (!photoUri) {
+        Alert.alert("Fotoğraf Gerekli", "Devam etmek için profil fotoğrafı eklemelisin.");
+        return;
+      }
+      setStep("info");
+    }
     else if (step === "info") {
       const day = parseInt(birthDay, 10);
       const month = parseInt(birthMonth, 10);
@@ -270,13 +276,11 @@ export default function ProfileSetupScreen() {
                     </Pressable>
 
                     <TouchableOpacity
-                      style={[styles.primaryButton, !photoUri && styles.buttonGhost]}
+                      style={styles.primaryButton}
                       onPress={goNext}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.primaryButtonText}>
-                        {photoUri ? "Devam Et" : "Şimdilik Atla"}
-                      </Text>
+                      <Text style={styles.primaryButtonText}>Devam Et</Text>
                     </TouchableOpacity>
                   </BlurView>
                 </Animated.View>

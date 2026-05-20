@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Pressable,
+  Modal,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
@@ -49,6 +52,11 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [age18Confirmed, setAge18Confirmed] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const termsScrollRef = useRef<ScrollView>(null);
 
   const strength = useMemo(() => passwordStrength(password), [password]);
 
@@ -69,6 +77,22 @@ export default function RegisterScreen() {
     }
   );
 
+  function handleTermsScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 50) {
+      setHasScrolledToBottom(true);
+    }
+  }
+
+  function handleTermsCheckboxPress() {
+    if (termsAccepted) {
+      setTermsAccepted(false);
+    } else {
+      setHasScrolledToBottom(false);
+      setTermsModalVisible(true);
+    }
+  }
+
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password) {
       Alert.alert("Hata", "Tüm alanları doldur.");
@@ -80,6 +104,14 @@ export default function RegisterScreen() {
     }
     if (password.length < 6) {
       Alert.alert("Hata", "Şifre en az 6 karakter olmalı.");
+      return;
+    }
+    if (!age18Confirmed) {
+      Alert.alert("Yaş Doğrulama", "Devam etmek için 18 yaşından büyük olduğunu onaylamalısın.");
+      return;
+    }
+    if (!termsAccepted) {
+      Alert.alert("Kullanım Sözleşmesi", "Devam etmek için kullanım sözleşmesini kabul etmelisin.");
       return;
     }
     setLoading(true);
@@ -225,6 +257,31 @@ export default function RegisterScreen() {
                   </View>
                 )}
 
+                {/* Age confirmation */}
+                <Pressable
+                  style={styles.checkboxRow}
+                  onPress={() => setAge18Confirmed((v) => !v)}
+                >
+                  <View style={[styles.checkbox, age18Confirmed && styles.checkboxChecked]}>
+                    {age18Confirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  </View>
+                  <Text style={styles.checkboxLabel}>18 yaşından büyük olduğumu onaylıyorum</Text>
+                </Pressable>
+
+                {/* Terms acceptance */}
+                <Pressable
+                  style={styles.checkboxRow}
+                  onPress={handleTermsCheckboxPress}
+                >
+                  <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                    {termsAccepted && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  </View>
+                  <Text style={styles.checkboxLabel}>
+                    Kullanım sözleşmesini okudum ve{" "}
+                    <Text style={styles.checkboxLabelBold}>kabul ediyorum</Text>
+                  </Text>
+                </Pressable>
+
                 <TouchableOpacity
                   style={[styles.primaryButton, loading && styles.buttonDisabled]}
                   onPress={handleRegister}
@@ -237,12 +294,6 @@ export default function RegisterScreen() {
                     <Text style={styles.primaryButtonText}>Kayıt Ol</Text>
                   )}
                 </TouchableOpacity>
-
-                <Text style={styles.termsText}>
-                  Kayıt olarak{" "}
-                  <Text style={styles.termsBold}>Kullanım Koşullarını</Text> ve{" "}
-                  <Text style={styles.termsBold}>Gizlilik Politikasını</Text> kabul ediyorsun.
-                </Text>
 
                 <Link href="/(auth)/login" asChild>
                   <TouchableOpacity style={styles.loginLink} activeOpacity={0.7}>
@@ -257,9 +308,109 @@ export default function RegisterScreen() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Terms modal */}
+      <Modal
+        visible={termsModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setTermsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Kullanım Sözleşmesi</Text>
+            <Pressable onPress={() => setTermsModalVisible(false)} hitSlop={12}>
+              <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            ref={termsScrollRef}
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            onScroll={handleTermsScroll}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={true}
+          >
+            {TERMS_SECTIONS.map((section) => (
+              <View key={section.title} style={styles.termsSectionBlock}>
+                <Text style={styles.termsSectionTitle}>{section.title}</Text>
+                <Text style={styles.termsSectionBody}>{section.body}</Text>
+              </View>
+            ))}
+            <Text style={styles.termsVersion}>
+              Son güncelleme: 19 Mayıs 2026 · Sürüm 1.0
+            </Text>
+            <View style={{ height: 20 }} />
+          </ScrollView>
+
+          {!hasScrolledToBottom && (
+            <View style={styles.scrollHint}>
+              <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.scrollHintText}>Kabul etmek için sona kadar kaydır</Text>
+            </View>
+          )}
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[
+                styles.acceptButton,
+                !hasScrolledToBottom && styles.acceptButtonDisabled,
+              ]}
+              disabled={!hasScrolledToBottom}
+              onPress={() => {
+                setTermsAccepted(true);
+                setTermsModalVisible(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.acceptButtonText}>Okudum ve Kabul Ediyorum</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const TERMS_SECTIONS = [
+  {
+    title: "1. Hizmetin Kapsamı",
+    body: "Eşleşbulus, 18 yaş ve üzeri yetişkinler için geliştirilmiş bir sosyal tanışma platformudur. Uygulamamız, kullanıcıların birbirleriyle tanışmasına ve iletişim kurmasına olanak tanır. Hizmetlerimizden yararlanmak için bu şartları kabul etmeniz zorunludur.",
+  },
+  {
+    title: "2. Kullanıcı Yükümlülükleri",
+    body: "Uygulamayı kullanarak aşağıdakileri kabul edersiniz:\n• Gerçek ve doğru bilgiler paylaşmak\n• 18 yaş ve üzeri olmak\n• Diğer kullanıcılara saygılı davranmak\n• Taciz, tehdit veya zararlı içerik paylaşmamak\n• Yasadışı faaliyetlerde bulunmamak",
+  },
+  {
+    title: "3. Yasaklanan İçerikler",
+    body: "Aşağıdaki içerikler kesinlikle yasaktır:\n• Cinsel açıdan müstehcen veya şiddet içeren görseller\n• Başkasına ait kişisel bilgilerin izinsiz paylaşılması\n• Sahte hesap veya kimlik oluşturma\n• Spam, reklam veya ticari içerik\n• Nefret söylemi ve ayrımcı paylaşımlar",
+  },
+  {
+    title: "4. Hesap Güvenliği",
+    body: "Hesabınızın güvenliğinden siz sorumlusunuz. Şifrenizi kimseyle paylaşmayın. Hesabınızda yetkisiz erişim tespit ederseniz derhal destek@eslesbulus.com adresine bildirin. Hizmet ihlali tespit edilmesi durumunda hesabınız uyarı yapılmaksızın askıya alınabilir veya kalıcı olarak kapatılabilir.",
+  },
+  {
+    title: "5. Gizlilik",
+    body: "Kişisel verileriniz 6698 sayılı KVKK ve GDPR kapsamında işlenmektedir. Verileriniz yalnızca hizmetin sunulması amacıyla kullanılır ve üçüncü taraflarla satılmaz. Gizlilik Politikamız bu sözleşmenin ayrılmaz bir parçasıdır.",
+  },
+  {
+    title: "6. Hizmet Değişiklikleri",
+    body: "Eşleşbulus, önceden bildirimde bulunmaksızın hizmet koşullarını, özelliklerini veya fiyatlandırmasını değiştirme hakkını saklı tutar. Değişiklikler uygulama içi bildirim veya e-posta aracılığıyla duyurulacaktır. Değişikliklerden sonra uygulamayı kullanmaya devam etmek, yeni koşulları kabul ettiğiniz anlamına gelir.",
+  },
+  {
+    title: "7. Sorumluluk Sınırları",
+    body: "Eşleşbulus; kullanıcılar arasındaki etkileşimlerden, üçüncü taraf hizmetlerinden veya kullanıcı içeriklerinden kaynaklanan zararlardan sorumlu tutulamaz. Platform, eşleşme garantisi vermez. Tüm kullanıcı etkileşimleri kullanıcıların kendi sorumluluğundadır.",
+  },
+  {
+    title: "8. KVKK Aydınlatma Metni",
+    body: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında haklarınız:\n• Kişisel verilerinize erişim hakkı\n• Verilerin düzeltilmesini talep etme hakkı\n• Hesabınızın ve verilerinizin silinmesini isteme hakkı\n• Veri işlemeye itiraz etme hakkı\n• Veri taşınabilirliği hakkı\n\nBu haklarınızı kullanmak için destek@eslesbulus.com adresine başvurabilirsiniz.",
+  },
+  {
+    title: "9. İletişim",
+    body: "Bu sözleşme veya uygulamamız hakkında sorularınız için:\n\nE-posta: destek@eslesbulus.com\nAdres: Türkiye\n\nYanıt süresi: 5 iş günü",
+  },
+];
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
@@ -358,16 +509,123 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 15.5 },
   buttonDisabled: { opacity: 0.6 },
 
-  termsText: {
-    fontSize: 11.5,
-    color: "rgba(255,255,255,0.5)",
-    textAlign: "center",
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginTop: 14,
-    lineHeight: 16,
   },
-  termsBold: { color: "rgba(255,255,255,0.75)", fontWeight: "600" },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  checkboxChecked: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 12.5,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 18,
+  },
+  checkboxLabelBold: {
+    color: "rgba(255,255,255,0.9)",
+    fontWeight: "700",
+  },
 
   loginLink: { marginTop: 18, alignItems: "center" },
   loginLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },
   loginLinkBold: { color: "#fff", fontWeight: "700" },
+
+  // Terms modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#0F0F0F",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  modalScroll: { flex: 1 },
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  termsSectionBlock: { marginBottom: 22 },
+  termsSectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  termsSectionBody: {
+    fontSize: 13.5,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 20,
+  },
+  termsVersion: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.3)",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  scrollHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  scrollHintText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+  acceptButton: {
+    backgroundColor: palette.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    shadowColor: palette.primary,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  acceptButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  acceptButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
 });
