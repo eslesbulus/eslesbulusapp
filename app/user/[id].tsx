@@ -29,12 +29,6 @@ import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ReportSheet } from "@/components/common/ReportSheet";
 
-const MESSAGE_SUGGESTIONS = [
-  "Merhaba! Profilin çok güzel 😊",
-  "Nasılsın, tanışabilir miyiz? ✨",
-  "Ortak ilgi alanlarımız var gibi 🎯",
-];
-
 const SCREEN_W = Dimensions.get("window").width;
 const HERO_H = SCREEN_W * 1.15;
 
@@ -284,24 +278,6 @@ export default function UserDetail() {
           },
         ]}
       >
-        {/* Öneri mesajı chip'leri */}
-        <View style={styles.suggestionsRow}>
-          {MESSAGE_SUGGESTIONS.map((s) => (
-            <Pressable
-              key={s}
-              onPress={() => openChat(s)}
-              style={({ pressed }) => [
-                styles.suggestionChip,
-                { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.75 : 1 },
-              ]}
-            >
-              <Text style={[styles.suggestionText, { color: c.text }]} numberOfLines={1}>
-                {s}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
         {/* Ana buton */}
         <Pressable
           onPress={() => openChat()}
@@ -487,20 +463,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     gap: 10,
   },
-  // Öneri chip'leri
-  suggestionsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  suggestionChip: {
-    flex: 1,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  suggestionText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
   // Ana buton
   hiBtn: {
     flexDirection: "row",
