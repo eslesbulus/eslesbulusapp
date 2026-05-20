@@ -5,12 +5,12 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  FlatList,
   Dimensions,
 } from "react-native";
 import { EMOJI_CATEGORIES } from "@/constants/gifts";
 
 const { width: W } = Dimensions.get("window");
+const CELL = Math.floor((W - 16) / 8);
 
 type Props = {
   onPick: (emoji: string) => void;
@@ -51,25 +51,26 @@ export function EmojiPicker({ onPick, colors: c }: Props) {
         })}
       </ScrollView>
 
-      {/* Emoji grid */}
-      <FlatList
-        key={tab}
-        data={active.emojis}
-        keyExtractor={(item, i) => `${item}-${i}`}
-        numColumns={8}
+      {/* Emoji grid — ScrollView + flexWrap, no FlatList layout quirks */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridContent}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => onPick(item)}
-            style={({ pressed }) => [
-              styles.emojiCell,
-              { backgroundColor: pressed ? c.surface : "transparent" },
-            ]}
-          >
-            <Text style={styles.emojiText}>{item}</Text>
-          </Pressable>
-        )}
-      />
+      >
+        <View style={styles.emojiGrid}>
+          {active.emojis.map((item, i) => (
+            <Pressable
+              key={`${tab}-${i}`}
+              onPress={() => onPick(item)}
+              style={({ pressed }) => [
+                styles.emojiCell,
+                { backgroundColor: pressed ? c.surface : "transparent" },
+              ]}
+            >
+              <Text style={styles.emojiText}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -92,12 +93,16 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 12, fontWeight: "600" },
   gridContent: {
     paddingHorizontal: 8,
-    paddingTop: 4,
-    paddingBottom: 16,
+    paddingTop: 2,
+    paddingBottom: 12,
+  },
+  emojiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   emojiCell: {
-    width: (W - 16) / 8,
-    height: (W - 16) / 8,
+    width: CELL,
+    height: CELL,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
