@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -41,8 +41,12 @@ export default function ProfileSetupScreen() {
 
   const [step, setStep] = useState<Step>("photo");
   const [photoUri, setPhotoUri] = useState<string>(user?.photoURL ?? "");
-  const [name, setName] = useState(user?.displayName ?? "");
-  const [birthDate, setBirthDate] = useState("");
+  const [name] = useState(user?.displayName ?? "");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const monthRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
   const [gender, setGender] = useState("");
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
@@ -120,8 +124,19 @@ export default function ProfileSetupScreen() {
   function goNext() {
     if (step === "photo") setStep("info");
     else if (step === "info") {
-      if (!name.trim()) return Alert.alert("Hata", "İsim boş olamaz.");
-      if (!birthDate.trim()) return Alert.alert("Hata", "Doğum tarihi gerekli.");
+      const day = parseInt(birthDay, 10);
+      const month = parseInt(birthMonth, 10);
+      const year = parseInt(birthYear, 10);
+      const maxYear = new Date().getFullYear() - 18;
+      if (!birthDay || !birthMonth || !birthYear || birthYear.length < 4) {
+        return Alert.alert("Hata", "Doğum tarihi gerekli.");
+      }
+      if (day < 1 || day > 31 || month < 1 || month > 12) {
+        return Alert.alert("Hata", "Geçerli bir tarih gir.");
+      }
+      if (year < 1920 || year > maxYear) {
+        return Alert.alert("Hata", `Doğum yılı 1920-${maxYear} arasında olmalı.`);
+      }
       if (!gender) return Alert.alert("Hata", "Cinsiyet seç.");
       if (!city) return Alert.alert("Hata", "Şehir seç.");
       setStep("about");
@@ -148,7 +163,7 @@ export default function ProfileSetupScreen() {
       await updateDoc(doc(db, "users", uid), {
         name: name.trim(),
         photoURL: downloadURL,
-        birthDate: birthDate.trim(),
+        birthDate: `${birthDay.padStart(2, "0")}.${birthMonth.padStart(2, "0")}.${birthYear}`,
         gender,
         city,
         bio: bio.trim(),
@@ -274,30 +289,57 @@ export default function ProfileSetupScreen() {
                     <Text style={styles.stepTitle}>Kendini Tanıt</Text>
                     <Text style={styles.stepSubtitle}>Temel bilgilerini girelim.</Text>
 
-                    {/* Name */}
-                    <View style={styles.inputWrap}>
-                      <Ionicons name="person-outline" size={18} color={glassColors.textMuted} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.input}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="Adın"
-                        placeholderTextColor={glassColors.textMuted}
-                        autoCapitalize="words"
-                      />
-                    </View>
-
                     {/* Birth date */}
-                    <View style={styles.inputWrap}>
-                      <Ionicons name="calendar-outline" size={18} color={glassColors.textMuted} style={styles.inputIcon} />
+                    <Text style={styles.fieldLabel}>Doğum Tarihi</Text>
+                    <View style={styles.dateRow}>
                       <TextInput
-                        style={styles.input}
-                        value={birthDate}
-                        onChangeText={setBirthDate}
-                        placeholder="GG.AA.YYYY"
+                        style={[styles.dateInput, styles.dateDayMonth]}
+                        value={birthDay}
+                        onChangeText={(v) => {
+                          const d = v.replace(/[^0-9]/g, "").slice(0, 2);
+                          setBirthDay(d);
+                          if (d.length === 2) monthRef.current?.focus();
+                        }}
+                        placeholder="GG"
                         placeholderTextColor={glassColors.textMuted}
-                        keyboardType="numeric"
-                        maxLength={10}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        textAlign="center"
+                        returnKeyType="next"
+                        onSubmitEditing={() => monthRef.current?.focus()}
+                      />
+                      <Text style={styles.dateSep}>/</Text>
+                      <TextInput
+                        ref={monthRef}
+                        style={[styles.dateInput, styles.dateDayMonth]}
+                        value={birthMonth}
+                        onChangeText={(v) => {
+                          const m = v.replace(/[^0-9]/g, "").slice(0, 2);
+                          setBirthMonth(m);
+                          if (m.length === 2) yearRef.current?.focus();
+                        }}
+                        placeholder="AA"
+                        placeholderTextColor={glassColors.textMuted}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        textAlign="center"
+                        returnKeyType="next"
+                        onSubmitEditing={() => yearRef.current?.focus()}
+                      />
+                      <Text style={styles.dateSep}>/</Text>
+                      <TextInput
+                        ref={yearRef}
+                        style={[styles.dateInput, styles.dateYear]}
+                        value={birthYear}
+                        onChangeText={(v) => {
+                          setBirthYear(v.replace(/[^0-9]/g, "").slice(0, 4));
+                        }}
+                        placeholder="YYYY"
+                        placeholderTextColor={glassColors.textMuted}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        textAlign="center"
+                        returnKeyType="done"
                       />
                     </View>
 
@@ -565,6 +607,30 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
+
+  // Date input
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 16,
+  },
+  dateSep: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    paddingVertical: 13,
+    fontSize: 16,
+    color: "#fff",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  dateDayMonth: { width: 60 },
+  dateYear: { flex: 1 },
 
   // Gender chips
   genderRow: {

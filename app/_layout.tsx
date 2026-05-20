@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,8 +15,10 @@ function RootNavigator() {
   const { user, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const navState = useRootNavigationState();
 
   useEffect(() => {
+    if (!navState?.key) return; // navigator not mounted yet
     if (loading) return;
 
     const inAuth = segments[0] === "(auth)";
@@ -29,7 +31,7 @@ function RootNavigator() {
     } else {
       if (inAuth || inOnboarding) router.replace("/(tabs)");
     }
-  }, [user, profile, loading, segments]);
+  }, [navState?.key, user, profile, loading, segments]);
 
   const { mode, theme } = useTheme();
   const bgColor = theme.colors.background;
