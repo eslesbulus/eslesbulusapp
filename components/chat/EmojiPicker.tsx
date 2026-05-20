@@ -82,12 +82,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
+    alignSelf: "flex-start",
   },
-  tabText: { fontSize: 12.5, fontWeight: "600" },
+  tabText: { fontSize: 12, fontWeight: "600" },
   gridContent: {
     paddingHorizontal: 8,
     paddingBottom: 16,
