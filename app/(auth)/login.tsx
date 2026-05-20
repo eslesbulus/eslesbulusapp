@@ -14,7 +14,9 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Pressable,
+  Modal,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -40,6 +42,8 @@ export default function LoginScreen() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [openLegal, setOpenLegal] = useState<(typeof LEGAL_ITEMS)[number] | null>(null);
+  const insets = useSafeAreaInsets();
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
@@ -65,7 +69,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     // DEV bypass
-    if (email.trim() === DEV_ADMIN_EMAIL && password === DEV_ADMIN_PASSWORD) {
+    if (email.trim().toLowerCase() === DEV_ADMIN_EMAIL && password.trim() === DEV_ADMIN_PASSWORD) {
       signInAsDevAdmin();
       setLoading(false);
       return;
@@ -163,6 +167,8 @@ export default function LoginScreen() {
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     secureTextEntry={!showPwd}
                     autoComplete="password"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     value={password}
                     onChangeText={setPassword}
                   />
@@ -220,12 +226,73 @@ export default function LoginScreen() {
                 </Link>
               </BlurView>
             </Animated.View>
+
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Fixed legal footer */}
+      <Animated.View
+        entering={FadeInDown.delay(300).duration(500)}
+        style={[styles.legalFooter, { paddingBottom: insets.bottom + 12 }]}
+        pointerEvents="box-none"
+      >
+        <Text style={styles.legalNotice}>
+          Uygulamayı kullanarak gizlilik politikamızı ve kullanıcı sözleşmemizi kabul etmiş olursunuz.
+        </Text>
+        <View style={styles.legalLinks}>
+          {LEGAL_ITEMS.map((item, i) => (
+            <View key={item.key} style={styles.legalLinkRow}>
+              {i > 0 && <Text style={styles.legalDot}>·</Text>}
+              <Pressable onPress={() => setOpenLegal(item)} hitSlop={6}>
+                <Text style={styles.legalLinkText}>{item.title}</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* Legal detail modal */}
+      <Modal
+        visible={openLegal !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpenLegal(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setOpenLegal(null)}>
+          <Pressable style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalSheetHeader}>
+              <Text style={styles.modalSheetTitle}>{openLegal?.title}</Text>
+              <Pressable onPress={() => setOpenLegal(null)} hitSlop={12}>
+                <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+              </Pressable>
+            </View>
+            <Text style={styles.modalSheetBody}>{openLegal?.body}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
+
+const LEGAL_ITEMS = [
+  {
+    key: "terms",
+    title: "Kullanım Şartları",
+    body: "Eşleşbulus, 18 yaş ve üzeri kullanıcılara yönelik bir sosyal tanışma platformudur. Uygulamayı kullanarak yasalara uygun davranmayı, diğer kullanıcılara saygılı olmayı ve sahte bilgi paylaşmamayı kabul edersiniz. Hizmet ihlali durumunda hesabınız uyarısız askıya alınabilir veya kalıcı olarak kapatılabilir.",
+  },
+  {
+    key: "privacy",
+    title: "Gizlilik Sözleşmesi",
+    body: "Adınız, e-posta adresiniz, profil fotoğrafınız ve şehir bilginiz güvenli sunucularımızda şifreli olarak saklanır. Verileriniz hiçbir koşulda üçüncü taraflarla satılmaz veya paylaşılmaz. Dilediğiniz zaman hesabınızı ve tüm verilerinizi kalıcı olarak silebilirsiniz. Detaylar için destek@eslesbulus.com adresine başvurabilirsiniz.",
+  },
+  {
+    key: "kvkk",
+    title: "KVKK",
+    body: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel verilerinize erişme, düzeltme, silme ve işlemeye itiraz etme haklarına sahipsiniz. Veri sorumlusu olarak Eşleşbulus, verilerinizi yalnızca hizmetin sunulması amacıyla işlemektedir. İlgili talepleriniz için destek@eslesbulus.com adresine e-posta gönderebilirsiniz.",
+  },
+];
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
@@ -235,7 +302,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 22,
-    paddingBottom: 40,
+    paddingBottom: 90,
     paddingTop: 40,
   },
   logoContainer: { alignItems: "center", marginBottom: 28 },
@@ -345,4 +412,82 @@ const styles = StyleSheet.create({
   registerLink: { marginTop: 18, alignItems: "center" },
   registerLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },
   registerLinkBold: { color: "#fff", fontWeight: "700" },
+
+  legalFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  legalNotice: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.38)",
+    textAlign: "center",
+    lineHeight: 15,
+    marginBottom: 8,
+  },
+  legalLinks: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 4,
+  },
+  legalLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  legalDot: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.25)",
+  },
+  legalLinkText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "600",
+    textDecorationLine: "underline",
+    textDecorationColor: "rgba(255,255,255,0.25)",
+  },
+
+  // Legal modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#1A1A1A",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  modalSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  modalSheetTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  modalSheetBody: {
+    fontSize: 13.5,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 21,
+  },
 });
