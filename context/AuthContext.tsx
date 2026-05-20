@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
@@ -57,10 +57,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDevAdmin, setIsDevAdmin] = useState(false);
+  // Ref so the onAuthStateChanged closure always sees the latest value
+  // without needing to re-subscribe every time isDevAdmin changes.
+  const isDevAdminRef = useRef(false);
 
   useEffect(() => {
+    // Single subscription that lives for the lifetime of the provider.
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-      if (isDevAdmin) return;
+      if (isDevAdminRef.current) return;
       setUser(u);
       if (!u) {
         setProfile(null);
@@ -68,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
     return unsubscribeAuth;
-  }, [isDevAdmin]);
+  }, []); // no deps — ref keeps it fresh without re-subscribing
 
   useEffect(() => {
     if (isDevAdmin) return;
@@ -85,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, isDevAdmin]);
 
   function signInAsDevAdmin() {
+    isDevAdminRef.current = true;
     setIsDevAdmin(true);
     setUser(DEV_ADMIN_USER);
     setProfile(DEV_ADMIN_PROFILE);
@@ -92,10 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
-    if (isDevAdmin) {
+    if (isDevAdminRef.current) {
+      isDevAdminRef.current = false;
       setIsDevAdmin(false);
       setUser(null);
       setProfile(null);
+      // Also clear any real Firebase session that may be persisted
+      await fbSignOut(auth).catch(() => {});
       return;
     }
     await fbSignOut(auth);
