@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,66 +11,105 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
-  Dimensions,
+  Pressable,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeInDown, FadeInUp } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
 import { auth, db, storage } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
-
-const { width } = Dimensions.get("window");
-
-const INTERESTS = [
-  "Müzik", "Spor", "Seyahat", "Yemek", "Sanat", "Film",
-  "Kitap", "Dans", "Doğa", "Teknoloji", "Fotoğrafçılık", "Yoga",
-  "Oyun", "Moda", "Şarap", "Kahve",
-];
+import { palette } from "@/constants/theme";
+import { INTERESTS_LIST, INTERESTS_MAX } from "@/constants/interests";
+import { CityPicker } from "@/components/common/CityPicker";
 
 const GENDERS = ["Erkek", "Kadın", "Diğer"];
-
 type Step = "photo" | "info" | "about";
 
 export default function ProfileSetupScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>("photo");
   const [photoUri, setPhotoUri] = useState<string>(user?.photoURL ?? "");
   const [name, setName] = useState(user?.displayName ?? "");
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState("");
+  const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+
+  // Video bg same as login/register
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
+
+  const videoPlayer = useVideoPlayer(
+    require("../../public/home/eslesbulus.mp4"),
+    (p) => {
+      p.loop = true;
+      p.muted = true;
+      p.play();
+    }
+  );
+
+  // Dark glassmorphism palette (matches login/register vibe)
+  const glassColors = {
+    background: "#000",
+    surface: "rgba(255,255,255,0.06)",
+    border: "rgba(255,255,255,0.18)",
+    text: "#fff",
+    textMuted: "rgba(255,255,255,0.55)",
+    primary: palette.primary,
+    card: "rgba(0,0,0,0.85)",
+  };
 
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin gerekli", "Fotoğraf seçmek için galeri iznine ihtiyacımız var.");
+      Alert.alert("İzin Gerekli", "Galeri izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.85,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setPhotoUri(result.assets[0].uri);
     }
   }
 
   function toggleInterest(item: string) {
-    setInterests((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
+    setInterests((prev) => {
+      if (prev.includes(item)) return prev.filter((i) => i !== item);
+      if (prev.length >= INTERESTS_MAX) {
+        Alert.alert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
+        return prev;
+      }
+      return [...prev, item];
+    });
   }
 
   async function uploadPhoto(uid: string): Promise<string> {
-    if (!photoUri || photoUri.startsWith("http")) return photoUri;
+    if (!photoUri) return "";
+    if (photoUri.startsWith("http")) return photoUri;
     const response = await fetch(photoUri);
     const blob = await response.blob();
     const storageRef = ref(storage, `profilePhotos/${uid}.jpg`);
@@ -78,45 +117,46 @@ export default function ProfileSetupScreen() {
     return await getDownloadURL(storageRef);
   }
 
-  async function handleSave() {
-    if (!name.trim()) {
-      Alert.alert("Hata", "İsim boş bırakılamaz.");
-      return;
+  function goNext() {
+    if (step === "photo") setStep("info");
+    else if (step === "info") {
+      if (!name.trim()) return Alert.alert("Hata", "İsim boş olamaz.");
+      if (!birthDate.trim()) return Alert.alert("Hata", "Doğum tarihi gerekli.");
+      if (!gender) return Alert.alert("Hata", "Cinsiyet seç.");
+      if (!city) return Alert.alert("Hata", "Şehir seç.");
+      setStep("about");
     }
-    if (!birthDate.trim()) {
-      Alert.alert("Hata", "Doğum tarihi gerekli.");
-      return;
-    }
-    if (!gender) {
-      Alert.alert("Hata", "Cinsiyet seçmelisin.");
-      return;
-    }
-    if (interests.length < 3) {
-      Alert.alert("Hata", "En az 3 ilgi alanı seç.");
-      return;
-    }
+  }
 
+  async function handleSave() {
+    if (interests.length === 0) {
+      Alert.alert("Hata", "En az bir ilgi alanı seç.");
+      return;
+    }
     setSaving(true);
     try {
       const uid = user!.uid;
       const downloadURL = await uploadPhoto(uid);
 
-      await updateProfile(auth.currentUser!, {
-        displayName: name.trim(),
-        photoURL: downloadURL,
-      });
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, {
+          displayName: name.trim(),
+          photoURL: downloadURL,
+        });
+      }
 
       await updateDoc(doc(db, "users", uid), {
         name: name.trim(),
         photoURL: downloadURL,
         birthDate: birthDate.trim(),
         gender,
+        city,
         bio: bio.trim(),
         interests,
         profileComplete: true,
       });
     } catch (e: any) {
-      Alert.alert("Kayıt başarısız", e.message);
+      Alert.alert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
     } finally {
       setSaving(false);
     }
@@ -126,352 +166,478 @@ export default function ProfileSetupScreen() {
   const stepIndex = steps.indexOf(step);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      {isFocused && (
+        <VideoView
+          player={videoPlayer}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          nativeControls={false}
+        />
+      )}
+      <LinearGradient
+        colors={["rgba(0,0,0,0.4)", "rgba(0,0,0,0.6)", "rgba(0,0,0,0.9)"]}
+        style={StyleSheet.absoluteFill}
+      />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Image
-            source={require("../../public/eslesbuluslogo.png")}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.headerStep}>{stepIndex + 1} / {steps.length}</Text>
-        </View>
-
-        {/* Progress */}
-        <View style={styles.progressBar}>
-          {steps.map((s, i) => (
-            <View
-              key={s}
-              style={[
-                styles.progressSegment,
-                i <= stepIndex && styles.progressActive,
-              ]}
-            />
-          ))}
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* STEP 1: Fotoğraf */}
-          {step === "photo" && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Profil Fotoğrafın</Text>
-              <Text style={styles.stepSubtitle}>
-                İlk izlenim önemli — en güzel fotoğrafını seç
-              </Text>
-
-              <TouchableOpacity style={styles.photoCircle} onPress={pickPhoto}>
-                {photoUri ? (
-                  <Image source={{ uri: photoUri }} style={styles.photoImage} />
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                    <Text style={styles.photoPlaceholderText}>Fotoğraf Ekle</Text>
-                  </View>
-                )}
-                <View style={styles.photoEditBadge}>
-                  <Text style={styles.photoEditIcon}>✏️</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.primaryButton} onPress={() => setStep("info")}>
-                <Text style={styles.primaryButtonText}>Devam Et</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* STEP 2: Kişisel Bilgiler */}
-          {step === "info" && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Kendini Tanıt</Text>
-              <Text style={styles.stepSubtitle}>Temel bilgilerini girelim</Text>
-
-              <Text style={styles.label}>Adın</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Adın soyadın"
-                placeholderTextColor="#bbb"
-              />
-
-              <Text style={styles.label}>Doğum Tarihi</Text>
-              <TextInput
-                style={styles.input}
-                value={birthDate}
-                onChangeText={setBirthDate}
-                placeholder="GG.AA.YYYY"
-                placeholderTextColor="#bbb"
-                keyboardType="numeric"
-              />
-
-              <Text style={styles.label}>Cinsiyet</Text>
-              <View style={styles.genderRow}>
-                {GENDERS.map((g) => (
-                  <TouchableOpacity
-                    key={g}
-                    style={[styles.genderChip, gender === g && styles.genderChipActive]}
-                    onPress={() => setGender(g)}
-                  >
-                    <Text
-                      style={[styles.genderChipText, gender === g && styles.genderChipTextActive]}
-                    >
-                      {g}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.backButton} onPress={() => setStep("photo")}>
-                  <Text style={styles.backButtonText}>Geri</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.primaryButton, styles.primaryButtonFlex]}
-                  onPress={() => setStep("about")}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={{ flex: 1, paddingTop: insets.top + 12 }}>
+            {/* Header */}
+            <View style={styles.header}>
+              {step !== "photo" && (
+                <Pressable
+                  onPress={() => {
+                    if (step === "info") setStep("photo");
+                    if (step === "about") setStep("info");
+                  }}
+                  hitSlop={12}
+                  style={styles.headerBack}
                 >
-                  <Text style={styles.primaryButtonText}>Devam Et</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* STEP 3: Hakkında */}
-          {step === "about" && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Seni Anlat</Text>
-              <Text style={styles.stepSubtitle}>
-                İlgi alanların ve kendinden bir şeyler paylaş
-              </Text>
-
-              <Text style={styles.label}>Hakkında (opsiyonel)</Text>
-              <TextInput
-                style={[styles.input, styles.bioInput]}
-                value={bio}
-                onChangeText={setBio}
-                placeholder="Kendini kısaca anlat..."
-                placeholderTextColor="#bbb"
-                multiline
-                maxLength={200}
+                  <Ionicons name="chevron-back" size={24} color="#fff" />
+                </Pressable>
+              )}
+              <Image
+                source={require("../../public/eslesbulustransp.png")}
+                style={styles.headerLogo}
+                resizeMode="contain"
               />
-              <Text style={styles.charCount}>{bio.length}/200</Text>
+              <Text style={styles.headerStep}>
+                {stepIndex + 1}/{steps.length}
+              </Text>
+            </View>
 
-              <Text style={styles.label}>İlgi Alanları (en az 3)</Text>
-              <View style={styles.interestsGrid}>
-                {INTERESTS.map((item) => {
-                  const active = interests.includes(item);
-                  return (
+            {/* Progress bar */}
+            <View style={styles.progressBar}>
+              {steps.map((s, i) => (
+                <View
+                  key={s}
+                  style={[
+                    styles.progressSegment,
+                    i <= stepIndex && {
+                      backgroundColor: palette.primary,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              {/* STEP 1: PHOTO */}
+              {step === "photo" && (
+                <Animated.View entering={FadeInDown.duration(360)}>
+                  <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+                    <Text style={styles.stepTitle}>Profil Fotoğrafın</Text>
+                    <Text style={styles.stepSubtitle}>
+                      İlk izlenim önemli. En güzel kareni seç.
+                    </Text>
+
+                    <Pressable onPress={pickPhoto} style={styles.photoCircle}>
+                      {photoUri ? (
+                        <Image source={{ uri: photoUri }} style={styles.photoImage} />
+                      ) : (
+                        <View style={styles.photoPlaceholder}>
+                          <Ionicons name="camera-outline" size={42} color={palette.primary} />
+                          <Text style={styles.photoPlaceholderText}>Fotoğraf Ekle</Text>
+                        </View>
+                      )}
+                      <View style={styles.photoEditBadge}>
+                        <Ionicons name="pencil" size={14} color="#fff" />
+                      </View>
+                    </Pressable>
+
                     <TouchableOpacity
-                      key={item}
-                      style={[styles.interestChip, active && styles.interestChipActive]}
-                      onPress={() => toggleInterest(item)}
+                      style={[styles.primaryButton, !photoUri && styles.buttonGhost]}
+                      onPress={goNext}
+                      activeOpacity={0.85}
                     >
-                      <Text
-                        style={[styles.interestChipText, active && styles.interestChipTextActive]}
-                      >
-                        {item}
+                      <Text style={styles.primaryButtonText}>
+                        {photoUri ? "Devam Et" : "Şimdilik Atla"}
                       </Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  </BlurView>
+                </Animated.View>
+              )}
 
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.backButton} onPress={() => setStep("info")}>
-                  <Text style={styles.backButtonText}>Geri</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.primaryButton, styles.primaryButtonFlex, saving && styles.buttonDisabled]}
-                  onPress={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>Tamamla 🎉</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </ScrollView>
+              {/* STEP 2: INFO */}
+              {step === "info" && (
+                <Animated.View entering={FadeInDown.duration(360)}>
+                  <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+                    <Text style={styles.stepTitle}>Kendini Tanıt</Text>
+                    <Text style={styles.stepSubtitle}>Temel bilgilerini girelim.</Text>
+
+                    {/* Name */}
+                    <View style={styles.inputWrap}>
+                      <Ionicons name="person-outline" size={18} color={glassColors.textMuted} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="Adın"
+                        placeholderTextColor={glassColors.textMuted}
+                        autoCapitalize="words"
+                      />
+                    </View>
+
+                    {/* Birth date */}
+                    <View style={styles.inputWrap}>
+                      <Ionicons name="calendar-outline" size={18} color={glassColors.textMuted} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        value={birthDate}
+                        onChangeText={setBirthDate}
+                        placeholder="GG.AA.YYYY"
+                        placeholderTextColor={glassColors.textMuted}
+                        keyboardType="numeric"
+                        maxLength={10}
+                      />
+                    </View>
+
+                    {/* Gender */}
+                    <Text style={styles.fieldLabel}>Cinsiyet</Text>
+                    <View style={styles.genderRow}>
+                      {GENDERS.map((g) => {
+                        const active = gender === g;
+                        return (
+                          <Pressable
+                            key={g}
+                            style={[styles.genderChip, active && styles.genderChipActive]}
+                            onPress={() => setGender(g)}
+                          >
+                            <Text style={[styles.genderChipText, active && styles.genderChipTextActive]}>
+                              {g}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {/* City */}
+                    <Text style={styles.fieldLabel}>Şehir</Text>
+                    <Pressable
+                      style={[styles.input, styles.cityPicker]}
+                      onPress={() => setCityPickerOpen(true)}
+                    >
+                      <Ionicons name="location-outline" size={18} color={glassColors.textMuted} />
+                      <Text style={[styles.cityPickerText, !city && { color: glassColors.textMuted }]}>
+                        {city || "Şehir seç"}
+                      </Text>
+                      <Ionicons name="chevron-down" size={18} color={glassColors.textMuted} />
+                    </Pressable>
+
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={goNext}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.primaryButtonText}>Devam Et</Text>
+                    </TouchableOpacity>
+                  </BlurView>
+                </Animated.View>
+              )}
+
+              {/* STEP 3: ABOUT */}
+              {step === "about" && (
+                <Animated.View entering={FadeInDown.duration(360)}>
+                  <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+                    <Text style={styles.stepTitle}>Seni Anlat</Text>
+                    <Text style={styles.stepSubtitle}>
+                      Bio ve ilgi alanların (en fazla {INTERESTS_MAX}).
+                    </Text>
+
+                    <View style={styles.inputWrap}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={18} color={glassColors.textMuted} style={[styles.inputIcon, { top: 14 }]} />
+                      <TextInput
+                        style={[styles.input, styles.bioInput]}
+                        value={bio}
+                        onChangeText={setBio}
+                        placeholder="Kendini kısaca anlat (opsiyonel)"
+                        placeholderTextColor={glassColors.textMuted}
+                        multiline
+                        maxLength={200}
+                      />
+                    </View>
+                    <Text style={styles.charCount}>{bio.length}/200</Text>
+
+                    <Text style={styles.fieldLabel}>
+                      İlgi Alanları ({interests.length}/{INTERESTS_MAX})
+                    </Text>
+                    <View style={styles.interestsGrid}>
+                      {INTERESTS_LIST.map((item) => {
+                        const active = interests.includes(item);
+                        return (
+                          <Pressable
+                            key={item}
+                            style={[styles.interestChip, active && styles.interestChipActive]}
+                            onPress={() => toggleInterest(item)}
+                          >
+                            <Text style={[styles.interestChipText, active && styles.interestChipTextActive]}>
+                              {item}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.primaryButton, saving && styles.buttonDisabled]}
+                      onPress={handleSave}
+                      disabled={saving}
+                      activeOpacity={0.85}
+                    >
+                      {saving ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.primaryButtonText}>Tamamla</Text>
+                      )}
+                    </TouchableOpacity>
+                  </BlurView>
+                </Animated.View>
+              )}
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      {/* City picker modal */}
+      <CityPicker
+        visible={cityPickerOpen}
+        selected={city}
+        onClose={() => setCityPickerOpen(false)}
+        onSelect={setCity}
+        colors={{
+          background: "#0A0A0A",
+          surface: "#1E1E1E",
+          card: "#1a1a1a",
+          border: "rgba(255,255,255,0.08)",
+          text: "#FFFFFF",
+          textMuted: "#A0A0A0",
+          primary: palette.primary,
+        }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#000" },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  headerLogo: { width: 120, height: 36 },
-  headerStep: { fontSize: 14, color: "#aaa", fontWeight: "600" },
+  headerBack: { padding: 4, position: "absolute", left: 12, zIndex: 1 },
+  headerLogo: { width: 130, height: 38, flex: 1, alignSelf: "center" },
+  headerStep: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "700",
+  },
   progressBar: {
     flexDirection: "row",
     paddingHorizontal: 20,
     gap: 6,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 12,
   },
   progressSegment: {
     flex: 1,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
-  progressActive: { backgroundColor: "#E91E63" },
-  content: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 8,
+
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    paddingBottom: 30,
   },
-  stepContainer: { flex: 1 },
+
+  glassCard: {
+    borderRadius: 26,
+    overflow: "hidden",
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+
   stepTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
-    color: "#1a1a1a",
-    marginBottom: 6,
-    marginTop: 16,
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   stepSubtitle: {
-    fontSize: 15,
-    color: "#888",
-    marginBottom: 28,
-    lineHeight: 22,
+    fontSize: 13.5,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 22,
+    lineHeight: 19,
   },
+
+  // Photo step
   photoCircle: {
     width: 160,
     height: 160,
     borderRadius: 80,
     alignSelf: "center",
-    marginBottom: 40,
+    marginBottom: 32,
     overflow: "hidden",
     borderWidth: 3,
-    borderColor: "#E91E63",
+    borderColor: palette.primary,
+    position: "relative",
   },
   photoImage: { width: "100%", height: "100%" },
   photoPlaceholder: {
     flex: 1,
-    backgroundColor: "#fce4ec",
+    backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
-  photoPlaceholderIcon: { fontSize: 40, marginBottom: 8 },
-  photoPlaceholderText: { fontSize: 14, color: "#E91E63", fontWeight: "600" },
+  photoPlaceholderText: { fontSize: 13, color: palette.primary, fontWeight: "700" },
   photoEditBadge: {
     position: "absolute",
     bottom: 8,
     right: 8,
-    backgroundColor: "#E91E63",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#000",
   },
-  photoEditIcon: { fontSize: 14 },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#444",
-    marginBottom: 8,
-    marginTop: 4,
+
+  // Inputs
+  inputWrap: { position: "relative", marginBottom: 12 },
+  inputIcon: {
+    position: "absolute",
+    left: 14,
+    top: 14,
+    zIndex: 1,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: "#e8e8e8",
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    paddingLeft: 42,
+    paddingRight: 14,
     paddingVertical: 13,
     fontSize: 15,
-    color: "#333",
-    marginBottom: 16,
-    backgroundColor: "#fafafa",
+    color: "#fff",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   bioInput: {
-    height: 100,
+    minHeight: 90,
     textAlignVertical: "top",
-    paddingTop: 12,
+    paddingTop: 14,
   },
   charCount: {
-    fontSize: 12,
-    color: "#bbb",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
     textAlign: "right",
-    marginTop: -12,
-    marginBottom: 16,
+    marginTop: -8,
+    marginBottom: 12,
   },
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 4,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  // Gender chips
   genderRow: {
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 24,
+    gap: 8,
+    marginBottom: 16,
   },
   genderChip: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   genderChipActive: {
-    borderColor: "#E91E63",
-    backgroundColor: "#fce4ec",
+    borderColor: palette.primary,
+    backgroundColor: palette.primary,
   },
-  genderChipText: { fontSize: 14, color: "#888", fontWeight: "600" },
-  genderChipTextActive: { color: "#E91E63" },
+  genderChipText: { fontSize: 14, color: "rgba(255,255,255,0.7)", fontWeight: "600" },
+  genderChipTextActive: { color: "#fff", fontWeight: "700" },
+
+  // City
+  cityPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 14,
+    marginBottom: 16,
+  },
+  cityPickerText: { flex: 1, fontSize: 15, color: "#fff" },
+
+  // Interests
   interestsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 32,
+    gap: 8,
+    marginBottom: 22,
   },
   interestChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    backgroundColor: "#fafafa",
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   interestChipActive: {
-    borderColor: "#E91E63",
-    backgroundColor: "#E91E63",
+    borderColor: palette.primary,
+    backgroundColor: palette.primary,
   },
-  interestChipText: { fontSize: 14, color: "#666", fontWeight: "500" },
-  interestChipTextActive: { color: "#fff" },
-  navRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
+  interestChipText: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontWeight: "500" },
+  interestChipTextActive: { color: "#fff", fontWeight: "700" },
+
+  // Buttons
   primaryButton: {
-    backgroundColor: "#E91E63",
+    backgroundColor: palette.primary,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: "center",
+    marginTop: 4,
+    shadowColor: palette.primary,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
   },
-  primaryButtonFlex: { flex: 1 },
-  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 15.5 },
   buttonDisabled: { opacity: 0.6 },
-  backButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    alignItems: "center",
+  buttonGhost: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  backButtonText: { color: "#666", fontWeight: "600", fontSize: 15 },
 });

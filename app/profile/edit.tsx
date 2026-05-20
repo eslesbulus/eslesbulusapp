@@ -16,16 +16,14 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
-import { POPULAR_CITIES } from "@/constants/mockUsers";
+import { CityPicker } from "@/components/common/CityPicker";
+import { INTERESTS_LIST, INTERESTS_MAX } from "@/constants/interests";
 
 const MAX_PHOTOS = 6;
-const INTERESTS_LIST = [
-  "Müzik", "Spor", "Seyahat", "Yemek", "Kitap", "Film",
-  "Sanat", "Dans", "Fotoğraf", "Doğa", "Yoga", "Oyun",
-  "Teknoloji", "Moda", "Kahve", "Kedi", "Köpek",
-];
 
 export default function EditProfileScreen() {
   const { profile, updateProfile } = useAuth();
@@ -40,7 +38,7 @@ export default function EditProfileScreen() {
   const [mainPhoto, setMainPhoto] = useState(profile?.photoURL ?? "");
   const [photos, setPhotos] = useState<string[]>(profile?.photos ?? []);
   const [saving, setSaving] = useState(false);
-  const [cityOpen, setCityOpen] = useState(false);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
   const pickMainPhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -84,18 +82,28 @@ export default function EditProfileScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
-  const MAX_INTERESTS = 5;
-
   const toggleInterest = useCallback((item: string) => {
     setInterests((prev) => {
       if (prev.includes(item)) return prev.filter((i) => i !== item);
-      if (prev.length >= MAX_INTERESTS) {
-        Alert.alert("Limit", `En fazla ${MAX_INTERESTS} ilgi alanı seçebilirsin.`);
+      if (prev.length >= INTERESTS_MAX) {
+        Alert.alert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
         return prev;
       }
       return [...prev, item];
     });
   }, []);
+
+  // Uploads a local file:// URI to Firebase Storage; returns download URL.
+  // If the URI is already http(s), returns it as-is (already uploaded).
+  async function uploadToStorage(localUri: string, path: string): Promise<string> {
+    if (!localUri) return "";
+    if (localUri.startsWith("http")) return localUri;
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -104,17 +112,31 @@ export default function EditProfileScreen() {
     }
     setSaving(true);
     try {
+      const uid = profile?.uid;
+      if (!uid) throw new Error("Kullanıcı yok");
+
+      const mainUrl = await uploadToStorage(mainPhoto, `profilePhotos/${uid}.jpg`);
+
+      const photoUrls: string[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        const url = await uploadToStorage(
+          photos[i],
+          `profilePhotos/${uid}_extra_${i}_${Date.now()}.jpg`
+        );
+        if (url) photoUrls.push(url);
+      }
+
       await updateProfile({
         name: name.trim(),
         bio: bio.trim(),
         city: city.trim(),
         interests,
-        photoURL: mainPhoto || undefined,
-        photos,
+        photoURL: mainUrl || undefined,
+        photos: photoUrls,
       });
       router.back();
-    } catch {
-      Alert.alert("Hata", "Profil kaydedilemedi. Tekrar dene.");
+    } catch (e: any) {
+      Alert.alert("Hata", e.message ?? "Profil kaydedilemedi. Tekrar dene.");
     } finally {
       setSaving(false);
     }
@@ -208,48 +230,15 @@ export default function EditProfileScreen() {
         <Animated.View entering={FadeInDown.delay(140).duration(350)} style={styles.section}>
           <Text style={[styles.label, { color: c.textMuted }]}>Şehir</Text>
           <Pressable
-            onPress={() => setCityOpen((o) => !o)}
+            onPress={() => setCityPickerOpen(true)}
             style={[styles.input, styles.citySelector, { backgroundColor: c.surface, borderColor: c.border }]}
           >
-            <Text style={[styles.citySelectorText, { color: city ? c.text : c.textMuted }]}>
+            <Ionicons name="location-outline" size={18} color={c.textMuted} />
+            <Text style={[styles.citySelectorText, { color: city ? c.text : c.textMuted, flex: 1, marginLeft: 8 }]}>
               {city || "Şehir seç"}
             </Text>
-            <Ionicons
-              name={cityOpen ? "chevron-up" : "chevron-down"}
-              size={18}
-              color={c.textMuted}
-            />
+            <Ionicons name="chevron-down" size={18} color={c.textMuted} />
           </Pressable>
-          {cityOpen && (
-            <View style={[styles.cityDropdown, { backgroundColor: c.surface, borderColor: c.border }]}>
-              {POPULAR_CITIES.map((c_) => (
-                <Pressable
-                  key={c_}
-                  onPress={() => { setCity(c_); setCityOpen(false); }}
-                  style={[
-                    styles.cityItem,
-                    { borderBottomColor: theme.colors.border },
-                    city === c_ && { backgroundColor: `${c.primary}15` },
-                  ]}
-                >
-                  <Text style={[styles.cityItemText, { color: theme.colors.text }]}>{c_}</Text>
-                  {city === c_ && <Ionicons name="checkmark" size={16} color={c.primary} />}
-                </Pressable>
-              ))}
-              <Pressable
-                style={[styles.cityItemCustom, { borderTopColor: theme.colors.border }]}
-                onPress={() => setCityOpen(false)}
-              >
-                <TextInput
-                  value={city}
-                  onChangeText={setCity}
-                  placeholder="Başka bir şehir yaz..."
-                  placeholderTextColor={theme.colors.textMuted}
-                  style={[styles.cityCustomInput, { color: theme.colors.text }]}
-                />
-              </Pressable>
-            </View>
-          )}
         </Animated.View>
 
         {/* Biyografi */}
@@ -275,7 +264,7 @@ export default function EditProfileScreen() {
         {/* İlgi Alanları */}
         <Animated.View entering={FadeInDown.delay(220).duration(350)} style={styles.section}>
           <Text style={[styles.label, { color: c.textMuted }]}>
-            İlgi Alanları ({interests.length}/{MAX_INTERESTS})
+            İlgi Alanları ({interests.length}/{INTERESTS_MAX})
           </Text>
           <View style={styles.interestsGrid}>
             {INTERESTS_LIST.map((item) => {
@@ -301,6 +290,14 @@ export default function EditProfileScreen() {
           </View>
         </Animated.View>
       </ScrollView>
+
+      <CityPicker
+        visible={cityPickerOpen}
+        selected={city}
+        onClose={() => setCityPickerOpen(false)}
+        onSelect={setCity}
+        colors={c}
+      />
     </SafeAreaView>
   );
 }

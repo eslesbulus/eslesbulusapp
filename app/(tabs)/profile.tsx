@@ -585,14 +585,15 @@ const styles = StyleSheet.create({
   photosGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
+    gap: 6,
     marginBottom: 8,
   },
   photoGridItem: {
-    width: "31.5%",
-    aspectRatio: 1,
+    width: "31%",
+    height: 120,
     borderRadius: 12,
     backgroundColor: "#222",
+    resizeMode: "cover",
   },
 
   reportModal: { flex: 1 },
