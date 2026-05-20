@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   featuresCard: {
     marginHorizontal: 16,
     borderRadius: 22,
-    backgroundColor: CARD_BG,
+    backgroundColor: "rgba(20,15,10,0.8)",
     borderWidth: 1,
     borderColor: `${GOLD}20`,
     padding: 16,
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   packageCard: {
     flex: 1,
     borderRadius: 18,
-    backgroundColor: CARD_BG,
+    backgroundColor: "rgba(20,15,10,0.8)",
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.08)",
     padding: 14,
