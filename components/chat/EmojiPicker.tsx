@@ -53,6 +53,7 @@ export function EmojiPicker({ onPick, colors: c }: Props) {
 
       {/* Emoji grid */}
       <FlatList
+        key={tab}
         data={active.emojis}
         keyExtractor={(item, i) => `${item}-${i}`}
         numColumns={8}
@@ -91,6 +92,7 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 12, fontWeight: "600" },
   gridContent: {
     paddingHorizontal: 8,
+    paddingTop: 4,
     paddingBottom: 16,
   },
   emojiCell: {
