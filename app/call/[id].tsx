@@ -218,13 +218,17 @@ export default function CallScreen() {
         entering={FadeIn.duration(500)}
         style={[styles.voiceCenter, { paddingTop: insets.top }]}
       >
-        {callState === "ringing" && (
-          <>
-            <Animated.View style={[styles.pulseRing, p1Style, { borderColor: "rgba(255,255,255,0.2)" }]} />
-            <Animated.View style={[styles.pulseRing, styles.pulseRing2, p2Style, { borderColor: "rgba(255,255,255,0.15)" }]} />
-          </>
-        )}
-        <Image source={{ uri: user.photo }} style={styles.voiceAvatar} />
+        {/* Rings ve avatar aynı container içinde hizalanıyor */}
+        <View style={styles.avatarPulseContainer}>
+          {callState === "ringing" && (
+            <>
+              <Animated.View style={[styles.pulseRing, p1Style, { borderColor: "rgba(255,255,255,0.2)" }]} />
+              <Animated.View style={[styles.pulseRingOuter, p2Style, { borderColor: "rgba(255,255,255,0.15)" }]} />
+            </>
+          )}
+          <Image source={{ uri: user.photo }} style={styles.voiceAvatar} />
+        </View>
+
         <Text style={styles.voiceName}>{user.name}</Text>
         <Text style={styles.voiceStatus}>
           {callState === "ringing"
@@ -370,17 +374,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 18,
   },
+  // Rings ve avatar'ı tam üst üste hizalayan container
+  avatarPulseContainer: {
+    width: 240,
+    height: 240,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   pulseRing: {
     position: "absolute",
     width: 180,
     height: 180,
     borderRadius: 90,
-    borderWidth: 36,
+    borderWidth: 30,
+    top: 30,   // (240 - 180) / 2
+    left: 30,
   },
-  pulseRing2: {
-    width: 230,
-    height: 230,
-    borderRadius: 115,
+  pulseRingOuter: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 24,
+    top: 0,
+    left: 0,
   },
   voiceAvatar: {
     width: 130,

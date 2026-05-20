@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   Switch,
+  Dimensions,
   Platform,
   Modal,
   TextInput,
@@ -24,11 +25,21 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
+import { usePremium } from "@/context/PremiumContext";
+import { useCoins } from "@/context/CoinsContext";
+
+const SCREEN_W = Dimensions.get("window").width;
+const PHOTO_GAP = 6;
+const PHOTO_PADDING = 16;
+// 3 sütun, 2 gap, her iki yanda padding
+const PHOTO_ITEM_W = Math.floor((SCREEN_W - PHOTO_PADDING * 2 - PHOTO_GAP * 2) / 3);
 
 export default function ProfileScreen() {
   const { user, profile, isDevAdmin, signOut } = useAuth();
   const { theme, mode, toggle } = useTheme();
   const { blockedUsers } = useBlockedUsers();
+  const { isPremium, premiumExpiry, dailyLikesUsed, dailyHisUsed } = usePremium();
+  const { balance: tokenBalance } = useCoins();
   const router = useRouter();
   const c = theme.colors;
 
@@ -114,10 +125,18 @@ export default function ProfileScreen() {
             </View>
           </Pressable>
 
-          <Text style={styles.heroName}>
-            {displayName}
-            {age ? `, ${age}` : ""}
-          </Text>
+          <View style={styles.heroNameRow}>
+            <Text style={styles.heroName}>
+              {displayName}
+              {age ? `, ${age}` : ""}
+            </Text>
+            {isPremium && (
+              <View style={styles.vipBadge}>
+                <Ionicons name="diamond" size={10} color="#000" />
+                <Text style={styles.vipBadgeText}>VIP</Text>
+              </View>
+            )}
+          </View>
 
           {profile?.city ? (
             <View style={styles.heroCityRow}>
@@ -141,7 +160,7 @@ export default function ProfileScreen() {
             <View style={styles.statDivider} />
             <StatItem
               label="Üyelik"
-              value={profile?.profileComplete ? "Standart" : "Eksik"}
+              value={isPremium ? "VIP ✦" : (profile?.profileComplete ? "Standart" : "Eksik")}
             />
           </View>
         </LinearGradient>
@@ -157,6 +176,66 @@ export default function ProfileScreen() {
           </Pressable>
         </Animated.View>
 
+        {/* ── Premium & Jeton Kartları ── */}
+        <Animated.View entering={FadeInDown.delay(80).duration(350)} style={styles.quickCardsRow}>
+          {/* Premium kart */}
+          <Pressable
+            onPress={() => router.push("/premium")}
+            style={[styles.quickCard, { backgroundColor: isPremium ? `${c.secondary}18` : c.card, borderColor: isPremium ? `${c.secondary}40` : c.border }]}
+          >
+            <LinearGradient
+              colors={isPremium ? ["#D4AF3720", "#D4AF3705"] : ["transparent", "transparent"]}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.quickCardIcon, { backgroundColor: `${c.secondary}20` }]}>
+              <Ionicons name="diamond" size={18} color={c.secondary} />
+            </View>
+            <View style={styles.quickCardTexts}>
+              <Text style={[styles.quickCardLabel, { color: c.textMuted }]}>Premium</Text>
+              {isPremium ? (
+                <Text style={[styles.quickCardValue, { color: c.secondary }]}>
+                  VIP Aktif ✓
+                </Text>
+              ) : (
+                <Text style={[styles.quickCardValue, { color: c.text }]}>
+                  Premium Al →
+                </Text>
+              )}
+              {isPremium && premiumExpiry && (
+                <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
+                  {premiumExpiry.toLocaleDateString("tr-TR")}'e kadar
+                </Text>
+              )}
+              {!isPremium && (
+                <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
+                  Beğeni: {10 - dailyLikesUsed}/10
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+          </Pressable>
+
+          {/* Jeton kart */}
+          <Pressable
+            onPress={() => router.push("/premium/coins")}
+            style={[styles.quickCard, { backgroundColor: c.card, borderColor: c.border }]}
+          >
+            <View style={[styles.quickCardIcon, { backgroundColor: "rgba(245,158,11,0.15)" }]}>
+              <Text style={{ fontSize: 18 }}>🪙</Text>
+            </View>
+            <View style={styles.quickCardTexts}>
+              <Text style={[styles.quickCardLabel, { color: c.textMuted }]}>Jetonlarım</Text>
+              <Text style={[styles.quickCardValue, { color: c.text }]}>
+                {tokenBalance} Jeton
+              </Text>
+              <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
+                ≈ {Math.floor(tokenBalance / 10)} mesaj
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+          </Pressable>
+        </Animated.View>
+
         {/* ── Bio ── */}
         {profile?.bio ? (
           <Animated.View entering={FadeInDown.delay(100).duration(350)} style={[styles.bioCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -168,9 +247,13 @@ export default function ProfileScreen() {
         {(photo || extraPhotos.length > 0) && (
           <Animated.View entering={FadeInDown.delay(120).duration(350)}>
             <SectionHeader title={`Fotoğraflar (${photoCount})`} c={c} />
-            <View style={[styles.photosGrid, { paddingHorizontal: 16 }]}>
-              {[...(photo ? [photo] : []), ...extraPhotos].slice(0, 6).map((uri, i) => (
-                <Image key={i} source={{ uri }} style={[styles.photoGridItem]} />
+            <View style={styles.photosGrid}>
+              {[...(photo ? [photo] : []), ...extraPhotos].slice(0, 9).map((uri, i) => (
+                <Image
+                  key={i}
+                  source={{ uri }}
+                  style={[styles.photoGridItem, { width: PHOTO_ITEM_W, height: PHOTO_ITEM_W }]}
+                />
               ))}
             </View>
           </Animated.View>
@@ -190,7 +273,7 @@ export default function ProfileScreen() {
             <RowItem
               icon="diamond-outline"
               label="Üyelik Planı"
-              value="Standart"
+              value={isPremium ? "VIP Premium ✦" : "Standart"}
               c={c}
             />
           </View>
@@ -488,7 +571,18 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
 
+  heroNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 0 },
   heroName: { fontSize: 22, fontWeight: "800", color: "#fff" },
+  vipBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#D4AF37",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  vipBadgeText: { color: "#000", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   heroCityRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3 },
   heroCity: { fontSize: 13, color: "rgba(255,255,255,0.8)" },
   devBadge: {
@@ -516,6 +610,35 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: "800", color: "#fff" },
   statLabel: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 },
   statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.2)", marginVertical: 4 },
+
+  // Quick cards (premium + jeton)
+  quickCardsRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  quickCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    overflow: "hidden",
+  },
+  quickCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickCardTexts: { flex: 1 },
+  quickCardLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 1 },
+  quickCardValue: { fontSize: 13, fontWeight: "700" },
+  quickCardSub: { fontSize: 10, marginTop: 1 },
 
   editBtnWrap: { paddingHorizontal: 16, marginTop: 16 },
   editBtn: {
@@ -585,12 +708,12 @@ const styles = StyleSheet.create({
   photosGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: PHOTO_GAP,
     marginBottom: 8,
+    paddingHorizontal: PHOTO_PADDING,
   },
   photoGridItem: {
-    width: "31%",
-    height: 120,
+    // width & height set dynamically via PHOTO_ITEM_W
     borderRadius: 12,
     backgroundColor: "#222",
     resizeMode: "cover",

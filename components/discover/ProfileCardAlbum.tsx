@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, Image, Pressable, StyleSheet, Dimensions } from "react-native";
+import { View, Text, Image, Pressable, StyleSheet, Dimensions, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,6 +15,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { usePremium, DAILY_LIKE_LIMIT } from "@/context/PremiumContext";
 
 type Props = {
   user: MockUser;
@@ -29,6 +31,8 @@ const CARD_H = CARD_W * 1.45;
 export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   const { theme } = useTheme();
   const { hasSent, isLiked, toggleLike } = useInteractions();
+  const { canLike, useLike } = usePremium();
+  const router = useRouter();
   const c = theme.colors;
   const sent = hasSent(user.id);
   const liked = isLiked(user.id);
@@ -49,12 +53,27 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const heartAnim = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
 
-  function handleLike() {
+  async function handleLike() {
+    if (!canLike && !liked) {
+      Alert.alert(
+        "Günlük Limit Doldu",
+        `Bugün ${DAILY_LIKE_LIMIT} beğeni hakkını kullandın. Premium üyelikle sınırsız beğen!`,
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Premium Al 👑", onPress: () => router.push("/premium") },
+        ]
+      );
+      return;
+    }
     heartScale.value = withSequence(
       withTiming(0.8, { duration: 80 }),
       withSpring(1.3, { damping: 5, stiffness: 300 }),
       withSpring(1, { damping: 10 })
     );
+    if (!liked) {
+      const allowed = await useLike();
+      if (!allowed) return;
+    }
     toggleLike(user);
   }
 

@@ -22,11 +22,18 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { getUserById, MockUser } from "@/constants/mockUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ReportSheet } from "@/components/common/ReportSheet";
+
+const MESSAGE_SUGGESTIONS = [
+  "Merhaba! Profilin çok güzel 😊",
+  "Nasılsın, tanışabilir miyiz? ✨",
+  "Ortak ilgi alanlarımız var gibi 🎯",
+];
 
 const SCREEN_W = Dimensions.get("window").width;
 const HERO_H = SCREEN_W * 1.15;
@@ -36,6 +43,7 @@ export default function UserDetail() {
   const router = useRouter();
   const { theme } = useTheme();
   const { hasSent, sendRandomHi } = useInteractions();
+  const { balance: tokenBalance } = useCoins();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
 
@@ -69,12 +77,22 @@ export default function UserDetail() {
     );
   }
 
-  const sent = hasSent(user.id);
-
-  function pressHi() {
-    if (sent) return;
-    const r = sendRandomHi(user!.id);
-    setToast({ user: user!, text: r.text, emoji: r.emoji });
+  function openChat(draft?: string) {
+    if (tokenBalance < TOKENS_PER_MESSAGE) {
+      Alert.alert(
+        "Jeton Yetersiz 🪙",
+        `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+        ]
+      );
+      return;
+    }
+    const path = draft
+      ? `/chat/${user!.id}?draft=${encodeURIComponent(draft)}`
+      : `/chat/${user!.id}`;
+    router.push(path as any);
   }
 
   return (
@@ -262,34 +280,38 @@ export default function UserDetail() {
           {
             backgroundColor: c.surface,
             borderTopColor: c.border,
-            paddingBottom: Platform.OS === "ios" ? insets.bottom + 10 : 16,
+            paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 14,
           },
         ]}
       >
+        {/* Öneri mesajı chip'leri */}
+        <View style={styles.suggestionsRow}>
+          {MESSAGE_SUGGESTIONS.map((s) => (
+            <Pressable
+              key={s}
+              onPress={() => openChat(s)}
+              style={({ pressed }) => [
+                styles.suggestionChip,
+                { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.75 : 1 },
+              ]}
+            >
+              <Text style={[styles.suggestionText, { color: c.text }]} numberOfLines={1}>
+                {s}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Ana buton */}
         <Pressable
-          onPress={pressHi}
-          disabled={sent}
+          onPress={() => openChat()}
           style={({ pressed }) => [
             styles.hiBtn,
-            sent
-              ? { backgroundColor: c.card, borderWidth: 1, borderColor: c.border }
-              : {
-                  backgroundColor: c.primary,
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
-                },
+            { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.97 : 1 }] },
           ]}
         >
-          {sent ? (
-            <>
-              <Ionicons name="checkmark-circle" size={20} color={c.online} />
-              <Text style={[styles.hiBtnText, { color: c.text }]}>Mesaj Gönderildi</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="hand-right" size={20} color="#fff" />
-              <Text style={styles.hiBtnText}>Hi gönder</Text>
-            </>
-          )}
+          <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+          <Text style={styles.hiBtnText}>Mesaj Gönder</Text>
         </Pressable>
       </View>
     </View>
@@ -460,15 +482,31 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
-    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     borderTopWidth: 1,
+    gap: 10,
   },
+  // Öneri chip'leri
+  suggestionsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  suggestionChip: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  suggestionText: { fontSize: 11, fontWeight: "600", textAlign: "center" },
+  // Ana buton
   hiBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 16,
     gap: 8,
   },
