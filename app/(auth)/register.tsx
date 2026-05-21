@@ -11,15 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Keyboard,
-  TouchableWithoutFeedback,
   Pressable,
   Modal,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
@@ -150,12 +147,13 @@ export default function RegisterScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
@@ -168,7 +166,7 @@ export default function RegisterScreen() {
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(120).duration(500)}>
-              <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+              <View style={styles.glassCard}>
                 <Text style={styles.cardTitle}>Hesap Oluştur</Text>
                 <Text style={styles.cardSub}>Birkaç saniye, hemen başlıyoruz</Text>
 
@@ -317,10 +315,9 @@ export default function RegisterScreen() {
                     </Text>
                   </TouchableOpacity>
                 </Link>
-              </BlurView>
+              </View>
             </Animated.View>
           </ScrollView>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
       {/* Date picker — Android: inline native; iOS: spinner inside modal */}
@@ -488,7 +485,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     padding: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(0,0,0,0.62)",
   },
   cardTitle: {
     fontSize: 26,

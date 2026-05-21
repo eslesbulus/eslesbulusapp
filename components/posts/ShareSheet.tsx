@@ -54,6 +54,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
       addSharedPost(u.uid, {
         id: `sp_${Date.now()}_${u.uid}`,
         postId: post.id,
+        userId: post.userId,
         userName: post.userName,
         userPhoto: post.userPhoto,
         text: post.text,
@@ -131,10 +132,15 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
 
           {/* Kullanıcı Listesi */}
           <Text style={[styles.subTitle, { color: c.textMuted }]}>Kişi Seç</Text>
+          {chatUsers.length === 0 && (
+            <View style={styles.emptyUsers}>
+              <Text style={[styles.emptyUsersText, { color: c.textMuted }]}>Henüz eşleşme yok</Text>
+            </View>
+          )}
           <FlatList
             data={chatUsers}
             keyExtractor={(u) => u.uid}
-            scrollEnabled={false}
+            scrollEnabled={true}
             renderItem={({ item }) => {
               const isSelected = selected.has(item.uid);
               const photo = item.photoURL || item.photos?.[0];
@@ -192,8 +198,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 16,
-    maxHeight: "80%",
+    minHeight: 380,
+    maxHeight: "85%",
   },
+  emptyUsers: {
+    alignItems: "center",
+    paddingVertical: 32,
+  },
+  emptyUsersText: { fontSize: 14 },
   handleWrap: { alignItems: "center", paddingTop: 10, paddingBottom: 4 },
   handle: { width: 36, height: 4, borderRadius: 2 },
 

@@ -82,6 +82,7 @@ export default function ChatDetailScreen() {
       shared.forEach((sp) => {
         sendSharedPost({
           id: sp.postId,
+          userId: sp.userId,
           userName: sp.userName,
           userPhoto: sp.userPhoto,
           text: sp.text,
@@ -422,6 +423,7 @@ function Bubble({
   colors: any;
   timeStr: string;
 }) {
+  const router = useRouter();
   const tailRadius = 6;
   const fullRadius = 18;
 
@@ -457,7 +459,14 @@ function Bubble({
       )}
 
       {msg.sharedPost ? (
-        <View style={[styles.sharedPostBubble, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Pressable
+          onPress={() => {
+            if (msg.sharedPost?.userId) {
+              router.push(`/user/${msg.sharedPost.userId}` as any);
+            }
+          }}
+          style={[styles.sharedPostBubble, { backgroundColor: c.surface, borderColor: c.border }]}
+        >
           <View style={styles.sharedPostHeader}>
             <Image source={{ uri: msg.sharedPost.userPhoto }} style={styles.sharedPostAvatar} />
             <Text style={[styles.sharedPostUser, { color: c.text }]} numberOfLines={1}>
@@ -477,6 +486,12 @@ function Bubble({
               {msg.sharedPost.text}
             </Text>
           ) : null}
+          {msg.sharedPost.userId ? (
+            <View style={styles.sharedPostTapHint}>
+              <Ionicons name="arrow-forward-circle-outline" size={13} color={c.textMuted} />
+              <Text style={[styles.sharedPostTapHintText, { color: c.textMuted }]}>Gönderiye git</Text>
+            </View>
+          ) : null}
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
             {fromMe && msg.status && (
@@ -487,7 +502,7 @@ function Bubble({
               />
             )}
           </View>
-        </View>
+        </Pressable>
       ) : msg.gift ? (
         <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
@@ -824,6 +839,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  sharedPostTapHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+  },
+  sharedPostTapHintText: { fontSize: 11 },
 
   // Gift bubble
   giftBubble: {

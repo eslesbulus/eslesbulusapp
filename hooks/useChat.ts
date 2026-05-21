@@ -35,6 +35,7 @@ export type ChatMessage = {
   // shared post
   sharedPost?: {
     id: string;
+    userId?: string; // post sahibinin uid'si — profil navigasyonu için
     userName: string;
     userPhoto: string;
     text: string;

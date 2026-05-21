@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { ScrollView, View, Text, Image, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInRight } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
@@ -18,7 +19,8 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
   const s = styles(theme.colors);
   const { profile } = useAuth();
   const { users } = useUsers();
-  const { storyUserIds, myStories } = useStories();
+  const router = useRouter();
+  const { storyUserIds, myStories, getStoriesForUser } = useStories();
 
   // Only users who have active stories, VIP first
   const storyUsers = useMemo(() => {
@@ -32,6 +34,18 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
   }, [users, storyUserIds]);
 
   const hasMyStory = myStories.length > 0;
+  // Hikayenin önizleme fotoğrafı (ilk hikayenin imageUrl'si)
+  const myStoryPreview = myStories[0]?.imageUrl ?? null;
+
+  function handlePressMyStory() {
+    if (hasMyStory && profile) {
+      // Kendi hikayesini görüntüle
+      router.push(`/story/${profile.uid}` as any);
+    } else {
+      // Yeni hikaye ekle
+      onPressAdd?.();
+    }
+  }
 
   return (
     <View style={s.wrap}>
@@ -41,7 +55,7 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
         contentContainerStyle={s.scroll}
       >
         {/* Add / My story button */}
-        <Pressable onPress={onPressAdd} style={s.item}>
+        <Pressable onPress={handlePressMyStory} style={s.item}>
           {hasMyStory ? (
             <LinearGradient
               colors={[theme.colors.primary, theme.colors.secondary]}
@@ -50,8 +64,12 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
               style={s.ring}
             >
               <View style={[s.inner, { backgroundColor: theme.colors.background }]}>
-                {profile?.photoURL ? (
-                  <Image source={{ uri: profile.photoURL }} style={s.avatar} />
+                {/* Hikayenin önizleme fotoğrafını göster */}
+                {(myStoryPreview || profile?.photoURL) ? (
+                  <Image
+                    source={{ uri: myStoryPreview || profile!.photoURL! }}
+                    style={s.avatar}
+                  />
                 ) : null}
               </View>
             </LinearGradient>
@@ -68,7 +86,10 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
         </Pressable>
 
         {storyUsers.map((u, i) => {
-          const photo = u.photoURL || u.photos?.[0];
+          // Kullanıcının hikaye önizleme fotoğrafı
+          const storyPreview = getStoriesForUser(u.uid)[0]?.imageUrl;
+          const profilePhoto = u.photoURL || u.photos?.[0];
+          const displayPhoto = storyPreview || profilePhoto;
           return (
             <Animated.View key={u.uid} entering={FadeInRight.delay(i * 60).duration(350)}>
               <Pressable onPress={() => onPressUser?.(u)} style={s.item}>
@@ -79,7 +100,7 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
                   style={s.ring}
                 >
                   <View style={[s.inner, { backgroundColor: theme.colors.background }]}>
-                    {photo ? <Image source={{ uri: photo }} style={s.avatar} /> : null}
+                    {displayPhoto ? <Image source={{ uri: displayPhoto }} style={s.avatar} /> : null}
                   </View>
                 </LinearGradient>
                 <Text style={s.name} numberOfLines={1}>

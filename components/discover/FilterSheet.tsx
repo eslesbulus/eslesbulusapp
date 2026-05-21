@@ -93,11 +93,11 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
   }
 
   function setGender(g: "all" | Gender) {
-    // Male users need premium to filter for "Kadın" only
-    if (g === "Kadın" && profile?.gender === "Erkek" && !isPremium) {
+    // Specific gender filter requires premium
+    if (g !== "all" && !isPremium) {
       Alert.alert(
         "Premium Gerekli 👑",
-        "Yalnızca kadınları görmek için Premium üyelik gereklidir. \"Tümü\" seçeneğiyle karışık olarak görebilirsiniz.",
+        "Cinsiyete göre filtre kullanmak Premium üyelik gerektirir. \"Tümü\" seçeneğiyle karışık olarak görüntüleyebilirsiniz.",
         [
           { text: "İptal", style: "cancel" },
           { text: "Premium Al", onPress: () => { onClose(); router.push("/premium"); } },
@@ -191,8 +191,8 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
           <Section title="Cinsiyet" c={c}>
             <View style={styles.segment}>
               <SegBtn label="Tümü" active={local.gender === "all"} onPress={() => setGender("all")} c={c} />
-              <SegBtn label="Kadın" icon="female" active={local.gender === "Kadın"} onPress={() => setGender("Kadın")} c={c} />
-              <SegBtn label="Erkek" icon="male" active={local.gender === "Erkek"} onPress={() => setGender("Erkek")} c={c} />
+              <SegBtn label="Kadın" icon="female" active={local.gender === "Kadın"} onPress={() => setGender("Kadın")} c={c} locked={!isPremium} />
+              <SegBtn label="Erkek" icon="male" active={local.gender === "Erkek"} onPress={() => setGender("Erkek")} c={c} locked={!isPremium} />
             </View>
           </Section>
 
@@ -269,11 +269,16 @@ function Section({ title, hint, c, children }: { title: string; hint?: string; c
   );
 }
 
-function SegBtn({ label, icon, active, onPress, c }: { label: string; icon?: any; active: boolean; onPress: () => void; c: any }) {
+function SegBtn({ label, icon, active, onPress, c, locked }: { label: string; icon?: any; active: boolean; onPress: () => void; c: any; locked?: boolean }) {
   return (
     <Pressable onPress={onPress} style={[styles.segBtn, { backgroundColor: active ? c.primary : "transparent" }]}>
       {icon && <Ionicons name={icon} size={15} color={active ? "#fff" : c.textMuted} />}
       <Text style={[styles.segText, { color: active ? "#fff" : c.text, fontWeight: active ? "800" : "600" }]}>{label}</Text>
+      {locked && (
+        <View style={styles.lockBadge}>
+          <Text style={styles.lockBadgeText}>👑</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -359,8 +364,21 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     borderRadius: 12,
+    overflow: "visible",
   },
   segText: { fontSize: 13 },
+  lockBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FFD700",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockBadgeText: { fontSize: 9, lineHeight: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",

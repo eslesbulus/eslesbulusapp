@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,6 +32,8 @@ type Props = {
   onPressShare: (post: DisplayPost) => void;
   hasStory?: boolean;
   onPressStory?: () => void;
+  currentUserId?: string;
+  onDelete?: (postId: string) => void;
 };
 
 export function PostCard({
@@ -42,6 +45,8 @@ export function PostCard({
   onPressShare,
   hasStory,
   onPressStory,
+  currentUserId,
+  onDelete,
 }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
   const scale = useSharedValue(1);
@@ -65,7 +70,11 @@ export function PostCard({
       {/* Header */}
       <Pressable
         style={styles.header}
-        onPress={() => router.push(`/user/${post.userId}`)}
+        onPress={() => {
+          if (post.userId && post.userName !== "Anonim") {
+            router.push(`/user/${post.userId}` as any);
+          }
+        }}
       >
         {/* Avatar with optional story ring */}
         {hasStory ? (
@@ -97,7 +106,36 @@ export function PostCard({
             {formatTimeAgo(post.createdAt)}
           </Text>
         </View>
-        <Pressable style={styles.moreBtn} hitSlop={8} onPress={() => setReportOpen(true)}>
+        <Pressable
+          style={styles.moreBtn}
+          hitSlop={8}
+          onPress={() => {
+            if (post.userId === currentUserId && onDelete) {
+              Alert.alert(
+                "Gönderi Seçenekleri",
+                undefined,
+                [
+                  {
+                    text: "Gönderiyi Sil",
+                    style: "destructive",
+                    onPress: () =>
+                      Alert.alert(
+                        "Gönderiyi Sil",
+                        "Bu gönderiyi silmek istediğinden emin misin?",
+                        [
+                          { text: "Sil", style: "destructive", onPress: () => onDelete(post.id) },
+                          { text: "İptal", style: "cancel" },
+                        ]
+                      ),
+                  },
+                  { text: "İptal", style: "cancel" },
+                ]
+              );
+            } else {
+              setReportOpen(true);
+            }
+          }}
+        >
           <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
         </Pressable>
       </Pressable>

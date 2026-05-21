@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   Image,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -17,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
@@ -36,8 +38,8 @@ export default function PostsScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const { users } = useUsers();
-  const { posts: rawPosts, loading: postsLoading, createPost, isPostLiked, togglePostLike } = usePosts();
-  const { hasStory } = useStories();
+  const { posts: rawPosts, loading: postsLoading, createPost, isPostLiked, togglePostLike, deletePost } = usePosts();
+  const { hasStory, storyUserIds, myStories, getStoriesForUser } = useStories();
 
   const userMap = useMemo(() => {
     const m = new Map<string, UserProfile>();
@@ -50,6 +52,15 @@ export default function PostsScreen() {
     () => enrichPosts(rawPosts, userMap, profile as UserProfile | null),
     [rawPosts, userMap, profile]
   );
+
+  const hasOwnStory = myStories.length > 0;
+
+  const storyBarUsers = useMemo(() => {
+    return users.filter((u) => storyUserIds.has(u.uid) && u.uid !== profile?.uid);
+  }, [users, storyUserIds, profile?.uid]);
+
+  const showStoryBar = hasOwnStory || storyBarUsers.length > 0;
+  // Sadece gerçekten gösterilecek balonlar varsa çubuğu göster
 
   const [commentPost, setCommentPost] = useState<DisplayPost | null>(null);
   const [sharePost, setSharePost] = useState<DisplayPost | null>(null);
@@ -141,6 +152,69 @@ export default function PostsScreen() {
             paddingBottom: Platform.OS === "ios" ? 110 : 90,
           }}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            showStoryBar ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.storyBar}
+              >
+                {profile && hasOwnStory && (
+                  <Pressable
+                    onPress={() => router.push(`/story/${profile.uid}` as any)}
+                    style={styles.storyItem}
+                  >
+                    <LinearGradient
+                      colors={[c.primary, c.secondary]}
+                      style={styles.storyGradientRing}
+                    >
+                      <View style={[styles.storyAvatarInner, { borderColor: c.background }]}>
+                        <Image
+                          source={{
+                            uri:
+                              myStories[0]?.imageUrl ||
+                              profile.photoURL ||
+                              profile.photos?.[0] ||
+                              "",
+                          }}
+                          style={styles.storyAvatar}
+                        />
+                      </View>
+                    </LinearGradient>
+                    <Text style={[styles.storyName, { color: c.textMuted }]} numberOfLines={1}>
+                      Hikayen
+                    </Text>
+                  </Pressable>
+                )}
+                {storyBarUsers.map((u) => {
+                  const storyPreview = getStoriesForUser(u.uid)[0]?.imageUrl;
+                  const displayPhoto = storyPreview || u.photoURL || u.photos?.[0] || "";
+                  return (
+                    <Pressable
+                      key={u.uid}
+                      onPress={() => router.push(`/story/${u.uid}` as any)}
+                      style={styles.storyItem}
+                    >
+                      <LinearGradient
+                        colors={[c.primary, c.secondary]}
+                        style={styles.storyGradientRing}
+                      >
+                        <View style={[styles.storyAvatarInner, { borderColor: c.background }]}>
+                          <Image
+                            source={{ uri: displayPhoto }}
+                            style={styles.storyAvatar}
+                          />
+                        </View>
+                      </LinearGradient>
+                      <Text style={[styles.storyName, { color: c.textMuted }]} numberOfLines={1}>
+                        {u.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null
+          }
           renderItem={({ item, index }) => (
             <Animated.View entering={FadeInDown.delay(Math.min(index, 6) * 60).duration(300)}>
               <PostCard
@@ -151,7 +225,9 @@ export default function PostsScreen() {
                 onPressComment={(p) => setCommentPost(p)}
                 onPressShare={(p) => setSharePost(p)}
                 hasStory={hasStory(item.userId)}
-                onPressStory={() => router.push(`/story/${item.userId}`)}
+                onPressStory={() => router.push(`/story/${item.userId}` as any)}
+                currentUserId={profile?.uid}
+                onDelete={(postId) => deletePost(postId)}
               />
             </Animated.View>
           )}
@@ -357,4 +433,42 @@ const styles = StyleSheet.create({
   },
   mediaBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   mediaBtnText: { fontSize: 14, fontWeight: "600" },
+
+  // Story bar
+  storyBar: {
+    flexDirection: "row",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 14,
+  },
+  storyItem: {
+    alignItems: "center",
+    gap: 5,
+    width: 62,
+  },
+  storyGradientRing: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    padding: 2.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  storyAvatarInner: {
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
+    borderWidth: 2,
+    overflow: "hidden",
+  },
+  storyAvatarBorder: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 1.5,
+    overflow: "hidden",
+  },
+  storyAvatar: { width: "100%", height: "100%" },
+  storyName: { fontSize: 11, textAlign: "center", maxWidth: 62 },
 });

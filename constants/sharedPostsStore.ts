@@ -6,6 +6,7 @@
 export type SharedPostEntry = {
   id: string;
   postId: string;
+  userId?: string; // post sahibinin uid'si
   userName: string;
   userPhoto: string;
   text: string;

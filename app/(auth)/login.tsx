@@ -11,13 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Keyboard,
-  TouchableWithoutFeedback,
   Pressable,
   Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
@@ -89,14 +86,14 @@ export default function LoginScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
@@ -109,7 +106,7 @@ export default function LoginScreen() {
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(120).duration(500)}>
-              <BlurView intensity={28} tint="dark" style={styles.glassCard}>
+              <View style={styles.glassCard}>
                 <Text style={styles.cardTitle}>Hoş Geldin</Text>
                 <Text style={styles.cardSub}>Giriş yap, eşleşmen başlasın</Text>
 
@@ -194,11 +191,10 @@ export default function LoginScreen() {
                     </Text>
                   </TouchableOpacity>
                 </Link>
-              </BlurView>
+              </View>
             </Animated.View>
 
           </ScrollView>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
       {/* Fixed legal footer */}
@@ -283,7 +279,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     padding: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(0,0,0,0.62)",
   },
   cardTitle: {
     fontSize: 26,
