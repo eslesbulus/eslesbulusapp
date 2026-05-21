@@ -54,7 +54,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
   function handleSend() {
     if (!selected) return;
     if (!spend(selected.price)) {
-      Alert.alert("Yetersiz Coin", `Bu hediye için ${selected.price} coin gerekli. Bakiyen: ${balance}`);
+      Alert.alert("Yetersiz Jeton 🪙", `Bu hediye için ${selected.price} jeton gerekli. Bakiyen: ${balance}`);
       return;
     }
     onSend(selected);
@@ -72,7 +72,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
           </Text>
         </View>
         <View style={[styles.balanceChip, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <Ionicons name="logo-bitcoin" size={13} color="#F59E0B" />
+          <Text style={{ fontSize: 14 }}>🪙</Text>
           <Text style={[styles.balanceText, { color: c.text }]}>{balance}</Text>
         </View>
       </View>
@@ -116,7 +116,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
                   {g.name}
                 </Text>
                 <View style={[styles.priceRow, { backgroundColor: hexToRgba(g.color, 0.13) }]}>
-                  <Ionicons name="logo-bitcoin" size={10} color="#F59E0B" />
+                  <Text style={{ fontSize: 11 }}>🪙</Text>
                   <Text style={[styles.priceText, { color: g.color }]}>{g.price}</Text>
                 </View>
               </Pressable>
@@ -133,8 +133,8 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
             <View style={{ flex: 1 }}>
               <Text style={[styles.sendGiftName, { color: c.text }]}>{selected.name}</Text>
               <View style={styles.sendPriceRow}>
-                <Ionicons name="logo-bitcoin" size={12} color="#F59E0B" />
-                <Text style={[styles.sendPriceText, { color: c.textMuted }]}>{selected.price} coin</Text>
+                <Text style={{ fontSize: 13 }}>🪙</Text>
+                <Text style={[styles.sendPriceText, { color: c.textMuted }]}>{selected.price} jeton</Text>
               </View>
             </View>
           </View>

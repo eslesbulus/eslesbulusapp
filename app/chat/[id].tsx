@@ -493,7 +493,7 @@ function Bubble({
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
           <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.name}</Text>
           <View style={styles.giftBubblePrice}>
-            <Ionicons name="logo-bitcoin" size={11} color="#F59E0B" />
+            <Text style={{ fontSize: 12 }}>🪙</Text>
             <Text style={[styles.giftBubblePriceText, { color: c.textMuted }]}>{msg.gift.price}</Text>
           </View>
           <Text style={[styles.giftBubbleTag, { color: msg.gift.color }]}>

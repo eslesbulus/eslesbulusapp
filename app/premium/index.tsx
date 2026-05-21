@@ -175,7 +175,7 @@ export default function PremiumScreen() {
           </LinearGradient>
 
           <Text style={styles.heroTitle}>VIP Premium</Text>
-          <Text style={styles.heroSub}>
+          <Text style={[styles.heroSub, { color: c.textMuted }]}>
             Tüm kısıtlamaları kaldır, öne çık.{"\n"}
             Gerçek bağlantılar için en iyi araçlar.
           </Text>
@@ -207,7 +207,7 @@ export default function PremiumScreen() {
               key={f.label}
               style={[
                 styles.featureRow,
-                i < FEATURES.length - 1 && styles.featureDivider,
+                i < FEATURES.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
               ]}
             >
               <View style={[styles.featureIconWrap, { backgroundColor: `${GOLD}14` }]}>
@@ -227,7 +227,7 @@ export default function PremiumScreen() {
           entering={FadeInDown.delay(280).duration(400)}
           style={styles.packagesSection}
         >
-          <Text style={styles.packagesSectionTitle}>Plan Seç</Text>
+          <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>Plan Seç</Text>
 
           <View style={styles.packagesRow}>
             {PACKAGES.map((pkg) => {
@@ -279,7 +279,7 @@ export default function PremiumScreen() {
                   >
                     {pkg.price}
                   </Text>
-                  <Text style={styles.pkgPerDay}>{pkg.perDay}</Text>
+                  <Text style={[styles.pkgPerDay, { color: c.textMuted }]}>{pkg.perDay}</Text>
 
                   {isSelected && (
                     <View style={[styles.pkgCheck, { backgroundColor: GOLD }]}>
@@ -297,8 +297,8 @@ export default function PremiumScreen() {
           entering={FadeInDown.delay(360).duration(400)}
           style={styles.safePayRow}
         >
-          <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.35)" />
-          <Text style={styles.safePayText}>Güvenli ödeme · SSL şifreli</Text>
+          <Ionicons name="lock-closed" size={12} color={c.textMuted} />
+          <Text style={[styles.safePayText, { color: c.textMuted }]}>Güvenli ödeme · SSL şifreli</Text>
         </Animated.View>
       </ScrollView>
 
@@ -340,7 +340,7 @@ export default function PremiumScreen() {
           </LinearGradient>
         </Pressable>
 
-        <Text style={styles.ctaNote}>
+        <Text style={[styles.ctaNote, { color: c.textMuted }]}>
           Abonelik otomatik yenilenmez · İptal kolaylıkla yapılabilir
         </Text>
       </Animated.View>
