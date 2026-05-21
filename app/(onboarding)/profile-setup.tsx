@@ -36,12 +36,13 @@ const GENDERS = ["Erkek", "Kadın", "Diğer"] as const;
 type Step = "photo" | "info" | "about";
 
 export default function ProfileSetupScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>("photo");
   const [photoUri, setPhotoUri] = useState<string>(user?.photoURL ?? "");
-  const [name] = useState(user?.displayName ?? "");
+  // Name was set during register — read latest from profile/auth, no local edit needed
+  const currentName = profile?.name || user?.displayName || "";
   const [gender, setGender] = useState<"" | "Erkek" | "Kadın" | "Diğer">("");
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
@@ -143,20 +144,25 @@ export default function ProfileSetupScreen() {
 
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, {
-          displayName: name.trim(),
+          displayName: currentName.trim() || undefined,
           photoURL: downloadURL,
         });
       }
 
-      await updateDoc(doc(db, "users", uid), {
-        name: name.trim(),
+      // Don't overwrite name if it's empty — register already set it
+      const updates: Record<string, unknown> = {
         photoURL: downloadURL,
         gender,
         city,
         bio: bio.trim(),
         interests,
         profileComplete: true,
-      });
+      };
+      // Only write name if we actually have one (don't overwrite with "")
+      if (currentName.trim()) {
+        updates.name = currentName.trim();
+      }
+      await updateDoc(doc(db, "users", uid), updates);
     } catch (e: any) {
       Alert.alert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
     } finally {

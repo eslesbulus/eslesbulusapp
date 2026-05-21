@@ -10,7 +10,8 @@ import {
 import { EMOJI_CATEGORIES } from "@/constants/gifts";
 
 const { width: W } = Dimensions.get("window");
-const CELL = Math.floor((W - 16) / 8);
+const COLS = 7;
+const CELL = Math.floor((W - 24) / COLS); // 12px padding each side
 
 type Props = {
   onPick: (emoji: string) => void;
@@ -51,7 +52,7 @@ export function EmojiPicker({ onPick, colors: c }: Props) {
         })}
       </ScrollView>
 
-      {/* Emoji grid — ScrollView + flexWrap, no FlatList layout quirks */}
+      {/* Emoji grid */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridContent}
@@ -79,9 +80,9 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   tabsRow: {
     paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
-    gap: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
+    gap: 6,
   },
   tab: {
     paddingHorizontal: 10,
@@ -92,9 +93,9 @@ const styles = StyleSheet.create({
   },
   tabText: { fontSize: 12, fontWeight: "600" },
   gridContent: {
-    paddingHorizontal: 8,
-    paddingTop: 2,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 0,
+    paddingBottom: 4,
   },
   emojiGrid: {
     flexDirection: "row",

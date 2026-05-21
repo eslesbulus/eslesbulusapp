@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -19,10 +19,8 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
-import { Link, useFocusEffect } from "expo-router";
+import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -77,29 +75,11 @@ export default function RegisterScreen() {
   const age = useMemo(() => (birthDate ? calculateAge(birthDate) : null), [birthDate]);
 
   function handleDateChange(event: DateTimePickerEvent, selected?: Date) {
-    // Android: dismisses on cancel/set; iOS: stays open until user closes manually
     if (Platform.OS === "android") setPickerOpen(false);
     if (event.type === "set" && selected) {
       setBirthDate(selected);
     }
   }
-
-  const [isFocused, setIsFocused] = useState(true);
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      return () => setIsFocused(false);
-    }, [])
-  );
-
-  const videoPlayer = useVideoPlayer(
-    require("../../public/home/eslesbulus.mp4"),
-    (p) => {
-      p.loop = true;
-      p.muted = true;
-      p.play();
-    }
-  );
 
   function handleTermsScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -150,10 +130,9 @@ export default function RegisterScreen() {
         uid: user.uid,
         name: name.trim(),
         email: email.trim(),
-        photoURL: "",
         birthDate: birthDate.toISOString().slice(0, 10),
         age,
-        coins: 500,
+        coins: 100,
         createdAt: serverTimestamp(),
         profileComplete: false,
       });
@@ -167,19 +146,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      {isFocused && (
-        <VideoView
-          player={videoPlayer}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          nativeControls={false}
-        />
-      )}
-
-      <LinearGradient
-        colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.85)"]}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* Video + gradient handled by (auth)/_layout.tsx */}
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -504,7 +471,7 @@ const TERMS_SECTIONS = [
 ];
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: "transparent" },
   keyboardView: { flex: 1 },
   scrollContent: {
     flexGrow: 1,

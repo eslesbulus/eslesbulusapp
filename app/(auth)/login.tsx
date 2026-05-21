@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -17,10 +17,8 @@ import {
   Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
-import { Link, useFocusEffect } from "expo-router";
+import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
@@ -44,22 +42,6 @@ export default function LoginScreen() {
 
   const [openLegal, setOpenLegal] = useState<(typeof LEGAL_ITEMS)[number] | null>(null);
   const insets = useSafeAreaInsets();
-  const [isFocused, setIsFocused] = useState(true);
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      return () => setIsFocused(false);
-    }, [])
-  );
-
-  const videoPlayer = useVideoPlayer(
-    require("../../public/home/eslesbulus.mp4"),
-    (p) => {
-      p.loop = true;
-      p.muted = true;
-      p.play();
-    }
-  );
 
   async function handleEmailLogin() {
     if (!email.trim() || !password) {
@@ -103,19 +85,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      {isFocused && (
-        <VideoView
-          player={videoPlayer}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          nativeControls={false}
-        />
-      )}
-
-      <LinearGradient
-        colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.85)"]}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* Video + gradient handled by (auth)/_layout.tsx */}
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -295,7 +265,7 @@ const LEGAL_ITEMS = [
 ];
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: "transparent" },
   keyboardView: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: {

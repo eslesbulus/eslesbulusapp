@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -116,6 +117,25 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
         emoji: msg.emoji,
         at: serverTimestamp(),
       });
+
+      // Also create a chat message so it shows in the chat screen
+      const chatId = [user.uid, userId].sort().join("_");
+      const chatRef = doc(db, "chats", chatId);
+      const hiText = `${msg.emoji} ${msg.text}`;
+      await setDoc(chatRef, {
+        participants: [user.uid, userId].sort(),
+        lastMessage: hiText,
+        lastMessageAt: serverTimestamp(),
+        lastSenderId: user.uid,
+      }, { merge: true });
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        senderId: user.uid,
+        text: hiText,
+        type: "text",
+        createdAt: serverTimestamp(),
+        status: "sent",
+      });
+
       // Optimistic local update — snapshot will overwrite shortly.
       setSentHis((prev) => ({ ...prev, [userId]: sent }));
       return sent;

@@ -34,6 +34,7 @@ import Animated, {
 import { useTheme } from "@/context/ThemeContext";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useUser } from "@/hooks/useUser";
+import { useChat, type ChatMessage } from "@/hooks/useChat";
 import type { UserProfile } from "@/context/AuthContext";
 import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
 import { Gift } from "@/constants/gifts";
@@ -50,44 +51,10 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-type SharedPostData = {
-  id: string;
-  userName: string;
-  userPhoto: string;
-  text: string;
-  image?: string;
-};
-
-type Message = {
-  id: string;
-  text: string;
-  fromMe: boolean;
-  time: string;
-  status?: "sent" | "delivered" | "read";
-  gift?: Gift; // if message is a gift
-  sharedPost?: SharedPostData; // if message is a shared post
-};
-
-// Each conversation gets a different mock seed based on userId
-function buildMockChat(user: UserProfile): Message[] {
-  const intros: Record<string, Message[]> = {
-    default: [
-      { id: "m1", text: `Selam ${user.name}! 👋`, fromMe: true, time: "14:02", status: "read" },
-      { id: "m2", text: "Profilini gördüm, çok ilgi çekici", fromMe: true, time: "14:02", status: "read" },
-      { id: "m3", text: "Selam! Çok teşekkürler 😊", fromMe: false, time: "14:08" },
-      { id: "m4", text: "Sen nasılsın?", fromMe: false, time: "14:08" },
-      { id: "m5", text: "İyiyim, sağ ol. Hafta sonu planın var mı?", fromMe: true, time: "14:15", status: "read" },
-      { id: "m6", text: "Cumartesi arkadaşlarla brunch düşünüyorum, sen?", fromMe: false, time: "14:22" },
-      { id: "m7", text: "Bir şey planlamamıştım", fromMe: true, time: "14:24", status: "read" },
-      { id: "m8", text: "Belki kahve içebiliriz?", fromMe: true, time: "14:24", status: "delivered" },
-    ],
-  };
-  return intros.default;
-}
-
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { user, loading: userLoading } = useUser(id);
+  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendSharedPost, myUid, formatTime } = useChat(id);
   const router = useRouter();
   const userPhoto = user?.photoURL || user?.photos?.[0] || "";
   const { theme, mode } = useTheme();
@@ -96,37 +63,33 @@ export default function ChatDetailScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (!user) return [];
-    const base = buildMockChat(user);
-    // Paylaşılan gönderileri mesajlara ekle
-    const shared = getSharedPosts(user.uid);
-    const sharedMsgs: Message[] = shared.map((sp) => ({
-      id: sp.id,
-      text: "",
-      fromMe: true,
-      time: sp.sentAt,
-      status: "sent" as const,
-      sharedPost: {
-        id: sp.postId,
-        userName: sp.userName,
-        userPhoto: sp.userPhoto,
-        text: sp.text,
-        image: sp.image,
-      },
-    }));
-    if (shared.length > 0) clearSharedPosts(user.uid);
-    return [...base, ...sharedMsgs];
-  });
-  // draft param ile gelen öneri mesajını başlangıç metni olarak kullan
   const [text, setText] = useState(draft ? decodeURIComponent(draft as string) : "");
-  const [typing, setTyping] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
   const [giftAnimKey, setGiftAnimKey] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const panelOpen = panelTab !== null;
+  const sharedPostsSent = useRef(false);
+
+  // Send shared posts on first load (from post sharing flow)
+  useEffect(() => {
+    if (sharedPostsSent.current || !user || chatLoading) return;
+    sharedPostsSent.current = true;
+    const shared = getSharedPosts(user.uid);
+    if (shared.length > 0) {
+      clearSharedPosts(user.uid);
+      shared.forEach((sp) => {
+        sendSharedPost({
+          id: sp.postId,
+          userName: sp.userName,
+          userPhoto: sp.userPhoto,
+          text: sp.text,
+          image: sp.image,
+        });
+      });
+    }
+  }, [user, chatLoading]);
 
   function togglePanel() {
     if (panelOpen) {
@@ -146,37 +109,17 @@ export default function ChatDetailScreen() {
     if (panelOpen) setPanelTab(null);
   }
 
+  // Auto-scroll when new messages arrive
   useEffect(() => {
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
-  }, []);
+    if (messages.length > 0) {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [messages.length]);
 
-  function handleSendGift(g: Gift) {
+  async function handleSendGift(g: Gift) {
     setGiftAnimKey((k) => k + 1);
     setActiveGiftAnim(g);
-    const msg: Message = {
-      id: `m_g_${Date.now()}`,
-      text: `🎁 ${g.name}`,
-      fromMe: true,
-      time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
-      status: "sent",
-      gift: g,
-    };
-    setMessages((prev) => [...prev, msg]);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-
-    // Mock reply with thanks after gift
-    setTimeout(() => setTyping(true), 1800);
-    setTimeout(() => {
-      setTyping(false);
-      const reply: Message = {
-        id: `m_gr_${Date.now()}`,
-        text: `Çok teşekkürler! ${g.emoji}😍`,
-        fromMe: false,
-        time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
-      };
-      setMessages((prev) => [...prev, reply]);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-    }, 3600);
+    await sendGift(g);
   }
 
   function handlePickEmoji(emoji: string) {
@@ -202,39 +145,9 @@ export default function ChatDetailScreen() {
     const spent = await spendTokens(TOKENS_PER_MESSAGE);
     if (!spent) return;
 
-    const msg: Message = {
-      id: `m_${Date.now()}`,
-      text: text.trim(),
-      fromMe: true,
-      time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
-      status: "sent",
-    };
-    setMessages((prev) => [...prev, msg]);
+    const msgText = text.trim();
     setText("");
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-
-    // Mock typing then reply
-    setTimeout(() => setTyping(true), 800);
-    setTimeout(() => {
-      setTyping(false);
-      const replies = [
-        "İlginç 🤔",
-        "Anladım!",
-        "Haklısın aslında",
-        "Bence de 😊",
-        "Daha anlat?",
-        "Hahaha",
-        "Süper",
-      ];
-      const reply: Message = {
-        id: `m_r_${Date.now()}`,
-        text: replies[Math.floor(Math.random() * replies.length)],
-        fromMe: false,
-        time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
-      };
-      setMessages((prev) => [...prev, reply]);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-    }, 2400);
+    await sendText(msgText);
   }
 
   if (userLoading || !user) {
@@ -272,7 +185,7 @@ export default function ChatDetailScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerName, { color: c.text }]}>{user.name}</Text>
             <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
-              {typing ? "yazıyor..." : user.online ? "çevrimiçi" : "çevrimdışı"}
+              {user.online ? "çevrimiçi" : "çevrimdışı"}
             </Text>
           </View>
         </Pressable>
@@ -318,31 +231,33 @@ export default function ChatDetailScreen() {
               </Text>
             </Animated.View>
           }
+          ListEmptyComponent={
+            chatLoading ? (
+              <View style={styles.loadingWrap}>
+                <Text style={[styles.loadingText, { color: c.textMuted }]}>Mesajlar yükleniyor…</Text>
+              </View>
+            ) : null
+          }
           renderItem={({ item, index }) => {
             const prev = messages[index - 1];
             const next = messages[index + 1];
-            const isFirstOfGroup = !prev || prev.fromMe !== item.fromMe;
-            const isLastOfGroup = !next || next.fromMe !== item.fromMe;
+            const fromMe = item.senderId === myUid;
+            const prevFromMe = prev ? prev.senderId === myUid : !fromMe;
+            const nextFromMe = next ? next.senderId === myUid : !fromMe;
+            const isFirstOfGroup = prevFromMe !== fromMe;
+            const isLastOfGroup = nextFromMe !== fromMe;
             return (
               <Bubble
                 msg={item}
+                fromMe={fromMe}
                 isFirstOfGroup={isFirstOfGroup}
                 isLastOfGroup={isLastOfGroup}
-                avatar={item.fromMe ? null : userPhoto}
+                avatar={fromMe ? null : userPhoto}
                 colors={c}
+                timeStr={formatTime(item.createdAt)}
               />
             );
           }}
-          ListFooterComponent={
-            typing ? (
-              <Animated.View entering={FadeInUp.duration(220)} style={styles.typingRow}>
-                <Image source={{ uri: userPhoto }} style={styles.typingAvatar} />
-                <View style={[styles.typingBubble, { backgroundColor: c.surface }]}>
-                  <TypingDots color={c.textMuted} />
-                </View>
-              </Animated.View>
-            ) : null
-          }
         />
 
         {/* Input */}
@@ -380,13 +295,12 @@ export default function ChatDetailScreen() {
           )}
         </View>
 
-        {/* Inline Emoji/Gift Panel — replaces keyboard space */}
+        {/* Inline Emoji/Gift Panel */}
         {panelOpen && (
           <Animated.View
             entering={FadeIn.duration(160)}
-            style={[styles.panel, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 8) }]}
+            style={[styles.panel, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: 0 }]}
           >
-            {/* Tabs */}
             <View style={[styles.panelTabs, { borderBottomColor: c.border }]}>
               <Pressable onPress={() => switchTab("emoji")} style={styles.panelTabBtn}>
                 <Ionicons name="happy-outline" size={20} color={panelTab === "emoji" ? c.primary : c.textMuted} />
@@ -400,7 +314,6 @@ export default function ChatDetailScreen() {
               </Pressable>
             </View>
 
-            {/* Content */}
             <View style={styles.panelContent}>
               {panelTab === "emoji" ? (
                 <EmojiPicker onPick={handlePickEmoji} colors={c} />
@@ -452,21 +365,17 @@ export default function ChatDetailScreen() {
                     if (item.icon === "camera") {
                       const { status } = await ImagePicker.requestCameraPermissionsAsync();
                       if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
-                      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.9 });
                       if (!res.canceled) {
-                        const msg: Message = { id: `m_${Date.now()}`, text: "📷 Fotoğraf gönderildi", fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
-                        setMessages(p => [...p, msg]);
-                        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                        await sendImage("📷 Fotoğraf gönderildi");
                       }
                     } else if (item.icon === "images" || item.icon === "videocam") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                       if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
-                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ["videos"] : ["images"], quality: 0.9 });
                       if (!res.canceled) {
                         const label = item.icon === "videocam" ? "🎥 Video gönderildi" : "🖼 Fotoğraf gönderildi";
-                        const msg: Message = { id: `m_${Date.now()}`, text: label, fromMe: true, time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), status: "sent" };
-                        setMessages(p => [...p, msg]);
-                        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+                        await sendImage(label);
                       }
                     } else {
                       Alert.alert(item.label, "Bu özellik yakında eklenecek.");
@@ -498,18 +407,21 @@ export default function ChatDetailScreen() {
 
 function Bubble({
   msg,
+  fromMe,
   isFirstOfGroup,
   isLastOfGroup,
   avatar,
   colors: c,
+  timeStr,
 }: {
-  msg: Message;
+  msg: ChatMessage;
+  fromMe: boolean;
   isFirstOfGroup: boolean;
   isLastOfGroup: boolean;
   avatar: string | null;
   colors: any;
+  timeStr: string;
 }) {
-  const fromMe = msg.fromMe;
   const tailRadius = 6;
   const fullRadius = 18;
 
@@ -566,7 +478,7 @@ function Bubble({
             </Text>
           ) : null}
           <View style={styles.metaRow}>
-            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{msg.time}</Text>
+            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
             {fromMe && msg.status && (
               <Ionicons
                 name={msg.status === "read" ? "checkmark-done" : "checkmark"}
@@ -588,7 +500,7 @@ function Bubble({
             {fromMe ? "Hediye gönderdin" : "Sana hediye gönderdi"}
           </Text>
           <View style={styles.metaRow}>
-            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{msg.time}</Text>
+            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
             {fromMe && msg.status && (
               <Ionicons
                 name={msg.status === "read" ? "checkmark-done" : "checkmark"}
@@ -611,7 +523,7 @@ function Bubble({
           <Text style={[styles.bubbleText, { color: fromMe ? "#fff" : c.text }]}>{msg.text}</Text>
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]}>
-              {msg.time}
+              {timeStr}
             </Text>
             {fromMe && msg.status && (
               <Ionicons
@@ -638,16 +550,14 @@ function PanelToggleIcon({
   mutedColor: string;
   primaryColor: string;
 }) {
-  // Auto-cycle icon between emoji + gift when panel closed, with pop animation
   const [cycle, setCycle] = useState<"emoji" | "gift">("emoji");
   const popScale = useSharedValue(1);
   const popRot = useSharedValue(0);
   const burst = useSharedValue(0);
 
   useEffect(() => {
-    if (panelOpen) return; // pause cycle when panel open
+    if (panelOpen) return;
     const interval = setInterval(() => {
-      // Pop animation
       popScale.value = withSequence(
         withTiming(0.6, { duration: 120, easing: Easing.in(Easing.quad) }),
         withSpring(1.35, { damping: 6, stiffness: 220 }),
@@ -662,7 +572,6 @@ function PanelToggleIcon({
         withTiming(1, { duration: 220, easing: Easing.out(Easing.quad) }),
         withTiming(0, { duration: 280 })
       );
-      // Swap mid-pop (during smallest scale)
       setTimeout(() => {
         setCycle((c) => (c === "emoji" ? "gift" : "emoji"));
       }, 120);
@@ -680,7 +589,6 @@ function PanelToggleIcon({
   }));
 
   if (panelOpen) {
-    // Static when open — shows current tab
     return (
       <Animated.View key={tab} entering={FadeIn.duration(180)}>
         <Ionicons
@@ -692,10 +600,8 @@ function PanelToggleIcon({
     );
   }
 
-  // Closed: cycling with pop animation
   return (
     <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
-      {/* Burst dots */}
       <Animated.View pointerEvents="none" style={[burstStyle, { position: "absolute" }]}>
         <View style={{ flexDirection: "row", gap: 14 }}>
           <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: primaryColor }} />
@@ -713,47 +619,12 @@ function PanelToggleIcon({
   );
 }
 
-function TypingDots({ color }: { color: string }) {
-  const d1 = useSharedValue(0.3);
-  const d2 = useSharedValue(0.3);
-  const d3 = useSharedValue(0.3);
-
-  useEffect(() => {
-    const loop = (v: SharedValue<number>, delay: number) => {
-      v.value = withDelay(
-        delay,
-        withRepeat(
-          withSequence(
-            withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.3, { duration: 400, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          false
-        )
-      );
-    };
-    loop(d1, 0);
-    loop(d2, 150);
-    loop(d3, 300);
-  }, []);
-
-  const s1 = useAnimatedStyle(() => ({ opacity: d1.value, transform: [{ scale: 0.7 + d1.value * 0.5 }] }));
-  const s2 = useAnimatedStyle(() => ({ opacity: d2.value, transform: [{ scale: 0.7 + d2.value * 0.5 }] }));
-  const s3 = useAnimatedStyle(() => ({ opacity: d3.value, transform: [{ scale: 0.7 + d3.value * 0.5 }] }));
-
-  return (
-    <View style={styles.dotsWrap}>
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s1]} />
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s2]} />
-      <Animated.View style={[styles.typingDot, { backgroundColor: color }, s3]} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   notFound: { flex: 1, alignItems: "center", justifyContent: "center" },
   notFoundText: { fontSize: 16 },
+  loadingWrap: { alignItems: "center", paddingVertical: 20 },
+  loadingText: { fontSize: 13 },
 
   header: {
     flexDirection: "row",
@@ -828,25 +699,6 @@ const styles = StyleSheet.create({
   },
   bubbleTime: { fontSize: 10.5 },
 
-  typingRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 6,
-    paddingLeft: 4,
-    marginTop: 4,
-  },
-  typingAvatar: { width: 24, height: 24, borderRadius: 12 },
-  typingBubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopRightRadius: 18,
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-  },
-  dotsWrap: { flexDirection: "row", gap: 4 },
-  typingDot: { width: 7, height: 7, borderRadius: 3.5 },
-
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -868,7 +720,6 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   input: { flex: 1, fontSize: 15, maxHeight: 100, paddingVertical: 7 },
-  emojiBtn: { padding: 6 },
   emojiInsideBtn: { padding: 6, paddingLeft: 8 },
 
   panel: {

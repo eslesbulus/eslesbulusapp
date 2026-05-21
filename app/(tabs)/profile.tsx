@@ -28,8 +28,8 @@ import { useBlockedUsers } from "@/context/BlockedUsersContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useCoins } from "@/context/CoinsContext";
 import { VerificationSheet } from "@/components/profile/VerificationSheet";
+import { MyPostsSection } from "@/components/profile/MyPostsSection";
 import { usePosts } from "@/hooks/usePosts";
-import { formatTimeAgo } from "@/constants/mockPosts";
 
 const SCREEN_W = Dimensions.get("window").width;
 const PHOTO_GAP = 6;
@@ -249,64 +249,15 @@ export default function ProfileScreen() {
         ) : null}
 
         {/* ── Gönderilerim ── */}
-        {myPosts.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(115).duration(350)}>
-            <SectionHeader title={`Gönderilerim (${myPosts.filter(p => !p.archived).length})`} c={c} />
-            <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
-              {myPosts.filter(p => !p.archived).slice(0, 5).map((post, idx) => (
-                <View key={post.id}>
-                  {idx > 0 && <Divider c={c} />}
-                  <View style={styles.rowItem}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowLabel, { color: c.text }]} numberOfLines={2}>
-                        {post.text || "Fotoğraf"}
-                      </Text>
-                      <Text style={[styles.rowValue, { color: c.textMuted }]}>
-                        {formatTimeAgo(post.createdAt)} · {post.likesCount} beğeni
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: "row", gap: 6 }}>
-                      <Pressable
-                        hitSlop={6}
-                        onPress={() => {
-                          Alert.alert("Düzenle", "Yeni metin gir:", [
-                            { text: "İptal", style: "cancel" },
-                            {
-                              text: "Kaydet",
-                              onPress: () => {
-                                // Simple edit — prompt in production
-                                editPost(post.id, post.text + " (düzenlendi)");
-                              },
-                            },
-                          ]);
-                        }}
-                      >
-                        <Ionicons name="create-outline" size={18} color={c.primary} />
-                      </Pressable>
-                      <Pressable
-                        hitSlop={6}
-                        onPress={() => archivePost(post.id, true)}
-                      >
-                        <Ionicons name="archive-outline" size={18} color={c.textMuted} />
-                      </Pressable>
-                      <Pressable
-                        hitSlop={6}
-                        onPress={() =>
-                          Alert.alert("Sil", "Bu gönderiyi silmek istediğine emin misin?", [
-                            { text: "İptal", style: "cancel" },
-                            { text: "Sil", style: "destructive", onPress: () => deletePost(post.id) },
-                          ])
-                        }
-                      >
-                        <Ionicons name="trash-outline" size={18} color="#E53935" />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
-        )}
+        <Animated.View entering={FadeInDown.delay(115).duration(350)}>
+          <MyPostsSection
+            posts={myPosts}
+            onEdit={editPost}
+            onArchive={archivePost}
+            onDelete={deletePost}
+            colors={c}
+          />
+        </Animated.View>
 
         {/* ── Fotoğraflar ── */}
         {(photo || extraPhotos.length > 0) && (

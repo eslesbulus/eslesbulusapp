@@ -1,132 +1,135 @@
-import { useMemo } from "react";
 import { View, Text, StyleSheet, FlatList, Image, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { useUsers } from "@/hooks/useUsers";
-import { useAuth } from "@/context/AuthContext";
-import type { UserProfile } from "@/context/AuthContext";
+import { useChats } from "@/hooks/useChats";
+import { useUser } from "@/hooks/useUser";
+import type { Timestamp } from "firebase/firestore";
 
-type ChatPreview = {
-  user: UserProfile;
-  lastMessage: string;
-  time: string;
-  unread: number;
-};
-
-const PREVIEW_TEXTS = [
-  "Selam! Profilin çok ilgi çekici.",
-  "Kahve içmek ister misin?",
-  "Bu akşam müsait misin?",
-  "Müzik zevkimiz benziyor olabilir mi?",
-  "Profilindeki enerji harika!",
-];
+function formatChatTime(ts: Timestamp | null): string {
+  if (!ts) return "";
+  const d = ts.toDate();
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "şimdi";
+  if (mins < 60) return `${mins} dk`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} sa`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "dün";
+  if (days < 7) return `${days} gün`;
+  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+}
 
 export default function ChatScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const router = useRouter();
-  const { profile } = useAuth();
-  const { users } = useUsers();
-
-  // Until a real `conversations` collection exists, show opposite-gender users
-  // as conversation starters. The previews below are placeholder copy.
-  const opposite = useMemo(() => {
-    const g = profile?.gender === "Erkek" ? "Kadın" : profile?.gender === "Kadın" ? "Erkek" : null;
-    return g ? users.filter((u) => u.gender === g) : users;
-  }, [users, profile?.gender]);
-
-  const chatList: ChatPreview[] = useMemo(
-    () =>
-      opposite.slice(0, 6).map((u, i) => ({
-        user: u,
-        lastMessage: PREVIEW_TEXTS[i % PREVIEW_TEXTS.length],
-        time: ["şimdi", "5 dk", "1 sa", "3 sa", "dün", "Pzt"][i] ?? "",
-        unread: 0,
-      })),
-    [opposite]
-  );
+  const { chats, loading } = useChats();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: c.text }]}>Sohbet</Text>
         <Text style={[styles.sub, { color: c.textMuted }]}>
-          {chatList.length > 0 ? "Yeni bir sohbet başlat" : "Henüz sohbet yok"}
+          {chats.length > 0 ? `${chats.length} sohbet` : "Henüz sohbet yok"}
         </Text>
       </View>
 
       <FlatList
-        data={chatList}
-        keyExtractor={(it) => it.user.uid}
+        data={chats}
+        keyExtractor={(it) => it.chatId}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={36} color={c.textMuted} />
-            <Text style={[styles.emptyText, { color: c.textMuted }]}>
-              Keşfet sekmesinden birine Hi gönder, sohbet burada açılır.
-            </Text>
-          </View>
+          loading ? (
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: c.textMuted }]}>Yükleniyor…</Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="chatbubbles-outline" size={36} color={c.textMuted} />
+              <Text style={[styles.emptyText, { color: c.textMuted }]}>
+                Keşfet sekmesinden birine mesaj gönder, sohbet burada açılır.
+              </Text>
+            </View>
+          )
         }
-        renderItem={({ item, index }) => {
-          const photo = item.user.photoURL || item.user.photos?.[0];
-          return (
-            <Animated.View entering={FadeInRight.delay(index * 50).duration(300)}>
-              <Pressable
-                onPress={() => router.push(`/chat/${item.user.uid}`)}
-                style={({ pressed }) => [
-                  styles.item,
-                  {
-                    backgroundColor: c.card,
-                    borderColor: c.border,
-                    opacity: pressed ? 0.92 : 1,
-                  },
-                ]}
-              >
-                <View style={styles.avatarWrap}>
-                  {photo ? <Image source={{ uri: photo }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: c.surface }]} />}
-                  {item.user.online && (
-                    <View
-                      style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]}
-                    />
-                  )}
-                </View>
-                <View style={styles.middle}>
-                  <View style={styles.topRow}>
-                    <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-                      {item.user.name}
-                    </Text>
-                    <Text style={[styles.time, { color: c.textMuted }]}>{item.time}</Text>
-                  </View>
-                  <View style={styles.bottomRow}>
-                    <Text
-                      style={[
-                        styles.msg,
-                        {
-                          color: item.unread > 0 ? c.text : c.textMuted,
-                          fontWeight: item.unread > 0 ? "600" : "400",
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.lastMessage}
-                    </Text>
-                    {item.unread > 0 && (
-                      <View style={[styles.badge, { backgroundColor: c.primary }]}>
-                        <Text style={styles.badgeText}>{item.unread}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </Pressable>
-            </Animated.View>
-          );
-        }}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInRight.delay(index * 50).duration(300)}>
+            <ChatRow
+              otherUid={item.otherUid}
+              lastMessage={item.lastMessage}
+              lastMessageAt={item.lastMessageAt}
+              colors={c}
+              onPress={() => router.push(`/chat/${item.otherUid}`)}
+            />
+          </Animated.View>
+        )}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       />
     </SafeAreaView>
+  );
+}
+
+function ChatRow({
+  otherUid,
+  lastMessage,
+  lastMessageAt,
+  colors: c,
+  onPress,
+}: {
+  otherUid: string;
+  lastMessage: string;
+  lastMessageAt: Timestamp | null;
+  colors: any;
+  onPress: () => void;
+}) {
+  const { user } = useUser(otherUid);
+  const photo = user?.photoURL || user?.photos?.[0];
+  const name = user?.name || "...";
+  const online = user?.online ?? false;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.item,
+        {
+          backgroundColor: c.card,
+          borderColor: c.border,
+          opacity: pressed ? 0.92 : 1,
+        },
+      ]}
+    >
+      <View style={styles.avatarWrap}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: c.surface }]} />
+        )}
+        {online && (
+          <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />
+        )}
+      </View>
+      <View style={styles.middle}>
+        <View style={styles.topRow}>
+          <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={[styles.time, { color: c.textMuted }]}>
+            {formatChatTime(lastMessageAt)}
+          </Text>
+        </View>
+        <View style={styles.bottomRow}>
+          <Text style={[styles.msg, { color: c.textMuted }]} numberOfLines={1}>
+            {lastMessage}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -171,13 +174,4 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   msg: { fontSize: 13, flex: 1 },
-  badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
 });

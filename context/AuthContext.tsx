@@ -64,23 +64,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDevAdmin, setIsDevAdmin] = useState(false);
-  // Ref so the onAuthStateChanged closure always sees the latest value
-  // without needing to re-subscribe every time isDevAdmin changes.
   const isDevAdminRef = useRef(false);
+  // Track whether we've received at least one real auth callback with a user.
+  // Firebase RN persistence fires null first, then user — we must not set
+  // loading=false on the initial null until a grace period passes.
+  const hasReceivedUserRef = useRef(false);
+  const nullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Single subscription that lives for the lifetime of the provider.
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
       if (__DEV__) console.log("[Auth] onAuthStateChanged →", u ? `uid=${u.uid}` : "null");
       if (isDevAdminRef.current) return;
-      setUser(u);
-      if (!u) {
-        setProfile(null);
-        setLoading(false);
+
+      if (u) {
+        // Clear any pending "no user" timer — a real user arrived
+        if (nullTimerRef.current) {
+          clearTimeout(nullTimerRef.current);
+          nullTimerRef.current = null;
+        }
+        hasReceivedUserRef.current = true;
+        setUser(u);
+        // loading stays true until Firestore profile snapshot resolves
+      } else {
+        if (hasReceivedUserRef.current) {
+          // We previously had a user and now got null → real sign-out
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        } else {
+          // First callback is null — might be persistence race.
+          // Wait 1.5s: if no user arrives, accept null as real.
+          if (!nullTimerRef.current) {
+            nullTimerRef.current = setTimeout(() => {
+              nullTimerRef.current = null;
+              if (!hasReceivedUserRef.current) {
+                if (__DEV__) console.log("[Auth] persistence grace expired — no user");
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+              }
+            }, 1500);
+          }
+        }
       }
     });
-    return unsubscribeAuth;
-  }, []); // no deps — ref keeps it fresh without re-subscribing
+    return () => {
+      unsubscribeAuth();
+      if (nullTimerRef.current) clearTimeout(nullTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isDevAdmin) return;
@@ -104,15 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribeDoc;
   }, [user, isDevAdmin]);
 
-  // Safety: if loading hangs >8s (Firestore offline, rules block, etc.), unblock the router.
+  // Safety: if loading hangs >10s, unblock the router.
   useEffect(() => {
     if (!loading) return;
     const t = setTimeout(() => {
-      if (loading) {
-        console.warn("[AuthContext] loading timed out — forcing false");
-        setLoading(false);
-      }
-    }, 8000);
+      console.warn("[AuthContext] loading timed out — forcing false");
+      setLoading(false);
+    }, 10000);
     return () => clearTimeout(t);
   }, [loading]);
 
@@ -130,10 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsDevAdmin(false);
       setUser(null);
       setProfile(null);
-      // Also clear any real Firebase session that may be persisted
       await fbSignOut(auth).catch(() => {});
       return;
     }
+    // Reset the flag so next launch can do the grace period again
+    hasReceivedUserRef.current = false;
     await fbSignOut(auth);
   }
 

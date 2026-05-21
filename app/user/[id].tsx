@@ -28,7 +28,7 @@ import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useUser } from "@/hooks/useUser";
 import type { UserProfile } from "@/context/AuthContext";
 import { usePosts } from "@/hooks/usePosts";
-import { formatTimeAgo } from "@/constants/mockPosts";
+import { UserPostsSection } from "@/components/profile/UserPostsSection";
 import { useInteractions } from "@/context/InteractionsContext";
 import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
@@ -285,24 +285,7 @@ export default function UserDetail() {
             </Section>
           )}
 
-          {userPosts.filter(p => !p.archived).length > 0 && (
-            <Section title={`Gönderiler (${userPosts.filter(p => !p.archived).length})`} c={c}>
-              {userPosts.filter(p => !p.archived).slice(0, 5).map((post) => (
-                <Pressable
-                  key={post.id}
-                  onPress={() => router.push("/(tabs)/posts")}
-                  style={{ paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}
-                >
-                  <Text style={[styles.bioText, { color: c.text }]} numberOfLines={2}>
-                    {post.text || "Fotoğraf"}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 4 }}>
-                    {formatTimeAgo(post.createdAt)} · {post.likesCount} beğeni
-                  </Text>
-                </Pressable>
-              ))}
-            </Section>
-          )}
+          <UserPostsSection posts={userPosts} colors={c} />
 
           {photos.length > 1 && (
             <Section title="Fotoğraflar" c={c}>
