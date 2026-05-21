@@ -21,7 +21,10 @@ export function enrichPosts(
   currentProfile?: UserProfile | null
 ): DisplayPost[] {
   return posts.map((p) => {
-    const u = userMap.get(p.userId) ?? currentProfile;
+    // Use post author from map; only use currentProfile if the post actually belongs to them
+    const u =
+      userMap.get(p.userId) ??
+      (currentProfile && p.userId === currentProfile.uid ? currentProfile : null);
     return {
       ...p,
       userName: u?.name ?? "Anonim",
