@@ -461,9 +461,7 @@ function Bubble({
       {msg.sharedPost ? (
         <Pressable
           onPress={() => {
-            if (msg.sharedPost?.userId) {
-              router.push(`/user/${msg.sharedPost.userId}` as any);
-            }
+            router.push("/(tabs)/posts" as any);
           }}
           style={[styles.sharedPostBubble, { backgroundColor: c.surface, borderColor: c.border }]}
         >
@@ -486,12 +484,10 @@ function Bubble({
               {msg.sharedPost.text}
             </Text>
           ) : null}
-          {msg.sharedPost.userId ? (
-            <View style={styles.sharedPostTapHint}>
-              <Ionicons name="arrow-forward-circle-outline" size={13} color={c.textMuted} />
-              <Text style={[styles.sharedPostTapHintText, { color: c.textMuted }]}>Gönderiye git</Text>
-            </View>
-          ) : null}
+          <View style={styles.sharedPostTapHint}>
+            <Ionicons name="arrow-forward-circle-outline" size={13} color={c.textMuted} />
+            <Text style={[styles.sharedPostTapHintText, { color: c.textMuted }]}>Gönderilere git</Text>
+          </View>
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
             {fromMe && msg.status && (
