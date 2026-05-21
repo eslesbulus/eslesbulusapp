@@ -20,6 +20,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { MOCK_POSTS, MockPost } from "@/constants/mockPosts";
 import { PostCard } from "@/components/posts/PostCard";
 import { CommentSheet } from "@/components/posts/CommentSheet";
+import { ShareSheet } from "@/components/posts/ShareSheet";
+import { MockUser } from "@/constants/mockUsers";
 
 export default function PostsScreen() {
   const { theme } = useTheme();
@@ -28,6 +30,7 @@ export default function PostsScreen() {
 
   const [posts, setPosts] = useState<MockPost[]>(MOCK_POSTS);
   const [commentPost, setCommentPost] = useState<MockPost | null>(null);
+  const [sharePost, setSharePost] = useState<MockPost | null>(null);
   const [newPostModal, setNewPostModal] = useState(false);
   const [newText, setNewText] = useState("");
 
@@ -87,6 +90,7 @@ export default function PostsScreen() {
               post={item}
               colors={c}
               onPressComment={(p) => setCommentPost(p)}
+              onPressShare={(p) => setSharePost(p)}
             />
           </Animated.View>
         )}
@@ -97,6 +101,17 @@ export default function PostsScreen() {
         post={commentPost}
         visible={!!commentPost}
         onClose={() => setCommentPost(null)}
+        colors={c}
+      />
+
+      {/* Share Sheet */}
+      <ShareSheet
+        visible={!!sharePost}
+        post={sharePost}
+        onClose={() => setSharePost(null)}
+        onSent={(_recipients: MockUser[], _post: MockPost) => {
+          // Firebase'e bağlandığında burada sohbet mesajı kaydedilecek
+        }}
         colors={c}
       />
 

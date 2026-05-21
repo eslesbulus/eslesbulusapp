@@ -27,6 +27,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useCoins } from "@/context/CoinsContext";
+import { VerificationSheet } from "@/components/profile/VerificationSheet";
 
 const SCREEN_W = Dimensions.get("window").width;
 const PHOTO_GAP = 6;
@@ -47,6 +48,7 @@ export default function ProfileScreen() {
   const [reportText, setReportText] = useState("");
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
   const [reportSending, setReportSending] = useState(false);
+  const [verificationOpen, setVerificationOpen] = useState(false);
 
   function calcAge(birthDate?: string): string {
     if (!birthDate) return "";
@@ -298,6 +300,20 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
+        {/* ── Doğrulama ── */}
+        <Animated.View entering={FadeInDown.delay(200).duration(350)}>
+          <SectionHeader title="Doğrulama" c={c} />
+          <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            <NavRow
+              icon="shield-checkmark-outline"
+              label="Hesabı Doğrula"
+              value="Onaylı rozet kazan"
+              onPress={() => setVerificationOpen(true)}
+              c={c}
+            />
+          </View>
+        </Animated.View>
+
         {/* ── Gizlilik ve Güvenlik ── */}
         <Animated.View entering={FadeInDown.delay(220).duration(350)}>
           <SectionHeader title="Gizlilik ve Güvenlik" c={c} />
@@ -346,6 +362,13 @@ export default function ProfileScreen() {
             />
           </View>
         </Animated.View>
+
+        {/* ── Doğrulama Sheet ── */}
+        <VerificationSheet
+          visible={verificationOpen}
+          onClose={() => setVerificationOpen(false)}
+          colors={c}
+        />
 
         {/* ── Sorun Bildir Modal ── */}
         <Modal

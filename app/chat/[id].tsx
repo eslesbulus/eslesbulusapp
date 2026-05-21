@@ -34,6 +34,7 @@ import Animated, {
 import { useTheme } from "@/context/ThemeContext";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { getUserById, MockUser } from "@/constants/mockUsers";
+import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
 import { Gift } from "@/constants/gifts";
 import { GiftSheet } from "@/components/chat/GiftSheet";
 import { GiftAnimation } from "@/components/chat/GiftAnimation";
@@ -48,6 +49,14 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+type SharedPostData = {
+  id: string;
+  userName: string;
+  userPhoto: string;
+  text: string;
+  image?: string;
+};
+
 type Message = {
   id: string;
   text: string;
@@ -55,6 +64,7 @@ type Message = {
   time: string;
   status?: "sent" | "delivered" | "read";
   gift?: Gift; // if message is a gift
+  sharedPost?: SharedPostData; // if message is a shared post
 };
 
 // Each conversation gets a different mock seed based on userId
@@ -84,9 +94,28 @@ export default function ChatDetailScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState<Message[]>(() =>
-    user ? buildMockChat(user) : []
-  );
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (!user) return [];
+    const base = buildMockChat(user);
+    // Paylaşılan gönderileri mesajlara ekle
+    const shared = getSharedPosts(user.id);
+    const sharedMsgs: Message[] = shared.map((sp) => ({
+      id: sp.id,
+      text: "",
+      fromMe: true,
+      time: sp.sentAt,
+      status: "sent" as const,
+      sharedPost: {
+        id: sp.postId,
+        userName: sp.userName,
+        userPhoto: sp.userPhoto,
+        text: sp.text,
+        image: sp.image,
+      },
+    }));
+    if (shared.length > 0) clearSharedPosts(user.id);
+    return [...base, ...sharedMsgs];
+  });
   // draft param ile gelen öneri mesajını başlangıç metni olarak kullan
   const [text, setText] = useState(draft ? decodeURIComponent(draft as string) : "");
   const [typing, setTyping] = useState(false);
@@ -509,7 +538,39 @@ function Bubble({
         </View>
       )}
 
-      {msg.gift ? (
+      {msg.sharedPost ? (
+        <View style={[styles.sharedPostBubble, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={styles.sharedPostHeader}>
+            <Image source={{ uri: msg.sharedPost.userPhoto }} style={styles.sharedPostAvatar} />
+            <Text style={[styles.sharedPostUser, { color: c.text }]} numberOfLines={1}>
+              {msg.sharedPost.userName}
+            </Text>
+            <Ionicons name="paper-plane-outline" size={13} color={c.textMuted} />
+          </View>
+          {msg.sharedPost.image ? (
+            <Image
+              source={{ uri: msg.sharedPost.image }}
+              style={styles.sharedPostImage}
+              resizeMode="cover"
+            />
+          ) : null}
+          {msg.sharedPost.text ? (
+            <Text style={[styles.sharedPostText, { color: c.text }]} numberOfLines={3}>
+              {msg.sharedPost.text}
+            </Text>
+          ) : null}
+          <View style={styles.metaRow}>
+            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{msg.time}</Text>
+            {fromMe && msg.status && (
+              <Ionicons
+                name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                size={14}
+                color={msg.status === "read" ? "#7DD3FC" : c.textMuted}
+              />
+            )}
+          </View>
+        </View>
+      ) : msg.gift ? (
         <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
           <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.name}</Text>
@@ -881,6 +942,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   attachLabel: { fontSize: 12, fontWeight: "500" },
+
+  // Shared post bubble
+  sharedPostBubble: {
+    maxWidth: "78%",
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginHorizontal: 4,
+  },
+  sharedPostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sharedPostAvatar: { width: 28, height: 28, borderRadius: 14 },
+  sharedPostUser: { flex: 1, fontSize: 13, fontWeight: "700" },
+  sharedPostImage: { width: "100%", height: 180 },
+  sharedPostText: {
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
 
   // Gift bubble
   giftBubble: {

@@ -24,9 +24,10 @@ type Props = {
   post: MockPost;
   colors: any;
   onPressComment: (post: MockPost) => void;
+  onPressShare: (post: MockPost) => void;
 };
 
-export function PostCard({ post, colors: c, onPressComment }: Props) {
+export function PostCard({ post, colors: c, onPressComment, onPressShare }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes);
   const [reportOpen, setReportOpen] = useState(false);
@@ -114,7 +115,7 @@ export function PostCard({ post, colors: c, onPressComment }: Props) {
           </Text>
         </Pressable>
 
-        <Pressable style={styles.actionBtn}>
+        <Pressable style={styles.actionBtn} onPress={() => onPressShare(post)}>
           <Ionicons name="paper-plane-outline" size={21} color={c.textMuted} />
         </Pressable>
       </View>
