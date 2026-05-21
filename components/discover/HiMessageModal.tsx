@@ -4,13 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, SlideInDown, SlideOutDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { HI_MESSAGES } from "@/constants/messageTemplates";
-import { MockUser } from "@/constants/mockUsers";
+import type { UserProfile } from "@/context/AuthContext";
 
 type Props = {
   visible: boolean;
-  user: MockUser | null;
+  user: UserProfile | null;
   onClose: () => void;
-  onSend: (user: MockUser, messageId: string, text: string) => void;
+  onSend: (user: UserProfile, messageId: string, text: string) => void;
 };
 
 export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
@@ -45,7 +45,7 @@ export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
           <View style={[styles.handle, { backgroundColor: c.border }]} />
 
           <View style={styles.header}>
-            <Image source={{ uri: user.photo }} style={styles.avatar} />
+            <Image source={{ uri: user.photoURL || user.photos?.[0] }} style={styles.avatar} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: c.text }]}>
                 {user.name}'e selam gönder

@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export const DAILY_LIKE_LIMIT = 10;
 export const DAILY_HI_LIMIT = 10;
+export const DAILY_STORY_LIKE_LIMIT = 5;
 
 export type PremiumPlan = "day" | "week" | "month";
 
@@ -13,12 +14,16 @@ type PremiumContextType = {
   premiumExpiry: Date | null;
   dailyLikesUsed: number;
   dailyHisUsed: number;
+  dailyStoryLikesUsed: number;
   likesRemaining: number;
   hisRemaining: number;
+  storyLikesRemaining: number;
   canLike: boolean;
   canSendHi: boolean;
+  canLikeStory: boolean;
   useLike: () => Promise<boolean>;
   useHi: () => Promise<boolean>;
+  useStoryLike: () => Promise<boolean>;
   activatePremium: (plan: PremiumPlan) => Promise<void>;
   loading: boolean;
 };
@@ -28,12 +33,16 @@ const PremiumContext = createContext<PremiumContextType>({
   premiumExpiry: null,
   dailyLikesUsed: 0,
   dailyHisUsed: 0,
+  dailyStoryLikesUsed: 0,
   likesRemaining: DAILY_LIKE_LIMIT,
   hisRemaining: DAILY_HI_LIMIT,
+  storyLikesRemaining: DAILY_STORY_LIKE_LIMIT,
   canLike: true,
   canSendHi: true,
+  canLikeStory: true,
   useLike: async () => true,
   useHi: async () => true,
+  useStoryLike: async () => true,
   activatePremium: async () => {},
   loading: true,
 });
@@ -56,6 +65,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
   const [premiumExpiry, setPremiumExpiry] = useState<Date | null>(null);
   const [dailyLikesUsed, setDailyLikesUsed] = useState(0);
   const [dailyHisUsed, setDailyHisUsed] = useState(0);
+  const [dailyStoryLikesUsed, setDailyStoryLikesUsed] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,13 +98,16 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
         updateDoc(doc(db, "users", user.uid), {
           dailyLikesUsed: 0,
           dailyHisUsed: 0,
+          dailyStoryLikesUsed: 0,
           lastResetDate: today,
         }).catch(() => {});
         setDailyLikesUsed(0);
         setDailyHisUsed(0);
+        setDailyStoryLikesUsed(0);
       } else {
         setDailyLikesUsed(data.dailyLikesUsed ?? 0);
         setDailyHisUsed(data.dailyHisUsed ?? 0);
+        setDailyStoryLikesUsed(data.dailyStoryLikesUsed ?? 0);
       }
 
       setLoading(false);
@@ -105,8 +118,10 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
 
   const canLike = isDevAdmin || isPremium || dailyLikesUsed < DAILY_LIKE_LIMIT;
   const canSendHi = isDevAdmin || isPremium || dailyHisUsed < DAILY_HI_LIMIT;
+  const canLikeStory = isDevAdmin || isPremium || dailyStoryLikesUsed < DAILY_STORY_LIKE_LIMIT;
   const likesRemaining = isPremium ? 9999 : Math.max(0, DAILY_LIKE_LIMIT - dailyLikesUsed);
   const hisRemaining = isPremium ? 9999 : Math.max(0, DAILY_HI_LIMIT - dailyHisUsed);
+  const storyLikesRemaining = isPremium ? 9999 : Math.max(0, DAILY_STORY_LIKE_LIMIT - dailyStoryLikesUsed);
 
   const useLike = useCallback(async (): Promise<boolean> => {
     if (isDevAdmin || isPremium) return true;
@@ -134,6 +149,19 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [user, isDevAdmin, isPremium, dailyHisUsed]);
 
+  const useStoryLike = useCallback(async (): Promise<boolean> => {
+    if (isDevAdmin || isPremium) return true;
+    if (!user) return false;
+    if (dailyStoryLikesUsed >= DAILY_STORY_LIKE_LIMIT) return false;
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        dailyStoryLikesUsed: increment(1),
+      });
+    } catch {}
+    setDailyStoryLikesUsed((p) => p + 1);
+    return true;
+  }, [user, isDevAdmin, isPremium, dailyStoryLikesUsed]);
+
   const activatePremium = useCallback(async (plan: PremiumPlan) => {
     const expiry = getPremiumExpiry(plan);
     if (isDevAdmin) {
@@ -155,12 +183,16 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
         premiumExpiry,
         dailyLikesUsed,
         dailyHisUsed,
+        dailyStoryLikesUsed,
         likesRemaining,
         hisRemaining,
+        storyLikesRemaining,
         canLike,
         canSendHi,
+        canLikeStory,
         useLike,
         useHi,
+        useStoryLike,
         activatePremium,
         loading,
       }}

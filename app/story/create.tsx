@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useStories } from "@/hooks/useStories";
 
 const { height: H } = Dimensions.get("window");
 
@@ -26,6 +27,7 @@ export default function StoryCreateScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
 
+  const { createStory } = useStories();
   const [photo, setPhoto] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [posting, setPosting] = useState(false);
@@ -69,11 +71,16 @@ export default function StoryCreateScreen() {
       return;
     }
     setPosting(true);
-    await new Promise((r) => setTimeout(r, 1400));
-    setPosting(false);
-    Alert.alert("Hikaye Paylaşıldı!", "Hikayen 24 saat boyunca görünecek.", [
-      { text: "Tamam", onPress: () => router.back() },
-    ]);
+    try {
+      await createStory(photo, caption.trim() || undefined);
+      setPosting(false);
+      Alert.alert("Hikaye Paylaşıldı!", "Hikayen 24 saat boyunca görünecek.", [
+        { text: "Tamam", onPress: () => router.back() },
+      ]);
+    } catch (e: any) {
+      setPosting(false);
+      Alert.alert("Hata", e.message ?? "Hikaye paylaşılamadı.");
+    }
   }
 
   return (

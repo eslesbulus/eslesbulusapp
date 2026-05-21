@@ -1,13 +1,16 @@
+import { useMemo } from "react";
 import { View, Text, StyleSheet, FlatList, Image, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { MOCK_USERS, MockUser } from "@/constants/mockUsers";
+import { useUsers } from "@/hooks/useUsers";
+import { useAuth } from "@/context/AuthContext";
+import type { UserProfile } from "@/context/AuthContext";
 
 type ChatPreview = {
-  user: MockUser;
+  user: UserProfile;
   lastMessage: string;
   time: string;
   unread: number;
@@ -21,82 +24,106 @@ const PREVIEW_TEXTS = [
   "Profilindeki enerji harika!",
 ];
 
-const CHAT_LIST: ChatPreview[] = MOCK_USERS.slice(0, 6).map((u, i) => ({
-  user: u,
-  lastMessage: PREVIEW_TEXTS[i % PREVIEW_TEXTS.length],
-  time: ["şimdi", "5 dk", "1 sa", "3 sa", "dün", "Pzt"][i],
-  unread: i < 3 ? (i === 0 ? 3 : i === 1 ? 1 : 2) : 0,
-}));
-
 export default function ChatScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const router = useRouter();
+  const { profile } = useAuth();
+  const { users } = useUsers();
+
+  // Until a real `conversations` collection exists, show opposite-gender users
+  // as conversation starters. The previews below are placeholder copy.
+  const opposite = useMemo(() => {
+    const g = profile?.gender === "Erkek" ? "Kadın" : profile?.gender === "Kadın" ? "Erkek" : null;
+    return g ? users.filter((u) => u.gender === g) : users;
+  }, [users, profile?.gender]);
+
+  const chatList: ChatPreview[] = useMemo(
+    () =>
+      opposite.slice(0, 6).map((u, i) => ({
+        user: u,
+        lastMessage: PREVIEW_TEXTS[i % PREVIEW_TEXTS.length],
+        time: ["şimdi", "5 dk", "1 sa", "3 sa", "dün", "Pzt"][i] ?? "",
+        unread: 0,
+      })),
+    [opposite]
+  );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: c.text }]}>Sohbet</Text>
         <Text style={[styles.sub, { color: c.textMuted }]}>
-          {CHAT_LIST.filter((x) => x.unread > 0).length} okunmamış mesaj
+          {chatList.length > 0 ? "Yeni bir sohbet başlat" : "Henüz sohbet yok"}
         </Text>
       </View>
 
       <FlatList
-        data={CHAT_LIST}
-        keyExtractor={(it) => it.user.id}
+        data={chatList}
+        keyExtractor={(it) => it.user.uid}
         contentContainerStyle={styles.list}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInRight.delay(index * 50).duration(300)}>
-            <Pressable
-              onPress={() => router.push(`/chat/${item.user.id}`)}
-              style={({ pressed }) => [
-                styles.item,
-                {
-                  backgroundColor: c.card,
-                  borderColor: c.border,
-                  opacity: pressed ? 0.92 : 1,
-                },
-              ]}
-            >
-              <View style={styles.avatarWrap}>
-                <Image source={{ uri: item.user.photo }} style={styles.avatar} />
-                {item.user.online && (
-                  <View
-                    style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]}
-                  />
-                )}
-              </View>
-              <View style={styles.middle}>
-                <View style={styles.topRow}>
-                  <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-                    {item.user.name}
-                  </Text>
-                  <Text style={[styles.time, { color: c.textMuted }]}>{item.time}</Text>
-                </View>
-                <View style={styles.bottomRow}>
-                  <Text
-                    style={[
-                      styles.msg,
-                      {
-                        color: item.unread > 0 ? c.text : c.textMuted,
-                        fontWeight: item.unread > 0 ? "600" : "400",
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.lastMessage}
-                  </Text>
-                  {item.unread > 0 && (
-                    <View style={[styles.badge, { backgroundColor: c.primary }]}>
-                      <Text style={styles.badgeText}>{item.unread}</Text>
-                    </View>
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="chatbubbles-outline" size={36} color={c.textMuted} />
+            <Text style={[styles.emptyText, { color: c.textMuted }]}>
+              Keşfet sekmesinden birine Hi gönder, sohbet burada açılır.
+            </Text>
+          </View>
+        }
+        renderItem={({ item, index }) => {
+          const photo = item.user.photoURL || item.user.photos?.[0];
+          return (
+            <Animated.View entering={FadeInRight.delay(index * 50).duration(300)}>
+              <Pressable
+                onPress={() => router.push(`/chat/${item.user.uid}`)}
+                style={({ pressed }) => [
+                  styles.item,
+                  {
+                    backgroundColor: c.card,
+                    borderColor: c.border,
+                    opacity: pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                <View style={styles.avatarWrap}>
+                  {photo ? <Image source={{ uri: photo }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: c.surface }]} />}
+                  {item.user.online && (
+                    <View
+                      style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]}
+                    />
                   )}
                 </View>
-              </View>
-            </Pressable>
-          </Animated.View>
-        )}
+                <View style={styles.middle}>
+                  <View style={styles.topRow}>
+                    <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
+                      {item.user.name}
+                    </Text>
+                    <Text style={[styles.time, { color: c.textMuted }]}>{item.time}</Text>
+                  </View>
+                  <View style={styles.bottomRow}>
+                    <Text
+                      style={[
+                        styles.msg,
+                        {
+                          color: item.unread > 0 ? c.text : c.textMuted,
+                          fontWeight: item.unread > 0 ? "600" : "400",
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.lastMessage}
+                    </Text>
+                    {item.unread > 0 && (
+                      <View style={[styles.badge, { backgroundColor: c.primary }]}>
+                        <Text style={styles.badgeText}>{item.unread}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            </Animated.View>
+          );
+        }}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       />
     </SafeAreaView>
@@ -111,6 +138,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
   sub: { fontSize: 13, marginTop: 4 },
   list: { paddingHorizontal: 16, paddingBottom: 100 },
+  empty: { alignItems: "center", padding: 32, gap: 10 },
+  emptyText: { fontSize: 13, textAlign: "center", maxWidth: 280 },
   item: {
     flexDirection: "row",
     alignItems: "center",

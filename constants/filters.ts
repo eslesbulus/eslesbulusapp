@@ -1,4 +1,6 @@
-import { Gender, MockUser } from "./mockUsers";
+import type { UserProfile } from "@/context/AuthContext";
+
+export type Gender = "Erkek" | "Kadın" | "Diğer";
 
 export type Filters = {
   ageMin: number;
@@ -30,11 +32,12 @@ export function activeFilterCount(f: Filters): number {
   return n;
 }
 
-export function applyFilters(users: MockUser[], f: Filters): MockUser[] {
+export function applyFilters(users: UserProfile[], f: Filters): UserProfile[] {
   return users.filter((u) => {
-    if (u.age < f.ageMin || u.age > f.ageMax) return false;
+    const age = u.age ?? 0;
+    if (age < f.ageMin || age > f.ageMax) return false;
     if (f.gender !== "all" && u.gender !== f.gender) return false;
-    if (f.cities.length > 0 && !f.cities.includes(u.city)) return false;
+    if (f.cities.length > 0 && (!u.city || !f.cities.includes(u.city))) return false;
     if (f.onlineOnly && !u.online) return false;
     if (f.verifiedOnly && !u.verified) return false;
     return true;

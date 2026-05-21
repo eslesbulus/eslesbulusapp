@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,50 +11,96 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  TouchableWithoutFeedback,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { MOCK_POSTS, MockPost } from "@/constants/mockPosts";
+import { useAuth } from "@/context/AuthContext";
+import type { UserProfile } from "@/context/AuthContext";
+import { useUsers } from "@/hooks/useUsers";
+import { usePosts } from "@/hooks/usePosts";
+import { useStories } from "@/hooks/useStories";
+import { enrichPosts, type DisplayPost } from "@/constants/mockPosts";
 import { PostCard } from "@/components/posts/PostCard";
 import { CommentSheet } from "@/components/posts/CommentSheet";
 import { ShareSheet } from "@/components/posts/ShareSheet";
-import { MockUser } from "@/constants/mockUsers";
 
 export default function PostsScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { profile } = useAuth();
+  const { users } = useUsers();
+  const { posts: rawPosts, loading: postsLoading, createPost, isPostLiked, togglePostLike } = usePosts();
+  const { hasStory } = useStories();
 
-  const [posts, setPosts] = useState<MockPost[]>(MOCK_POSTS);
-  const [commentPost, setCommentPost] = useState<MockPost | null>(null);
-  const [sharePost, setSharePost] = useState<MockPost | null>(null);
+  const userMap = useMemo(() => {
+    const m = new Map<string, UserProfile>();
+    users.forEach((u) => m.set(u.uid, u));
+    if (profile) m.set(profile.uid, profile as UserProfile);
+    return m;
+  }, [users, profile]);
+
+  const displayPosts = useMemo(
+    () => enrichPosts(rawPosts, userMap, profile as UserProfile | null),
+    [rawPosts, userMap, profile]
+  );
+
+  const [commentPost, setCommentPost] = useState<DisplayPost | null>(null);
+  const [sharePost, setSharePost] = useState<DisplayPost | null>(null);
   const [newPostModal, setNewPostModal] = useState(false);
   const [newText, setNewText] = useState("");
+  const [newImage, setNewImage] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
 
-  function handleAddPost() {
-    if (!newText.trim()) {
+  async function handlePickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) setNewImage(result.assets[0].uri);
+  }
+
+  async function handlePickVideo() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) setNewImage(result.assets[0].uri);
+  }
+
+  async function handleAddPost() {
+    if (!newText.trim() && !newImage) {
       Alert.alert("Hata", "Gönderi boş olamaz.");
       return;
     }
-    const newPost: MockPost = {
-      id: `p_${Date.now()}`,
-      userId: "me",
-      userName: "Sen",
-      userPhoto: `https://i.pravatar.cc/400?img=68`,
-      userAge: 25,
-      userCity: "İstanbul",
-      verified: false,
-      text: newText.trim(),
-      likes: 0,
-      comments: [],
-      createdAt: "şimdi",
-    };
-    setPosts((prev) => [newPost, ...prev]);
-    setNewText("");
-    setNewPostModal(false);
+    setPosting(true);
+    try {
+      await createPost(newText.trim(), newImage ?? undefined);
+      setNewText("");
+      setNewImage(null);
+      setNewPostModal(false);
+    } catch (e: any) {
+      Alert.alert("Hata", e.message ?? "Gönderi paylaşılamadı.");
+    }
+    setPosting(false);
   }
 
   return (
@@ -75,30 +121,47 @@ export default function PostsScreen() {
       </View>
 
       {/* Feed */}
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{
-          paddingHorizontal: 14,
-          paddingTop: 12,
-          paddingBottom: Platform.OS === "ios" ? 110 : 90,
-        }}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 60).duration(300)}>
-            <PostCard
-              post={item}
-              colors={c}
-              onPressComment={(p) => setCommentPost(p)}
-              onPressShare={(p) => setSharePost(p)}
-            />
-          </Animated.View>
-        )}
-      />
+      {postsLoading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={c.primary} />
+        </View>
+      ) : displayPosts.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <Ionicons name="document-text-outline" size={40} color={c.textMuted} />
+          <Text style={[styles.emptyText, { color: c.textMuted }]}>Henüz gönderi yok</Text>
+          <Text style={[styles.emptyHint, { color: c.textMuted }]}>İlk gönderiyi sen paylaş!</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={displayPosts}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{
+            paddingHorizontal: 14,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === "ios" ? 110 : 90,
+          }}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item, index }) => (
+            <Animated.View entering={FadeInDown.delay(Math.min(index, 6) * 60).duration(300)}>
+              <PostCard
+                post={item}
+                colors={c}
+                liked={isPostLiked(item.id)}
+                onToggleLike={() => togglePostLike(item.id)}
+                onPressComment={(p) => setCommentPost(p)}
+                onPressShare={(p) => setSharePost(p)}
+                hasStory={hasStory(item.userId)}
+                onPressStory={() => router.push(`/story/${item.userId}`)}
+              />
+            </Animated.View>
+          )}
+        />
+      )}
 
       {/* Comment Sheet */}
       <CommentSheet
-        post={commentPost}
+        postId={commentPost?.id ?? null}
+        postUserName={commentPost?.userName}
         visible={!!commentPost}
         onClose={() => setCommentPost(null)}
         colors={c}
@@ -109,9 +172,7 @@ export default function PostsScreen() {
         visible={!!sharePost}
         post={sharePost}
         onClose={() => setSharePost(null)}
-        onSent={(_recipients: MockUser[], _post: MockPost) => {
-          // Firebase'e bağlandığında burada sohbet mesajı kaydedilecek
-        }}
+        onSent={() => {}}
         colors={c}
       />
 
@@ -122,7 +183,6 @@ export default function PostsScreen() {
         transparent
         onRequestClose={() => setNewPostModal(false)}
       >
-        {/* Backdrop — tap outside closes */}
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)" }]}
           onPress={() => setNewPostModal(false)}
@@ -144,31 +204,36 @@ export default function PostsScreen() {
             </View>
 
             <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
-              <Pressable onPress={() => setNewPostModal(false)}>
+              <Pressable onPress={() => { setNewPostModal(false); setNewImage(null); }}>
                 <Text style={[styles.cancelText, { color: c.textMuted }]}>İptal</Text>
               </Pressable>
               <Text style={[styles.modalTitle, { color: c.text }]}>Yeni Gönderi</Text>
               <Pressable
                 onPress={handleAddPost}
+                disabled={posting}
                 style={[
                   styles.shareBtn,
-                  { backgroundColor: newText.trim() ? c.primary : c.surface },
+                  { backgroundColor: (newText.trim() || newImage) ? c.primary : c.surface },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.shareBtnText,
-                    { color: newText.trim() ? "#fff" : c.textMuted },
-                  ]}
-                >
-                  Paylaş
-                </Text>
+                {posting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.shareBtnText,
+                      { color: (newText.trim() || newImage) ? "#fff" : c.textMuted },
+                    ]}
+                  >
+                    Paylaş
+                  </Text>
+                )}
               </Pressable>
             </View>
 
             <View style={styles.newPostBody}>
               <Image
-                source={{ uri: `https://i.pravatar.cc/400?img=68` }}
+                source={{ uri: profile?.photoURL || "https://i.pravatar.cc/400?img=68" }}
                 style={styles.newPostAvatar}
               />
               <TextInput
@@ -183,26 +248,25 @@ export default function PostsScreen() {
               />
             </View>
 
+            {newImage && (
+              <View style={styles.imagePreviewWrap}>
+                <Image source={{ uri: newImage }} style={styles.imagePreview} />
+                <Pressable onPress={() => setNewImage(null)} style={styles.imageRemoveBtn}>
+                  <Ionicons name="close-circle" size={24} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+
             <Text style={[styles.charHint, { color: c.textMuted }]}>
               {newText.length}/500
             </Text>
 
             <View style={[styles.mediaRow, { borderTopColor: c.border }]}>
-              <Pressable
-                style={styles.mediaBtn}
-                onPress={() =>
-                  Alert.alert("Fotoğraf", "Firebase bağlandıktan sonra aktif olacak.")
-                }
-              >
+              <Pressable style={styles.mediaBtn} onPress={handlePickImage}>
                 <Ionicons name="image-outline" size={22} color={c.primary} />
                 <Text style={[styles.mediaBtnText, { color: c.primary }]}>Fotoğraf</Text>
               </Pressable>
-              <Pressable
-                style={styles.mediaBtn}
-                onPress={() =>
-                  Alert.alert("Video", "Firebase bağlandıktan sonra aktif olacak.")
-                }
-              >
+              <Pressable style={styles.mediaBtn} onPress={handlePickVideo}>
                 <Ionicons name="videocam-outline" size={22} color={c.primary} />
                 <Text style={[styles.mediaBtnText, { color: c.primary }]}>Video</Text>
               </Pressable>
@@ -236,10 +300,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingBottom: 80 },
+  emptyText: { fontSize: 16, fontWeight: "700" },
+  emptyHint: { fontSize: 13 },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
   newPostSheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -261,6 +326,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    minWidth: 72,
+    alignItems: "center",
   },
   shareBtnText: { fontWeight: "700", fontSize: 14 },
   newPostBody: {
@@ -277,6 +344,9 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: "top",
   },
+  imagePreviewWrap: { marginHorizontal: 16, marginBottom: 8, position: "relative" },
+  imagePreview: { width: "100%", height: 180, borderRadius: 14 },
+  imageRemoveBtn: { position: "absolute", top: 6, right: 6 },
   charHint: { fontSize: 12, textAlign: "right", paddingHorizontal: 16, marginBottom: 8 },
   mediaRow: {
     flexDirection: "row",

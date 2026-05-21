@@ -13,7 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { MOCK_NOTIFS, Notif, getNotifUser, notifLabel } from "@/constants/notifications";
+import { MOCK_NOTIFS, Notif, notifLabel } from "@/constants/notifications";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 
 type Props = {
@@ -107,8 +107,8 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
           ItemSeparatorComponent={() => <View style={[styles.sep, { backgroundColor: c.border }]} />}
           contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
-            const u = getNotifUser(item);
-            if (!u) return null;
+            // Backend pending — render placeholder using only notif metadata.
+            const u = { name: "Bilinmeyen", photo: "", verified: false };
             const lbl = notifLabel(item.type);
             return (
               <Animated.View entering={FadeIn.delay(80 + index * 35).duration(280)}>

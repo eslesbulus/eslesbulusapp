@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -13,16 +13,16 @@ import Animated, { FadeIn, Layout } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import type { UserProfile } from "@/context/AuthContext";
+import { useUsers } from "@/hooks/useUsers";
 import { useInteractions } from "@/context/InteractionsContext";
 import { usePremium, DAILY_HI_LIMIT } from "@/context/PremiumContext";
-import { MOCK_USERS, MockUser } from "@/constants/mockUsers";
 import {
   Filters,
   DEFAULT_FILTERS,
   activeFilterCount,
-  applyFilters,
 } from "@/constants/filters";
-import { MOCK_NOTIFS } from "@/constants/notifications";
 import { StoriesBar } from "@/components/discover/StoriesBar";
 import { VipSection } from "@/components/discover/VipSection";
 import { ViewToggle, ViewMode } from "@/components/discover/ViewToggle";
@@ -34,38 +34,59 @@ import { NotificationsPopup } from "@/components/discover/NotificationsPopup";
 
 export default function DiscoverScreen() {
   const { theme, mode } = useTheme();
+  const { profile } = useAuth();
   const { sendRandomHi } = useInteractions();
   const { canSendHi, useHi } = usePremium();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const c = theme.colors;
 
+  // Discover defaults to the opposite gender. "Diğer" → show everyone.
+  const defaultGender = useMemo<Filters["gender"]>(() => {
+    if (profile?.gender === "Erkek") return "Kadın";
+    if (profile?.gender === "Kadın") return "Erkek";
+    return "all";
+  }, [profile?.gender]);
+
   const [viewMode, setViewMode] = useState<ViewMode>("album");
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<Filters>(() => ({
+    ...DEFAULT_FILTERS,
+    gender: defaultGender,
+  }));
   const [filterOpen, setFilterOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [toast, setToast] = useState<{
     seq: number;
-    user: MockUser;
+    user: UserProfile;
     text: string;
     emoji: string;
   } | null>(null);
 
-  const filterCount = activeFilterCount(filters);
-  const unreadNotifs = MOCK_NOTIFS.filter((n) => !n.read).length;
+  // Sync filter default if profile gender loads after mount.
+  useEffect(() => {
+    setFilters((prev) =>
+      prev.gender === "all" || prev.gender === "Erkek" || prev.gender === "Kadın"
+        ? { ...prev, gender: defaultGender }
+        : prev
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultGender]);
 
-  const users = useMemo(() => applyFilters(MOCK_USERS, filters), [filters]);
+  const filterCount = activeFilterCount(filters);
+  const unreadNotifs = 0; // notifications backend pending
+
+  const { users } = useUsers(filters);
 
   const rows = useMemo(() => {
     if (viewMode !== "album") return [];
-    const out: MockUser[][] = [];
+    const out: UserProfile[][] = [];
     for (let i = 0; i < users.length; i += 2) {
       out.push(users.slice(i, i + 2));
     }
     return out;
   }, [users, viewMode]);
 
-  async function handlePressHi(user: MockUser) {
+  async function handlePressHi(user: UserProfile) {
     if (!canSendHi) {
       Alert.alert(
         "Günlük Limit Doldu",
@@ -79,12 +100,12 @@ export default function DiscoverScreen() {
     }
     const allowed = await useHi();
     if (!allowed) return;
-    const sent = sendRandomHi(user.id);
-    setToast({ seq: Date.now(), user, text: sent.text, emoji: sent.emoji });
+    const sent = await sendRandomHi(user.uid);
+    if (sent) setToast({ seq: Date.now(), user, text: sent.text, emoji: sent.emoji });
   }
 
-  function openProfile(user: MockUser) {
-    router.push(`/user/${user.id}`);
+  function openProfile(user: UserProfile) {
+    router.push(`/user/${user.uid}`);
   }
 
   return (
@@ -92,7 +113,7 @@ export default function DiscoverScreen() {
       <SentToast
         show={!!toast}
         userName={toast?.user.name}
-        userPhoto={toast?.user.photo}
+        userPhoto={toast?.user.photoURL || toast?.user.photos?.[0]}
         message={toast?.text}
         emoji={toast?.emoji}
         topInset={insets.top}
@@ -127,7 +148,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
       >
         <StoriesBar
-          onPressUser={(u) => router.push(`/story/${u.id}`)}
+          onPressUser={(u) => router.push(`/story/${u.uid}`)}
           onPressAdd={() => router.push("/story/create")}
         />
 
@@ -179,7 +200,7 @@ export default function DiscoverScreen() {
                 <View key={ri} style={styles.row}>
                   {pair.map((u) => (
                     <ProfileCardAlbum
-                      key={u.id}
+                      key={u.uid}
                       user={u}
                       onPressHi={handlePressHi}
                       onPress={openProfile}
@@ -191,7 +212,7 @@ export default function DiscoverScreen() {
             ) : (
               users.map((u) => (
                 <ProfileCardList
-                  key={u.id}
+                  key={u.uid}
                   user={u}
                   onPressHi={handlePressHi}
                   onPress={openProfile}

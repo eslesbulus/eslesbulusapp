@@ -1,0 +1,230 @@
+# Plan: Mock → Firebase Migration + Discover Gender Filter + Register DatePicker
+
+## Context
+
+Eşleşbulus (React Native + Expo + Firebase) dating app has 14+ files importing from `constants/mockUsers.ts`. Firebase (Auth + Firestore + Storage) is already set up in `config/firebase.ts`. `AuthContext` already subscribes to `users/{uid}` Firestore doc — partial real-user infra exists, but discovery / lists / single-user fetches all read from MOCK_USERS arrays. This plan does three things:
+
+1. **Migrates all mock reads to Firestore** (hooks for list + single user), migrates Interactions & BlockedUsers contexts to subcollections, deletes `constants/mockUsers.ts` entirely.
+2. **Adds opposite-gender filter** in Discover — current user's gender determines who they see by default.
+3. **Adds DatePicker to register** with age computation + 18+ enforcement. Removes the manual GG/AA/YYYY birth-date inputs from `profile-setup.tsx` (single source of truth on registration).
+
+Why now: `MockUser` is the #2 god node with 14 cross-community edges (mock data leaks into production screens). Removing it lets the app run with real Firestore users and removes a major architectural smell flagged by graphify.
+
+---
+
+## Decisions (locked by user)
+
+- **MOCK_USERS:** delete entirely, no seed, no fallback. Discover will be empty until real users register.
+- **Birthdate:** register-only. profile-setup loses its manual date inputs.
+- **Interactions + BlockedUsers:** migrate to Firestore now (subcollections).
+
+---
+
+## Phase 1 — Foundation: types + hooks + Firestore schema
+
+### `context/AuthContext.tsx`
+Extend `UserProfile` type to include all discovery-needed fields:
+```ts
+export type UserProfile = {
+  uid: string;
+  name: string;
+  email: string;
+  photoURL?: string;
+  birthDate?: string;   // ISO yyyy-mm-dd (from DatePicker)
+  age?: number;         // computed at register, stored
+  gender?: "Erkek" | "Kadın" | "Diğer";
+  bio?: string;
+  city?: string;
+  photos?: string[];
+  interests?: string[];
+  job?: string;
+  height?: number;
+  online?: boolean;
+  lastActive?: number;  // unix ms; serverTimestamp on writes
+  verified?: boolean;
+  vip?: boolean;
+  profileComplete: boolean;
+};
+```
+
+### `hooks/useUsers.ts` (NEW)
+Real-time subscription to `users` collection with client-side filtering.
+- Returns `{ users, loading, error }`.
+- Filters out current user's own doc.
+- Caller passes `Filters` from `constants/filters.ts`; hook applies same predicate as `applyFilters()`.
+- Uses `onSnapshot(collection(db, "users"))` so new registrations appear live.
+
+### `hooks/useUser.ts` (NEW)
+Single-user `onSnapshot(doc(db, "users", uid))` subscription. Replaces every `getUserById(id)` call. Returns `{ user, loading }`.
+
+### Firestore schema
+```
+users/{uid}                       // existing, extended
+users/{uid}/sent_his/{otherUid}   // NEW — { text, emoji, at }
+users/{uid}/liked/{otherUid}      // NEW — { at }
+users/{uid}/blocked/{otherUid}    // NEW — { name, photo, at }
+```
+
+---
+
+## Phase 2 — Register screen: DatePicker + age + 18+
+
+### Install
+```bash
+npx expo install @react-native-community/datetimepicker
+```
+(Expo v54 has prebuilt config plugin — no manual native linking.)
+
+### `app/(auth)/register.tsx`
+Add between password and age-confirm checkbox:
+- `birthDate: Date | null` state.
+- Pressable "Doğum Tarihi Seç" button → opens `DateTimePicker` (`display="spinner"` on iOS, default modal on Android).
+- `maximumDate = new Date(today - 18 years)` — picker won't let user pick younger.
+- Computed age shown beside selected date: `28 yaşında ✓`.
+- On submit: validate `birthDate !== null`, compute age, save `birthDate.toISOString().slice(0,10)` + `age` into Firestore `users/{uid}` doc.
+
+The existing "18 yaşından büyük olduğumu onaylıyorum" checkbox becomes redundant once the picker enforces it — **remove the checkbox** to simplify the form. Keep `termsAccepted` checkbox.
+
+### `lib/age.ts` (NEW)
+Small util:
+```ts
+export function calculateAge(birthDate: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+}
+```
+
+### `app/(onboarding)/profile-setup.tsx`
+Remove `birthDay/birthMonth/birthYear` state, the date inputs (lines 297–348), and the validation block in `goNext()` (lines 133–145). Step "info" now only asks gender + city.
+
+---
+
+## Phase 3 — Discover gender filter
+
+### `app/(tabs)/index.tsx`
+Inject current user's gender into default filters:
+```ts
+const { profile } = useAuth();
+const oppositeGender = profile?.gender === "Erkek" ? "Kadın"
+                     : profile?.gender === "Kadın" ? "Erkek"
+                     : "all";
+const [filters, setFilters] = useState<Filters>({
+  ...DEFAULT_FILTERS,
+  gender: oppositeGender,
+});
+```
+"Diğer" → shows all genders. User can still override in `FilterSheet`.
+
+### `constants/filters.ts`
+Change `Gender` type to match new schema:
+```ts
+export type Gender = "Erkek" | "Kadın" | "Diğer";
+```
+`applyFilters()` predicate stays identical.
+
+### `components/discover/FilterSheet.tsx`
+Update gender chip labels to "Erkek" / "Kadın" / "Tümü". (No "Diğer" option in the filter — only as a self-identifier.)
+
+---
+
+## Phase 4 — Migrate consumers to Firestore (delete mock)
+
+Replace `MOCK_USERS` / `MockUser` / `getUserById` everywhere:
+
+### List consumers — swap to `useUsers()` (or specialized variants)
+- `app/(tabs)/index.tsx` → `const { users } = useUsers(filters)` (filters applied inside hook).
+- `app/(tabs)/chat.tsx` → for now show recent chats from a future `messages` collection; until then show `useUsers().slice(0, 6)` as a "Mesaj başlat" suggestion list.
+- `app/(tabs)/matches.tsx` → same temporary approach until matches collection exists; show liked-me derived from `users/{uid}/liked` reverse-lookup later.
+- `components/discover/StoriesBar.tsx` → drop entirely OR fetch users with `hasStory: true`. Recommendation: drop stories UI from discover until stories backend exists.
+- `components/discover/VipSection.tsx` → `useUsers({ ...DEFAULT_FILTERS, gender: oppositeGender }).filter(u => u.vip)`.
+- `constants/notifications.ts` → currently exports `MOCK_NOTIFS` referencing mock IDs. **Delete this constant** — notifications need their own backing later. Stub the notifications popup to show "Henüz bildirim yok".
+
+### Single-user consumers — swap to `useUser(uid)`
+- `app/user/[id].tsx`, `app/chat/[id].tsx`, `app/call/[id].tsx`, `app/story/[id].tsx` — replace `getUserById(id)` with `useUser(id)`.
+- Components receiving a `MockUser` prop (`ProfileCardAlbum`, `ProfileCardList`, `HiMessageModal`) — change prop type from `MockUser` to `UserProfile`. Field surface is compatible (same names).
+
+### `context/InteractionsContext.tsx` — Firestore-backed
+Replace local state with Firestore subscriptions:
+- `sentHis`: `onSnapshot(collection(db, "users", uid, "sent_his"))`.
+- `likedUsers`: `onSnapshot(collection(db, "users", uid, "liked"))`.
+- `sendRandomHi(otherUid)`: `setDoc(doc(db, "users", uid, "sent_his", otherUid), { text, emoji, at: serverTimestamp() })`.
+- `likeUser(otherUid)`: same shape, `liked` collection.
+- Daily-limit count: `query(..., where("at", ">=", startOfToday))`.
+
+### `context/BlockedUsersContext.tsx` — Firestore-backed
+- `blocked`: `onSnapshot(collection(db, "users", uid, "blocked"))`.
+- `blockUser(user)`: `setDoc(..., { name, photo, at: serverTimestamp() })`.
+- `unblockUser(uid)`: `deleteDoc(...)`.
+
+### DELETE
+- `constants/mockUsers.ts` (entire file — Gender type re-exported from filters.ts)
+- `constants/notifications.ts` `MOCK_NOTIFS` constant (keep file empty or delete if unused)
+- All `import ... from "@/constants/mockUsers"` lines.
+
+---
+
+## Phase 5 — Firestore security rules (CRITICAL)
+
+`firestore.rules` (create if missing — currently no rules file in repo):
+```
+match /users/{uid} {
+  allow read: if request.auth != null;
+  allow write: if request.auth.uid == uid;
+  match /{sub=**}/{doc} {
+    allow read, write: if request.auth.uid == uid;
+  }
+}
+```
+Push with `firebase deploy --only firestore:rules`. **Without this, anyone can read/write any user.**
+
+---
+
+## Critical Files
+
+| File | Action |
+|------|--------|
+| `context/AuthContext.tsx` | Extend `UserProfile` type |
+| `hooks/useUsers.ts` | CREATE |
+| `hooks/useUser.ts` | CREATE |
+| `lib/age.ts` | CREATE |
+| `app/(auth)/register.tsx` | Add DatePicker, age display, 18+ via `maximumDate`, write birthDate+age to Firestore |
+| `app/(onboarding)/profile-setup.tsx` | Remove birth date step inputs + validation |
+| `app/(tabs)/index.tsx` | Inject opposite-gender filter, swap `MOCK_USERS` → `useUsers()` |
+| `app/(tabs)/chat.tsx`, `matches.tsx` | Swap mock to `useUsers()` |
+| `app/user/[id].tsx`, `chat/[id].tsx`, `call/[id].tsx`, `story/[id].tsx` | Swap `getUserById` → `useUser` |
+| `components/discover/*.tsx` (6 files) | Change `MockUser` prop type to `UserProfile`; drop StoriesBar mock |
+| `context/InteractionsContext.tsx` | Replace local state with Firestore subscriptions |
+| `context/BlockedUsersContext.tsx` | Replace local state with Firestore subscriptions |
+| `constants/filters.ts` | Update `Gender` type to match new schema |
+| `constants/mockUsers.ts` | **DELETE** |
+| `constants/notifications.ts` | Delete `MOCK_NOTIFS` constant |
+| `firestore.rules` | CREATE — uid-gated read/write |
+| `package.json` | Add `@react-native-community/datetimepicker` |
+
+---
+
+## Verification
+
+1. **Build & run:** `npx expo start --clear` — TypeScript compiles, no stale `MockUser` imports.
+2. **Token check:** `rg "MOCK_USERS|MockUser|getUserById|mockUsers" --type tsx --type ts` should return only the deleted-file path or zero hits.
+3. **Register flow:** Create new account → pick birthdate via picker → confirm age shown → submit. Verify `users/{uid}` doc in Firestore Console has `birthDate`, `age`, `profileComplete: false`.
+4. **Profile setup:** Continue flow → gender + city + interests → no birthdate step. Verify `profileComplete: true`.
+5. **Discover gender filter:** Log in as a "Kadın" account → Discover shows only "Erkek" users (and vice versa). Open FilterSheet → switch to "Tümü" → mix appears.
+6. **Single-user fetch:** Tap a profile card → `app/user/[id]` loads via `useUser(id)` Firestore subscription. Edit that user's bio in another browser tab → live update in app.
+7. **Interactions:** Send a "Hi" → check Firestore Console for `users/{senderUid}/sent_his/{receiverUid}` doc with text/emoji/at timestamp.
+8. **Blocked users:** Block someone → check `users/{uid}/blocked/{otherUid}` exists. Reopen app → list still shows the block (persistence proven).
+9. **Security rules:** In Firestore Console rules playground, attempt unauthenticated read of `users/x` → denied. Authenticated read of `users/x` → allowed. Authenticated write to `users/y` where `y != uid` → denied.
+10. **Empty-state UX:** If Firestore `users` collection has only your own doc, Discover should show an empty state ("Şu an kimse yok") — verify a graceful empty render exists in `app/(tabs)/index.tsx`.
+
+---
+
+## Graphify follow-up
+
+After implementation, run `/graphify . --update` and verify:
+- `MockUser` node disappears from god-node list.
+- `useTheme()` remains god #1 (unrelated, separate refactor).
+- New nodes `useUsers()`, `useUser()` show up as god nodes (this is correct — single source of truth replaces the mock).
+- Communities should drop from 28 → ~24 as mock-related artifacts vanish.

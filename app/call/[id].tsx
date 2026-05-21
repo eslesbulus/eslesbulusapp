@@ -24,7 +24,7 @@ import Animated, {
   FadeInDown,
   FadeInUp,
 } from "react-native-reanimated";
-import { getUserById } from "@/constants/mockUsers";
+import { useUser } from "@/hooks/useUser";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -32,7 +32,9 @@ export default function CallScreen() {
   const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const user = getUserById(id ?? "");
+  const { user } = useUser(id);
+  const userPhoto = user?.photoURL || user?.photos?.[0] || "";
+  const userName = user?.name ?? "";
   const isVideo = type === "video";
 
   const [callState, setCallState] = useState<"ringing" | "connected">("ringing");
@@ -131,7 +133,7 @@ export default function CallScreen() {
 
         {/* Remote "video" feed — user's photo as bg */}
         <Image
-          source={{ uri: user.photo }}
+          source={{ uri: userPhoto }}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
         />
@@ -147,7 +149,7 @@ export default function CallScreen() {
           entering={FadeIn.duration(400)}
           style={[styles.videoTop, { paddingTop: insets.top + 16 }]}
         >
-          <Text style={styles.videoName}>{user.name}</Text>
+          <Text style={styles.videoName}>{userName}</Text>
           <Text style={styles.videoStatus}>
             {callState === "ringing" ? "Aranıyor..." : formatDuration(duration)}
           </Text>
@@ -226,10 +228,10 @@ export default function CallScreen() {
               <Animated.View style={[styles.pulseRingOuter, p2Style, { borderColor: "rgba(255,255,255,0.15)" }]} />
             </>
           )}
-          <Image source={{ uri: user.photo }} style={styles.voiceAvatar} />
+          <Image source={{ uri: userPhoto }} style={styles.voiceAvatar} />
         </View>
 
-        <Text style={styles.voiceName}>{user.name}</Text>
+        <Text style={styles.voiceName}>{userName}</Text>
         <Text style={styles.voiceStatus}>
           {callState === "ringing"
             ? "Aranıyor..."

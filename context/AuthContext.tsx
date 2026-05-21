@@ -8,12 +8,19 @@ export type UserProfile = {
   name: string;
   email: string;
   photoURL?: string;
-  birthDate?: string;
-  gender?: string;
+  birthDate?: string;     // ISO yyyy-mm-dd
+  age?: number;           // computed at register, stored for cheap filtering
+  gender?: "Erkek" | "Kadın" | "Diğer";
   bio?: string;
   city?: string;
   photos?: string[];
   interests?: string[];
+  job?: string;
+  height?: number;
+  online?: boolean;
+  lastActive?: number;    // unix ms
+  verified?: boolean;
+  vip?: boolean;
   profileComplete: boolean;
 };
 
@@ -64,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Single subscription that lives for the lifetime of the provider.
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+      if (__DEV__) console.log("[Auth] onAuthStateChanged →", u ? `uid=${u.uid}` : "null");
       if (isDevAdminRef.current) return;
       setUser(u);
       if (!u) {
@@ -77,16 +85,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isDevAdmin) return;
     if (!user) return;
-    const unsubscribeDoc = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (snap.exists()) {
-        setProfile(snap.data() as UserProfile);
-      } else {
+    const unsubscribeDoc = onSnapshot(
+      doc(db, "users", user.uid),
+      (snap) => {
+        if (snap.exists()) {
+          setProfile(snap.data() as UserProfile);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("[AuthContext] profile snapshot error:", err);
         setProfile(null);
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      },
+    );
     return unsubscribeDoc;
   }, [user, isDevAdmin]);
+
+  // Safety: if loading hangs >8s (Firestore offline, rules block, etc.), unblock the router.
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => {
+      if (loading) {
+        console.warn("[AuthContext] loading timed out — forcing false");
+        setLoading(false);
+      }
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   function signInAsDevAdmin() {
     isDevAdminRef.current = true;

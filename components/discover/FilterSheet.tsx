@@ -21,13 +21,18 @@ import Animated, {
   interpolate,
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import { usePremium } from "@/context/PremiumContext";
+import { useRouter } from "expo-router";
+import { Alert } from "react-native";
 import {
   Filters,
   DEFAULT_FILTERS,
   AGE_BOUND,
   activeFilterCount,
+  Gender,
 } from "@/constants/filters";
-import { POPULAR_CITIES, Gender } from "@/constants/mockUsers";
+import { POPULAR_CITY_SHORTLIST } from "@/constants/cities";
 
 type Props = {
   visible: boolean;
@@ -43,6 +48,9 @@ const EASE_IN = Easing.bezier(0.7, 0, 0.84, 0);
 
 export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
   const { theme, mode } = useTheme();
+  const { profile } = useAuth();
+  const { isPremium } = usePremium();
+  const router = useRouter();
   const c = theme.colors;
   const [local, setLocal] = useState<Filters>(initial);
   const [mounted, setMounted] = useState(visible);
@@ -85,6 +93,18 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
   }
 
   function setGender(g: "all" | Gender) {
+    // Male users need premium to filter for "Kadın" only
+    if (g === "Kadın" && profile?.gender === "Erkek" && !isPremium) {
+      Alert.alert(
+        "Premium Gerekli 👑",
+        "Yalnızca kadınları görmek için Premium üyelik gereklidir. \"Tümü\" seçeneğiyle karışık olarak görebilirsiniz.",
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Premium Al", onPress: () => { onClose(); router.push("/premium"); } },
+        ]
+      );
+      return;
+    }
     setLocal((s) => ({ ...s, gender: g }));
   }
 
@@ -171,8 +191,8 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
           <Section title="Cinsiyet" c={c}>
             <View style={styles.segment}>
               <SegBtn label="Tümü" active={local.gender === "all"} onPress={() => setGender("all")} c={c} />
-              <SegBtn label="Kadın" icon="female" active={local.gender === "kadın"} onPress={() => setGender("kadın")} c={c} />
-              <SegBtn label="Erkek" icon="male" active={local.gender === "erkek"} onPress={() => setGender("erkek")} c={c} />
+              <SegBtn label="Kadın" icon="female" active={local.gender === "Kadın"} onPress={() => setGender("Kadın")} c={c} />
+              <SegBtn label="Erkek" icon="male" active={local.gender === "Erkek"} onPress={() => setGender("Erkek")} c={c} />
             </View>
           </Section>
 
@@ -182,7 +202,7 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
             c={c}
           >
             <View style={styles.chips}>
-              {POPULAR_CITIES.map((city) => {
+              {POPULAR_CITY_SHORTLIST.map((city) => {
                 const on = local.cities.includes(city);
                 return (
                   <Pressable

@@ -2,23 +2,24 @@ import { useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
-import { MockUser } from "@/constants/mockUsers";
+import type { UserProfile } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ReportSheet } from "@/components/common/ReportSheet";
 
 type Props = {
-  user: MockUser;
-  onPressHi: (u: MockUser) => void;
-  onPress?: (u: MockUser) => void;
+  user: UserProfile;
+  onPressHi: (u: UserProfile) => void;
+  onPress?: (u: UserProfile) => void;
 };
 
 export function ProfileCardList({ user, onPressHi, onPress }: Props) {
   const { theme } = useTheme();
   const { hasSent } = useInteractions();
   const c = theme.colors;
-  const sent = hasSent(user.id);
+  const sent = hasSent(user.uid);
   const [reportOpen, setReportOpen] = useState(false);
+  const photo = user.photoURL || user.photos?.[0];
 
   return (
     <Pressable
@@ -33,7 +34,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
       ]}
     >
       <View style={styles.avatarWrap}>
-        <Image source={{ uri: user.photo }} style={styles.avatar} />
+        <Image source={{ uri: photo }} style={styles.avatar} />
         {user.online && (
           <View
             style={[
@@ -63,7 +64,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
           </Text>
           <View style={[styles.sep, { backgroundColor: c.textMuted }]} />
           <Text style={[styles.meta, { color: user.online ? c.online : c.textMuted }]}>
-            {user.online ? "Çevrimiçi" : user.lastActive ?? "Çevrimdışı"}
+            {user.online ? "Çevrimiçi" : "Çevrimdışı"}
           </Text>
         </View>
         {user.bio ? (
@@ -107,8 +108,8 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
         onClose={() => setReportOpen(false)}
         type="user"
         targetName={user.name}
-        targetId={user.id}
-        targetPhoto={user.photo}
+        targetId={user.uid}
+        targetPhoto={photo ?? ""}
       />
     </Pressable>
   );

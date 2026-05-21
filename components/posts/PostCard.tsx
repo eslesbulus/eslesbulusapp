@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,21 +16,33 @@ import Animated, {
   withSequence,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
-import { MockPost } from "@/constants/mockPosts";
+import { useState } from "react";
 import { ReportSheet } from "@/components/common/ReportSheet";
+import { type DisplayPost, formatTimeAgo } from "@/constants/mockPosts";
 
 const { width: W } = Dimensions.get("window");
 
 type Props = {
-  post: MockPost;
+  post: DisplayPost;
   colors: any;
-  onPressComment: (post: MockPost) => void;
-  onPressShare: (post: MockPost) => void;
+  liked: boolean;
+  onToggleLike: () => void;
+  onPressComment: (post: DisplayPost) => void;
+  onPressShare: (post: DisplayPost) => void;
+  hasStory?: boolean;
+  onPressStory?: () => void;
 };
 
-export function PostCard({ post, colors: c, onPressComment, onPressShare }: Props) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.likes);
+export function PostCard({
+  post,
+  colors: c,
+  liked,
+  onToggleLike,
+  onPressComment,
+  onPressShare,
+  hasStory,
+  onPressStory,
+}: Props) {
   const [reportOpen, setReportOpen] = useState(false);
   const scale = useSharedValue(1);
   const router = useRouter();
@@ -38,13 +51,14 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
     transform: [{ scale: scale.value }],
   }));
 
-  function handleLike() {
+  const handleLike = useCallback(() => {
     scale.value = withSequence(withSpring(1.4), withSpring(1));
-    setLiked((prev) => {
-      setLikeCount((c) => (prev ? c - 1 : c + 1));
-      return !prev;
-    });
-  }
+    onToggleLike();
+  }, [onToggleLike]);
+
+  const avatarContent = (
+    <Image source={{ uri: post.userPhoto }} style={styles.avatar} />
+  );
 
   return (
     <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -53,7 +67,23 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
         style={styles.header}
         onPress={() => router.push(`/user/${post.userId}`)}
       >
-        <Image source={{ uri: post.userPhoto }} style={styles.avatar} />
+        {/* Avatar with optional story ring */}
+        {hasStory ? (
+          <Pressable onPress={onPressStory}>
+            <LinearGradient
+              colors={[c.primary, c.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.storyRing}
+            >
+              <View style={[styles.storyRingInner, { backgroundColor: c.card }]}>
+                {avatarContent}
+              </View>
+            </LinearGradient>
+          </Pressable>
+        ) : (
+          avatarContent
+        )}
         <View style={styles.headerInfo}>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: c.text }]}>{post.userName}</Text>
@@ -62,7 +92,9 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
             )}
           </View>
           <Text style={[styles.meta, { color: c.textMuted }]}>
-            {post.userAge} · {post.userCity} · {post.createdAt}
+            {post.userAge ? `${post.userAge} · ` : ""}
+            {post.userCity ? `${post.userCity} · ` : ""}
+            {formatTimeAgo(post.createdAt)}
           </Text>
         </View>
         <Pressable style={styles.moreBtn} hitSlop={8} onPress={() => setReportOpen(true)}>
@@ -85,9 +117,9 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
       ) : null}
 
       {/* Image */}
-      {post.image ? (
+      {post.imageUrl ? (
         <Image
-          source={{ uri: post.image }}
+          source={{ uri: post.imageUrl }}
           style={[styles.postImage, { backgroundColor: c.surface }]}
           resizeMode="cover"
         />
@@ -104,15 +136,12 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
             />
           </Animated.View>
           <Text style={[styles.actionCount, { color: liked ? "#E91E63" : c.textMuted }]}>
-            {likeCount}
+            {post.likesCount}
           </Text>
         </Pressable>
 
         <Pressable style={styles.actionBtn} onPress={() => onPressComment(post)}>
           <Ionicons name="chatbubble-outline" size={21} color={c.textMuted} />
-          <Text style={[styles.actionCount, { color: c.textMuted }]}>
-            {post.comments.length}
-          </Text>
         </Pressable>
 
         <Pressable style={styles.actionBtn} onPress={() => onPressShare(post)}>
@@ -122,6 +151,8 @@ export function PostCard({ post, colors: c, onPressComment, onPressShare }: Prop
     </View>
   );
 }
+
+const AVATAR_SIZE = 42;
 
 const styles = StyleSheet.create({
   card: {
@@ -137,10 +168,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     backgroundColor: "#eee",
+  },
+  storyRing: {
+    width: AVATAR_SIZE + 6,
+    height: AVATAR_SIZE + 6,
+    borderRadius: (AVATAR_SIZE + 6) / 2,
+    padding: 2.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  storyRingInner: {
+    width: AVATAR_SIZE + 1,
+    height: AVATAR_SIZE + 1,
+    borderRadius: (AVATAR_SIZE + 1) / 2,
+    padding: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerInfo: { flex: 1 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 4 },

@@ -26,28 +26,29 @@ import Animated, {
   FadeInDown,
   Easing,
 } from "react-native-reanimated";
-import { MockPost, MockComment } from "@/constants/mockPosts";
+import { useAuth } from "@/context/AuthContext";
+import { usePostComments, type PostComment } from "@/hooks/usePosts";
+import { formatTimeAgo } from "@/constants/mockPosts";
 
 const { height: H } = Dimensions.get("window");
-const A = (n: number) => `https://i.pravatar.cc/400?img=${n}`;
 
 type Props = {
-  post: MockPost | null;
+  postId: string | null;
+  postUserName?: string;
   visible: boolean;
   onClose: () => void;
   colors: any;
 };
 
-export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
+export function CommentSheet({ postId, postUserName, visible, onClose, colors: c }: Props) {
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
+  const { comments, addComment } = usePostComments(visible ? postId : null);
   const [text, setText] = useState("");
-  const [comments, setComments] = useState<MockComment[]>([]);
-  const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList>(null);
 
-  // Sheet animation
   const translateY = useSharedValue(H);
   const backdrop = useSharedValue(0);
 
@@ -59,46 +60,26 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
     opacity: backdrop.value,
   }));
 
-  // Sheet open: smooth ease-out deceleration (native-feeling)
-  // Sheet close: quick ease-in acceleration
   useEffect(() => {
     if (visible) {
       backdrop.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.quad) });
-      translateY.value = withTiming(0, {
-        duration: 360,
-        easing: Easing.out(Easing.exp),
-      });
+      translateY.value = withTiming(0, { duration: 360, easing: Easing.out(Easing.exp) });
     } else {
       backdrop.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.quad) });
-      translateY.value = withTiming(H, {
-        duration: 260,
-        easing: Easing.in(Easing.cubic),
-      });
+      translateY.value = withTiming(H, { duration: 260, easing: Easing.in(Easing.cubic) });
     }
   }, [visible]);
 
-  // Reset comments when post changes
   useEffect(() => {
-    if (post) {
-      setComments(post.comments);
+    if (visible) {
       setText("");
       setLikedIds(new Set());
-      setNewCommentIds(new Set());
     }
-  }, [post?.id]);
+  }, [postId, visible]);
 
-  function handleSend() {
+  async function handleSend() {
     if (!text.trim()) return;
-    const newComment: MockComment = {
-      id: `c_${Date.now()}`,
-      userId: "me",
-      userName: "sen",
-      userPhoto: A(68),
-      text: text.trim(),
-      createdAt: "şimdi",
-    };
-    setComments((prev) => [...prev, newComment]);
-    setNewCommentIds((prev) => new Set([...prev, newComment.id]));
+    await addComment(text.trim());
     setText("");
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
   }
@@ -117,18 +98,18 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
     onClose();
   }
 
-  if (!post && !visible) return null;
+  if (!postId && !visible) return null;
+
+  const userPhoto = profile?.photoURL ?? "";
 
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={handleClose}>
-      {/* Backdrop */}
       <Animated.View style={[StyleSheet.absoluteFillObject, backdropStyle]} pointerEvents={visible ? "auto" : "none"}>
         <TouchableWithoutFeedback onPress={handleClose}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
       </Animated.View>
 
-      {/* Sheet */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.kavWrap}
@@ -141,12 +122,10 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
             sheetStyle,
           ]}
         >
-          {/* Handle */}
           <View style={styles.handleWrap}>
             <View style={[styles.handle, { backgroundColor: c.border }]} />
           </View>
 
-          {/* Header */}
           <View style={[styles.sheetHeader, { borderBottomColor: c.border }]}>
             <View style={{ width: 22 }} />
             <Text style={[styles.sheetTitle, { color: c.text }]}>Yorumlar</Text>
@@ -155,7 +134,6 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
             </Pressable>
           </View>
 
-          {/* Comments list */}
           <FlatList
             ref={listRef}
             data={comments}
@@ -179,19 +157,17 @@ export function CommentSheet({ post, visible, onClose, colors: c }: Props) {
                 liked={likedIds.has(item.id)}
                 onLike={() => toggleLikeComment(item.id)}
                 colors={c}
-                isNew={newCommentIds.has(item.id)}
               />
             )}
           />
 
-          {/* Input bar */}
           <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card }]}>
-            <Image source={{ uri: A(68) }} style={styles.inputAvatar} />
+            {userPhoto ? <Image source={{ uri: userPhoto }} style={styles.inputAvatar} /> : null}
             <View style={[styles.inputWrap, { backgroundColor: c.surface, borderColor: c.border }]}>
               <TextInput
                 ref={inputRef}
                 style={[styles.input, { color: c.text }]}
-                placeholder={`${post?.userName ?? ""} kullanıcısının gönderisine yorum yaz...`}
+                placeholder={`${postUserName ?? ""} gönderisine yorum yaz...`}
                 placeholderTextColor={c.textMuted}
                 value={text}
                 onChangeText={setText}
@@ -216,16 +192,13 @@ function CommentRow({
   liked,
   onLike,
   colors: c,
-  isNew,
 }: {
-  item: MockComment;
+  item: PostComment;
   liked: boolean;
   onLike: () => void;
   colors: any;
-  isNew?: boolean;
 }) {
   const heartScale = useSharedValue(1);
-
   const heartStyle = useAnimatedStyle(() => ({
     transform: [{ scale: heartScale.value }],
   }));
@@ -239,22 +212,22 @@ function CommentRow({
   }
 
   return (
-    <Animated.View
-      entering={isNew ? FadeInDown.duration(280).springify().damping(18) : undefined}
-      style={styles.commentRow}
-    >
-      <Image source={{ uri: item.userPhoto }} style={styles.commentAvatar} />
+    <View style={styles.commentRow}>
+      {item.userPhoto ? (
+        <Image source={{ uri: item.userPhoto }} style={styles.commentAvatar} />
+      ) : (
+        <View style={[styles.commentAvatar, { backgroundColor: "#ddd" }]} />
+      )}
       <View style={styles.commentBody}>
         <Text style={styles.commentLine}>
           <Text style={[styles.commentName, { color: c.text }]}>{item.userName} </Text>
           <Text style={[styles.commentText, { color: c.text }]}>{item.text}</Text>
         </Text>
         <View style={styles.commentMeta}>
-          <Text style={[styles.metaText, { color: c.textMuted }]}>{item.createdAt}</Text>
+          <Text style={[styles.metaText, { color: c.textMuted }]}>
+            {formatTimeAgo(item.createdAt)}
+          </Text>
           {liked && <Text style={[styles.metaText, { color: c.textMuted }]}>1 beğeni</Text>}
-          <Pressable hitSlop={6}>
-            <Text style={[styles.metaText, { color: c.textMuted, fontWeight: "600" }]}>Yanıtla</Text>
-          </Pressable>
         </View>
       </View>
       <Pressable onPress={handleLike} hitSlop={10} style={styles.likeBtn}>
@@ -266,7 +239,7 @@ function CommentRow({
           />
         </Animated.View>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -289,9 +262,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetTitle: { fontSize: 15, fontWeight: "700" },
-
   list: { flex: 1 },
-
   emptyWrap: { alignItems: "center", paddingTop: 60, gap: 10 },
   emptyIcon: {
     width: 64,
@@ -303,7 +274,6 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 17, fontWeight: "700" },
   emptyHint: { fontSize: 13 },
-
   commentRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -328,7 +298,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
   },
-
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",

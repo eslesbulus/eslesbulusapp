@@ -18,6 +18,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,6 +30,19 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 import { palette } from "@/constants/theme";
 import { firebaseAuthErrorMessage } from "@/constants/firebaseErrors";
+import { calculateAge } from "@/lib/age";
+
+const MIN_AGE = 18;
+const MAX_DATE = (() => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - MIN_AGE);
+  return d;
+})();
+const DEFAULT_PICKER_DATE = (() => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 25);
+  return d;
+})();
 
 function passwordStrength(p: string): { score: 0 | 1 | 2 | 3; label: string; color: string } {
   if (!p) return { score: 0, label: "", color: "#666" };
@@ -52,13 +66,23 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [age18Confirmed, setAge18Confirmed] = useState(false);
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const termsScrollRef = useRef<ScrollView>(null);
 
   const strength = useMemo(() => passwordStrength(password), [password]);
+  const age = useMemo(() => (birthDate ? calculateAge(birthDate) : null), [birthDate]);
+
+  function handleDateChange(event: DateTimePickerEvent, selected?: Date) {
+    // Android: dismisses on cancel/set; iOS: stays open until user closes manually
+    if (Platform.OS === "android") setPickerOpen(false);
+    if (event.type === "set" && selected) {
+      setBirthDate(selected);
+    }
+  }
 
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -106,8 +130,12 @@ export default function RegisterScreen() {
       Alert.alert("Hata", "Şifre en az 6 karakter olmalı.");
       return;
     }
-    if (!age18Confirmed) {
-      Alert.alert("Yaş Doğrulama", "Devam etmek için 18 yaşından büyük olduğunu onaylamalısın.");
+    if (!birthDate || age == null) {
+      Alert.alert("Doğum Tarihi", "Doğum tarihini seçmelisin.");
+      return;
+    }
+    if (age < MIN_AGE) {
+      Alert.alert("Yaş Doğrulama", `Uygulamayı kullanmak için en az ${MIN_AGE} yaşında olmalısın.`);
       return;
     }
     if (!termsAccepted) {
@@ -123,6 +151,8 @@ export default function RegisterScreen() {
         name: name.trim(),
         email: email.trim(),
         photoURL: "",
+        birthDate: birthDate.toISOString().slice(0, 10),
+        age,
         coins: 500,
         createdAt: serverTimestamp(),
         profileComplete: false,
@@ -257,15 +287,32 @@ export default function RegisterScreen() {
                   </View>
                 )}
 
-                {/* Age confirmation */}
+                {/* Birth date picker */}
                 <Pressable
-                  style={styles.checkboxRow}
-                  onPress={() => setAge18Confirmed((v) => !v)}
+                  style={styles.dateButton}
+                  onPress={() => setPickerOpen(true)}
+                  android_ripple={{ color: "rgba(255,255,255,0.08)" }}
                 >
-                  <View style={[styles.checkbox, age18Confirmed && styles.checkboxChecked]}>
-                    {age18Confirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
-                  </View>
-                  <Text style={styles.checkboxLabel}>18 yaşından büyük olduğumu onaylıyorum</Text>
+                  <Ionicons name="calendar-outline" size={18} color="rgba(255,255,255,0.65)" />
+                  <Text
+                    style={[
+                      styles.dateButtonText,
+                      !birthDate && { color: "rgba(255,255,255,0.5)" },
+                    ]}
+                  >
+                    {birthDate
+                      ? birthDate.toLocaleDateString("tr-TR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })
+                      : "Doğum Tarihi Seç"}
+                  </Text>
+                  {age != null && (
+                    <View style={styles.ageBadge}>
+                      <Text style={styles.ageBadgeText}>{age} yaş</Text>
+                    </View>
+                  )}
                 </Pressable>
 
                 {/* Terms acceptance */}
@@ -308,6 +355,50 @@ export default function RegisterScreen() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Date picker — Android: inline native; iOS: spinner inside modal */}
+      {pickerOpen && Platform.OS === "android" && (
+        <DateTimePicker
+          value={birthDate ?? DEFAULT_PICKER_DATE}
+          mode="date"
+          display="default"
+          maximumDate={MAX_DATE}
+          minimumDate={new Date(1920, 0, 1)}
+          onChange={handleDateChange}
+        />
+      )}
+      {Platform.OS === "ios" && (
+        <Modal
+          visible={pickerOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setPickerOpen(false)}
+        >
+          <Pressable style={styles.iosPickerBackdrop} onPress={() => setPickerOpen(false)}>
+            <Pressable style={styles.iosPickerSheet} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.iosPickerHeader}>
+                <Pressable onPress={() => setPickerOpen(false)} hitSlop={12}>
+                  <Text style={styles.iosPickerCancel}>İptal</Text>
+                </Pressable>
+                <Text style={styles.iosPickerTitle}>Doğum Tarihi</Text>
+                <Pressable onPress={() => setPickerOpen(false)} hitSlop={12}>
+                  <Text style={styles.iosPickerDone}>Tamam</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={birthDate ?? DEFAULT_PICKER_DATE}
+                mode="date"
+                display="spinner"
+                maximumDate={MAX_DATE}
+                minimumDate={new Date(1920, 0, 1)}
+                onChange={handleDateChange}
+                themeVariant="dark"
+                locale="tr-TR"
+              />
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
 
       {/* Terms modal */}
       <Modal
@@ -540,6 +631,61 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
     fontWeight: "700",
   },
+
+  // Date button
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    height: 48,
+    paddingHorizontal: 14,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  dateButtonText: {
+    flex: 1,
+    fontSize: 15,
+    color: "#fff",
+  },
+  ageBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    backgroundColor: palette.primary,
+    borderRadius: 10,
+  },
+  ageBadgeText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "700",
+  },
+
+  // iOS date picker modal
+  iosPickerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  iosPickerSheet: {
+    backgroundColor: "#1A1A1A",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingBottom: 24,
+  },
+  iosPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  iosPickerCancel: { color: "rgba(255,255,255,0.65)", fontSize: 15 },
+  iosPickerDone: { color: palette.primary, fontSize: 15, fontWeight: "700" },
+  iosPickerTitle: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
   loginLink: { marginTop: 18, alignItems: "center" },
   loginLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },

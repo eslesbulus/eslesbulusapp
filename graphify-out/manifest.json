@@ -1,8 +1,8 @@
 {
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app.config.js": {
-    "mtime": 1779206595.6730459,
-    "ast_hash": "c7262fd52edcd25a763b1c874d79385b",
-    "semantic_hash": "c7262fd52edcd25a763b1c874d79385b"
+    "mtime": 1779331700.3862991,
+    "ast_hash": "fc01ad3e742455853c3fa55b2bc7a443",
+    "semantic_hash": "fc01ad3e742455853c3fa55b2bc7a443"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\eas.json": {
     "mtime": 1779146588.7359805,
@@ -15,9 +15,9 @@
     "semantic_hash": "6ca1aa4dd2ab7dbeeff8d0bf79cbf711"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\package.json": {
-    "mtime": 1779230305.169444,
-    "ast_hash": "dfaf33162f12f553e1f758bfa33a3297",
-    "semantic_hash": "dfaf33162f12f553e1f758bfa33a3297"
+    "mtime": 1779331684.6124485,
+    "ast_hash": "71926eeca4d9943d5a04b4687551503d",
+    "semantic_hash": "71926eeca4d9943d5a04b4687551503d"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\tsconfig.json": {
     "mtime": 1779139445.5362308,
@@ -25,19 +25,19 @@
     "semantic_hash": "dd44505e753e2adb7d02eab8f8942755"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\_layout.tsx": {
-    "mtime": 1779317812.8560305,
+    "mtime": 1779326923.7490885,
     "ast_hash": "8b9a772f5e71af2dc99edd763f0a0280",
     "semantic_hash": "8b9a772f5e71af2dc99edd763f0a0280"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(auth)\\login.tsx": {
-    "mtime": 1779317812.8544135,
+    "mtime": 1779326923.7450633,
     "ast_hash": "9dd1f795aac7e61dc80d4f7bb3f74b28",
     "semantic_hash": "9dd1f795aac7e61dc80d4f7bb3f74b28"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(auth)\\register.tsx": {
-    "mtime": 1779320956.6242676,
-    "ast_hash": "9ab8615c1437ae6c4a7579fb4845baf8",
-    "semantic_hash": "9ab8615c1437ae6c4a7579fb4845baf8"
+    "mtime": 1779331822.5230877,
+    "ast_hash": "d5053473bbc3d68f38343075b257385d",
+    "semantic_hash": "d5053473bbc3d68f38343075b257385d"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(auth)\\_layout.tsx": {
     "mtime": 1779251005.0105371,
@@ -45,9 +45,9 @@
     "semantic_hash": "30a7e4a202e2a58e829405a9d8e11b40"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(onboarding)\\profile-setup.tsx": {
-    "mtime": 1779320956.625273,
-    "ast_hash": "f38e8d803a5c93a9153020252ac15de9",
-    "semantic_hash": "f38e8d803a5c93a9153020252ac15de9"
+    "mtime": 1779331870.512711,
+    "ast_hash": "2683e43405040cb97fc47d1061580a98",
+    "semantic_hash": "2683e43405040cb97fc47d1061580a98"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(onboarding)\\_layout.tsx": {
     "mtime": 1779251007.8310542,
@@ -55,29 +55,29 @@
     "semantic_hash": "6f57d14da1d6abce11a374d892db7b9a"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\chat.tsx": {
-    "mtime": 1779219394.1290228,
-    "ast_hash": "b7518fad6a232fa394affa755997d02a",
-    "semantic_hash": "b7518fad6a232fa394affa755997d02a"
+    "mtime": 1779332494.0930064,
+    "ast_hash": "ddc79ad8b82fdbcb920b63cc6458241e",
+    "semantic_hash": "ddc79ad8b82fdbcb920b63cc6458241e"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\index.tsx": {
-    "mtime": 1779317812.8549242,
-    "ast_hash": "5f272211a8d79adbfa8e6d26225850b0",
-    "semantic_hash": "5f272211a8d79adbfa8e6d26225850b0"
+    "mtime": 1779332103.4792445,
+    "ast_hash": "3defc7db32f7d54f28c8c0c45442fc68",
+    "semantic_hash": "3defc7db32f7d54f28c8c0c45442fc68"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\matches.tsx": {
-    "mtime": 1779317812.855502,
-    "ast_hash": "233d54151aff213716b0d560ce5e29e3",
-    "semantic_hash": "233d54151aff213716b0d560ce5e29e3"
+    "mtime": 1779332545.4928396,
+    "ast_hash": "12e4d921a63c05ebfb303b0dc3bf245a",
+    "semantic_hash": "12e4d921a63c05ebfb303b0dc3bf245a"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\posts.tsx": {
-    "mtime": 1779231419.486232,
-    "ast_hash": "0372cc2ff0b8f2dbe64d1e295c67422f",
-    "semantic_hash": "0372cc2ff0b8f2dbe64d1e295c67422f"
+    "mtime": 1779332635.1205516,
+    "ast_hash": "98327902d8fca44a769480dc6b8747ae",
+    "semantic_hash": "98327902d8fca44a769480dc6b8747ae"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\profile.tsx": {
-    "mtime": 1779317812.8560305,
-    "ast_hash": "e071fa14ea8acf0fd7e23b6d18c5a8fb",
-    "semantic_hash": "e071fa14ea8acf0fd7e23b6d18c5a8fb"
+    "mtime": 1779326923.7490885,
+    "ast_hash": "364f192855a2da7417bb808012b2737f",
+    "semantic_hash": "364f192855a2da7417bb808012b2737f"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\(tabs)\\_layout.tsx": {
     "mtime": 1779251110.5475633,
@@ -85,14 +85,14 @@
     "semantic_hash": "17c35a336027f5afe83409771cc247b2"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\call\\[id].tsx": {
-    "mtime": 1779317812.8575578,
-    "ast_hash": "99e4998c4650e18b00523e37413835f9",
-    "semantic_hash": "99e4998c4650e18b00523e37413835f9"
+    "mtime": 1779332397.9153225,
+    "ast_hash": "41ed2da9bc0672eaa516e5cefe931046",
+    "semantic_hash": "41ed2da9bc0672eaa516e5cefe931046"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\chat\\[id].tsx": {
-    "mtime": 1779317812.8575578,
-    "ast_hash": "6bc191be24bb6d23a2f62abb142764eb",
-    "semantic_hash": "6bc191be24bb6d23a2f62abb142764eb"
+    "mtime": 1779332380.5457902,
+    "ast_hash": "063ea968c98aa74bb7a473fb09e6dd8e",
+    "semantic_hash": "063ea968c98aa74bb7a473fb09e6dd8e"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\profile\\blocked-users.tsx": {
     "mtime": 1779230305.1573424,
@@ -120,17 +120,17 @@
     "semantic_hash": "a4ec3204cd379186438dcc0ea24ff23f"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\story\\[id].tsx": {
-    "mtime": 1779230305.15896,
-    "ast_hash": "99d17939dbc3543fe64b96f8cf72f2fe",
-    "semantic_hash": "99d17939dbc3543fe64b96f8cf72f2fe"
+    "mtime": 1779332446.4387841,
+    "ast_hash": "ec1bf0139f1bb4b8b0d9fc0d9d6b9663",
+    "semantic_hash": "ec1bf0139f1bb4b8b0d9fc0d9d6b9663"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\user\\[id].tsx": {
-    "mtime": 1779319051.178022,
-    "ast_hash": "7f5dfd24ecd1b67cd2b0def463e782b8",
-    "semantic_hash": "7f5dfd24ecd1b67cd2b0def463e782b8"
+    "mtime": 1779332281.921312,
+    "ast_hash": "f14c7fd6b3ab452f1ab7d73daa9458a4",
+    "semantic_hash": "f14c7fd6b3ab452f1ab7d73daa9458a4"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\chat\\EmojiPicker.tsx": {
-    "mtime": 1779319051.178022,
+    "mtime": 1779326923.7533793,
     "ast_hash": "41782168fa216a7b532481b598139747",
     "semantic_hash": "41782168fa216a7b532481b598139747"
   },
@@ -150,9 +150,9 @@
     "semantic_hash": "27ed4a1c97c5cba6c34977f96bf4e030"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\common\\ReportSheet.tsx": {
-    "mtime": 1779231397.0036924,
-    "ast_hash": "b55e0a314794d3c22bfbf5f69143441c",
-    "semantic_hash": "b55e0a314794d3c22bfbf5f69143441c"
+    "mtime": 1779332658.6735225,
+    "ast_hash": "4a5c0f69ba2e39bea8c97b9a43c877a4",
+    "semantic_hash": "4a5c0f69ba2e39bea8c97b9a43c877a4"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\common\\VerifiedBadge.tsx": {
     "mtime": 1779206595.7015584,
@@ -160,29 +160,29 @@
     "semantic_hash": "e1841e0b2e5855f474e6e8c661093bcd"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\FilterSheet.tsx": {
-    "mtime": 1779206595.7015584,
-    "ast_hash": "5119c36efe676a91bcd0019caa49faff",
-    "semantic_hash": "5119c36efe676a91bcd0019caa49faff"
+    "mtime": 1779331940.124182,
+    "ast_hash": "f5a7c544ef5ec28e26e954e5b2e38d01",
+    "semantic_hash": "f5a7c544ef5ec28e26e954e5b2e38d01"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\HiMessageModal.tsx": {
-    "mtime": 1779206595.7015584,
-    "ast_hash": "081b61cb4717876dda160615fdc56027",
-    "semantic_hash": "081b61cb4717876dda160615fdc56027"
+    "mtime": 1779332002.6913228,
+    "ast_hash": "d5e4d065650f37b9d3f5b9a3688f2521",
+    "semantic_hash": "d5e4d065650f37b9d3f5b9a3688f2521"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\NotificationsPopup.tsx": {
-    "mtime": 1779206595.7031047,
-    "ast_hash": "fe11e0986d6ad754bd0acbdb13694b57",
-    "semantic_hash": "fe11e0986d6ad754bd0acbdb13694b57"
+    "mtime": 1779332172.6453109,
+    "ast_hash": "6defe263cae0a04756e8d269aaaf8085",
+    "semantic_hash": "6defe263cae0a04756e8d269aaaf8085"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\ProfileCardAlbum.tsx": {
-    "mtime": 1779317812.8606112,
-    "ast_hash": "59aa4df1fe2874608286bf1dfe130bc8",
-    "semantic_hash": "59aa4df1fe2874608286bf1dfe130bc8"
+    "mtime": 1779332670.2271585,
+    "ast_hash": "92139641a63cea9503f130f8ad30c8cf",
+    "semantic_hash": "92139641a63cea9503f130f8ad30c8cf"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\ProfileCardList.tsx": {
-    "mtime": 1779230305.1625333,
-    "ast_hash": "dca68d628b936211cc967ee26825ff9c",
-    "semantic_hash": "dca68d628b936211cc967ee26825ff9c"
+    "mtime": 1779331991.7530148,
+    "ast_hash": "7af83e12fce7367baa1203f23a8a02b3",
+    "semantic_hash": "7af83e12fce7367baa1203f23a8a02b3"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\SentToast.tsx": {
     "mtime": 1779206595.7041209,
@@ -190,9 +190,9 @@
     "semantic_hash": "e2e18e09ee4e51fda8c2dac87c7eba88"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\StoriesBar.tsx": {
-    "mtime": 1779206595.7046375,
-    "ast_hash": "b2a8e37bfa9305be2e4b8797e65c0781",
-    "semantic_hash": "b2a8e37bfa9305be2e4b8797e65c0781"
+    "mtime": 1779332022.2844286,
+    "ast_hash": "ab847b541f283013a20e4bc715090800",
+    "semantic_hash": "ab847b541f283013a20e4bc715090800"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\ViewToggle.tsx": {
     "mtime": 1779206595.705177,
@@ -200,9 +200,9 @@
     "semantic_hash": "ca08405e63c23bcea4d8c301c531beee"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\discover\\VipSection.tsx": {
-    "mtime": 1779206595.705177,
-    "ast_hash": "09e81c6b34b1753229c6bc0db6869e37",
-    "semantic_hash": "09e81c6b34b1753229c6bc0db6869e37"
+    "mtime": 1779332044.80959,
+    "ast_hash": "c0f56c23c0d077e25fcfee16ceab65ba",
+    "semantic_hash": "c0f56c23c0d077e25fcfee16ceab65ba"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\posts\\CommentSheet.tsx": {
     "mtime": 1779230305.1631866,
@@ -210,9 +210,9 @@
     "semantic_hash": "5a130f98d8da18be0842e0e6b34fb571"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\posts\\PostCard.tsx": {
-    "mtime": 1779230305.1637075,
-    "ast_hash": "69a6cf8db9a98cac42843a93edf00595",
-    "semantic_hash": "69a6cf8db9a98cac42843a93edf00595"
+    "mtime": 1779326923.7549284,
+    "ast_hash": "1a490d00ccdfecb363f77f6ba724956b",
+    "semantic_hash": "1a490d00ccdfecb363f77f6ba724956b"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\story\\StoryProgressBar.tsx": {
     "mtime": 1779206595.705177,
@@ -235,9 +235,9 @@
     "semantic_hash": "89f27073031d0c79b1bb730ea384cae1"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\filters.ts": {
-    "mtime": 1779206595.70727,
-    "ast_hash": "d955fe5409c79bba0a761c1e966a56fe",
-    "semantic_hash": "d955fe5409c79bba0a761c1e966a56fe"
+    "mtime": 1779331717.1862557,
+    "ast_hash": "da8d556dfafe1ec5bdc02becf0565882",
+    "semantic_hash": "da8d556dfafe1ec5bdc02becf0565882"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\firebaseErrors.ts": {
     "mtime": 1779239557.8183918,
@@ -269,15 +269,10 @@
     "ast_hash": "e826ee221b521dc43f2371ababfb4750",
     "semantic_hash": "e826ee221b521dc43f2371ababfb4750"
   },
-  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\mockUsers.ts": {
-    "mtime": 1779206595.7083802,
-    "ast_hash": "9b37aa7045e8f6d50cafb3a2a18be758",
-    "semantic_hash": "9b37aa7045e8f6d50cafb3a2a18be758"
-  },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\notifications.ts": {
-    "mtime": 1779206595.708908,
-    "ast_hash": "72da36aec9dfafa29b876339db40c8c4",
-    "semantic_hash": "72da36aec9dfafa29b876339db40c8c4"
+    "mtime": 1779332148.750168,
+    "ast_hash": "a56538a029106b7fed4018dbab825f6e",
+    "semantic_hash": "a56538a029106b7fed4018dbab825f6e"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\theme.ts": {
     "mtime": 1779206595.708908,
@@ -285,24 +280,24 @@
     "semantic_hash": "f2a8b1737747e483c9f452b15ca8b4a8"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\AuthContext.tsx": {
-    "mtime": 1779317812.8606112,
-    "ast_hash": "c0b5e63f4af8222ecbaf1d8451e0c234",
-    "semantic_hash": "c0b5e63f4af8222ecbaf1d8451e0c234"
+    "mtime": 1779331723.3519146,
+    "ast_hash": "dacb53cf210c2c9e23e4cd33d32f2c33",
+    "semantic_hash": "dacb53cf210c2c9e23e4cd33d32f2c33"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\BlockedUsersContext.tsx": {
-    "mtime": 1779230305.1653113,
-    "ast_hash": "6a797e8de2a72d73268e03fd7d4e26cc",
-    "semantic_hash": "6a797e8de2a72d73268e03fd7d4e26cc"
+    "mtime": 1779332139.891725,
+    "ast_hash": "644dc422338b5b0672e8b213cfb8c06f",
+    "semantic_hash": "644dc422338b5b0672e8b213cfb8c06f"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\CoinsContext.tsx": {
-    "mtime": 1779317812.8606112,
+    "mtime": 1779326923.7679799,
     "ast_hash": "b481e2f14559770d325abdad404e9754",
     "semantic_hash": "b481e2f14559770d325abdad404e9754"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\InteractionsContext.tsx": {
-    "mtime": 1779230305.1658423,
-    "ast_hash": "fd982eb8444370c364e7d7218f7edc47",
-    "semantic_hash": "fd982eb8444370c364e7d7218f7edc47"
+    "mtime": 1779332126.202276,
+    "ast_hash": "9367e5c315bdf7a7045b6efec33fad09",
+    "semantic_hash": "9367e5c315bdf7a7045b6efec33fad09"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\ThemeContext.tsx": {
     "mtime": 1779206595.7104678,
@@ -360,23 +355,58 @@
     "semantic_hash": "96ac58e691cfcb80bb98e9e04ae649e9"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\premium\\coins.tsx": {
-    "mtime": 1779317812.8590856,
+    "mtime": 1779326923.7518494,
     "ast_hash": "f981c5fc179c876c6b085a8305365451",
     "semantic_hash": "f981c5fc179c876c6b085a8305365451"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\premium\\index.tsx": {
-    "mtime": 1779319051.1775057,
+    "mtime": 1779326923.7518494,
     "ast_hash": "99d77a1e9c67f8cabf8dc441a000bca9",
     "semantic_hash": "99d77a1e9c67f8cabf8dc441a000bca9"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\app\\premium\\_layout.tsx": {
-    "mtime": 1779317812.858573,
+    "mtime": 1779326923.7518494,
     "ast_hash": "6eb3ab7f26df20717b2d8ddf70c03cd1",
     "semantic_hash": "6eb3ab7f26df20717b2d8ddf70c03cd1"
   },
   "C:\\Users\\efeha\\Documents\\eslesbulusapp\\context\\PremiumContext.tsx": {
-    "mtime": 1779317812.8616252,
+    "mtime": 1779326923.7679799,
     "ast_hash": "1091804f896a8223e15a28a419de4390",
     "semantic_hash": "1091804f896a8223e15a28a419de4390"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\posts\\ShareSheet.tsx": {
+    "mtime": 1779332609.3978515,
+    "ast_hash": "c60dfe081ee8253efdb521ad6f3d5eec",
+    "semantic_hash": "c60dfe081ee8253efdb521ad6f3d5eec"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\components\\profile\\VerificationSheet.tsx": {
+    "mtime": 1779326923.7654674,
+    "ast_hash": "11b8fae8ad315a4a1c7e959ecb9138bc",
+    "semantic_hash": "11b8fae8ad315a4a1c7e959ecb9138bc"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\constants\\sharedPostsStore.ts": {
+    "mtime": 1779326923.7664728,
+    "ast_hash": "adcb67c177e4b302fa255094c58c2c74",
+    "semantic_hash": "adcb67c177e4b302fa255094c58c2c74"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\hooks\\useUser.ts": {
+    "mtime": 1779331740.1913927,
+    "ast_hash": "665d9a6a1f1ea988a07ee6f7a5a1eaad",
+    "semantic_hash": "665d9a6a1f1ea988a07ee6f7a5a1eaad"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\hooks\\useUsers.ts": {
+    "mtime": 1779331732.8534193,
+    "ast_hash": "e0d8c4dd89ff3d50cf02062bdde568ef",
+    "semantic_hash": "e0d8c4dd89ff3d50cf02062bdde568ef"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\lib\\age.ts": {
+    "mtime": 1779331707.7982898,
+    "ast_hash": "57cfa472bcb3bb197f990b58a228e3fd",
+    "semantic_hash": "57cfa472bcb3bb197f990b58a228e3fd"
+  },
+  "C:\\Users\\efeha\\Documents\\eslesbulusapp\\plan.txt": {
+    "mtime": 1779331437.3823187,
+    "ast_hash": "53af1d8db320223cdb68de2670194bd2",
+    "semantic_hash": "53af1d8db320223cdb68de2670194bd2"
   }
 }

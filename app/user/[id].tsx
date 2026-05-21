@@ -8,6 +8,8 @@ import {
   Pressable,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -23,7 +25,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
-import { getUserById, MockUser } from "@/constants/mockUsers";
+import { useUser } from "@/hooks/useUser";
+import type { UserProfile } from "@/context/AuthContext";
+import { usePosts } from "@/hooks/usePosts";
+import { formatTimeAgo } from "@/constants/mockPosts";
 import { useInteractions } from "@/context/InteractionsContext";
 import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
@@ -41,9 +46,16 @@ export default function UserDetail() {
   const insets = useSafeAreaInsets();
   const c = theme.colors;
 
-  const user = useMemo(() => (id ? getUserById(id) : undefined), [id]);
+  const { user, loading } = useUser(id);
+  const { posts: userPosts } = usePosts(id ?? undefined);
+  const photos = useMemo(() => {
+    if (!user) return [];
+    if (user.photos?.length) return user.photos;
+    if (user.photoURL) return [user.photoURL];
+    return [];
+  }, [user]);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [toast, setToast] = useState<{ user: MockUser; text: string; emoji: string } | null>(null);
+  const [toast, setToast] = useState<{ user: UserProfile; text: string; emoji: string } | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
 
   const scrollY = useSharedValue(0);
@@ -56,6 +68,17 @@ export default function UserDetail() {
   const headerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [HERO_H - 100, HERO_H - 40], [0, 1], "clamp"),
   }));
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.notFound}>
+          <ActivityIndicator color={c.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!user) {
     return (
@@ -84,8 +107,8 @@ export default function UserDetail() {
       return;
     }
     const path = draft
-      ? `/chat/${user!.id}?draft=${encodeURIComponent(draft)}`
-      : `/chat/${user!.id}`;
+      ? `/chat/${user!.uid}?draft=${encodeURIComponent(draft)}`
+      : `/chat/${user!.uid}`;
     router.push(path as any);
   }
 
@@ -96,7 +119,7 @@ export default function UserDetail() {
       <SentToast
         show={!!toast}
         userName={toast?.user.name}
-        userPhoto={toast?.user.photo}
+        userPhoto={toast?.user.photoURL || toast?.user.photos?.[0]}
         message={toast?.text}
         emoji={toast?.emoji}
         topInset={insets.top}
@@ -114,7 +137,7 @@ export default function UserDetail() {
         ]}
       >
         <Text style={[styles.stickyTitle, { color: c.text }]} numberOfLines={1}>
-          {user.name}, {user.age}
+          {user.name}{user.age != null ? `, ${user.age}` : ""}
         </Text>
       </Animated.View>
 
@@ -139,8 +162,8 @@ export default function UserDetail() {
         onClose={() => setReportOpen(false)}
         type="user"
         targetName={user?.name}
-        targetId={user?.id}
-        targetPhoto={user?.photo}
+        targetId={user?.uid}
+        targetPhoto={photos[0]}
       />
 
       <Animated.ScrollView
@@ -159,7 +182,7 @@ export default function UserDetail() {
               setPhotoIndex(idx);
             }}
           >
-            {user.photos.map((p, i) => (
+            {photos.map((p, i) => (
               <Image key={i} source={{ uri: p }} style={styles.heroPhoto} />
             ))}
           </ScrollView>
@@ -172,7 +195,7 @@ export default function UserDetail() {
           />
 
           <View style={styles.dotsRow} pointerEvents="none">
-            {user.photos.map((_, i) => (
+            {photos.map((_, i) => (
               <View
                 key={i}
                 style={[
@@ -189,7 +212,7 @@ export default function UserDetail() {
           <View style={styles.heroInfo} pointerEvents="none">
             <View style={styles.nameRow}>
               <Text style={styles.heroName}>
-                {user.name}, {user.age}
+                {user.name}{user.age != null ? `, ${user.age}` : ""}
               </Text>
               {user.verified && <VerifiedBadge size={18} />}
               {user.vip && (
@@ -200,9 +223,13 @@ export default function UserDetail() {
               )}
             </View>
             <View style={styles.metaRow}>
-              <Ionicons name="location" size={14} color="#fff" />
-              <Text style={styles.metaText}>{user.city}</Text>
-              <View style={styles.metaDot} />
+              {user.city ? (
+                <>
+                  <Ionicons name="location" size={14} color="#fff" />
+                  <Text style={styles.metaText}>{user.city}</Text>
+                  <View style={styles.metaDot} />
+                </>
+              ) : null}
               <View
                 style={[
                   styles.statusDot,
@@ -210,7 +237,7 @@ export default function UserDetail() {
                 ]}
               />
               <Text style={styles.metaText}>
-                {user.online ? "Çevrimiçi" : user.lastActive ?? "Çevrimdışı"}
+                {user.online ? "Çevrimiçi" : "Çevrimdışı"}
               </Text>
             </View>
           </View>
@@ -228,19 +255,21 @@ export default function UserDetail() {
             {user.height && (
               <InfoRow icon="resize-outline" label="Boy" value={`${user.height} cm`} c={c} />
             )}
-            <InfoRow icon="location-outline" label="Şehir" value={user.city} c={c} />
+            {user.city && (
+              <InfoRow icon="location-outline" label="Şehir" value={user.city} c={c} />
+            )}
             <InfoRow
               icon="time-outline"
               label="Aktiflik"
-              value={user.online ? "Şu an çevrimiçi" : user.lastActive ?? "Bilinmiyor"}
+              value={user.online ? "Şu an çevrimiçi" : "Bilinmiyor"}
               c={c}
             />
           </Section>
 
-          {user.interests.length > 0 && (
+          {(user.interests?.length ?? 0) > 0 && (
             <Section title="İlgi Alanları" c={c}>
               <View style={styles.chips}>
-                {user.interests.map((it, i) => (
+                {user.interests!.map((it, i) => (
                   <Animated.View key={it} entering={FadeIn.delay(80 * i).duration(280)}>
                     <View
                       style={[
@@ -256,10 +285,29 @@ export default function UserDetail() {
             </Section>
           )}
 
-          {user.photos.length > 1 && (
+          {userPosts.filter(p => !p.archived).length > 0 && (
+            <Section title={`Gönderiler (${userPosts.filter(p => !p.archived).length})`} c={c}>
+              {userPosts.filter(p => !p.archived).slice(0, 5).map((post) => (
+                <Pressable
+                  key={post.id}
+                  onPress={() => router.push("/(tabs)/posts")}
+                  style={{ paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}
+                >
+                  <Text style={[styles.bioText, { color: c.text }]} numberOfLines={2}>
+                    {post.text || "Fotoğraf"}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: c.textMuted, marginTop: 4 }}>
+                    {formatTimeAgo(post.createdAt)} · {post.likesCount} beğeni
+                  </Text>
+                </Pressable>
+              ))}
+            </Section>
+          )}
+
+          {photos.length > 1 && (
             <Section title="Fotoğraflar" c={c}>
               <View style={styles.galleryGrid}>
-                {user.photos.map((p, i) => (
+                {photos.map((p, i) => (
                   <Image key={i} source={{ uri: p }} style={styles.galleryItem} />
                 ))}
               </View>

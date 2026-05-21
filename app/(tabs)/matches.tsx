@@ -13,19 +13,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { useMemo } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { usePremium } from "@/context/PremiumContext";
-import { MOCK_USERS } from "@/constants/mockUsers";
+import { useUsers } from "@/hooks/useUsers";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 16 * 2 - 12) / 2;
 const CARD_H = CARD_W * 1.4;
-
-// Mock: profilimi görüntüleyenler (ilk 6)
-const VIEWERS = MOCK_USERS.slice(0, 6);
-// Mock: beni beğenenler (3-9.)
-const LIKED_ME = MOCK_USERS.slice(3, 9);
 
 // Standart kullanıcıda sadece ilk 1'i net görünsün
 const FREE_VISIBLE_VIEWERS = 1;
@@ -35,9 +32,26 @@ export default function MatchesScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const router = useRouter();
+  const { profile } = useAuth();
   const { likedUsers } = useInteractions();
   const { isPremium } = usePremium();
-  const myLikedList = Object.values(likedUsers);
+  const { users: allUsers } = useUsers();
+
+  // Filter to opposite gender so previews stay relevant.
+  const candidates = useMemo(() => {
+    const g = profile?.gender === "Erkek" ? "Kadın" : profile?.gender === "Kadın" ? "Erkek" : null;
+    return g ? allUsers.filter((u) => u.gender === g) : allUsers;
+  }, [allUsers, profile?.gender]);
+
+  // Placeholder until real "viewers" / "liked-me" collections exist.
+  const VIEWERS = candidates.slice(0, 6);
+  const LIKED_ME = candidates.slice(3, 9);
+
+  // Resolve my-liked uids against the live user list.
+  const myLikedList = useMemo(() => {
+    const ids = Object.keys(likedUsers);
+    return allUsers.filter((u) => ids.includes(u.uid));
+  }, [allUsers, likedUsers]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
@@ -85,13 +99,13 @@ export default function MatchesScreen() {
               const blurred = !isPremium && i >= FREE_VISIBLE_VIEWERS;
               return (
                 <Pressable
-                  key={u.id}
-                  onPress={() => blurred ? router.push("/premium") : router.push(`/user/${u.id}`)}
+                  key={u.uid}
+                  onPress={() => blurred ? router.push("/premium") : router.push(`/user/${u.uid}`)}
                   style={styles.viewerItem}
                 >
                   <View style={[styles.viewerRing, { borderColor: blurred ? c.border : c.primary }]}>
                     <Image
-                      source={{ uri: u.photo }}
+                      source={{ uri: u.photoURL || u.photos?.[0] }}
                       style={styles.viewerAvatar}
                       blurRadius={blurred ? 18 : 0}
                     />
@@ -111,7 +125,9 @@ export default function MatchesScreen() {
                       <Text style={[styles.viewerName, { color: c.text }]} numberOfLines={1}>
                         {u.name.split(" ")[0]}
                       </Text>
-                      <Text style={[styles.viewerAge, { color: c.textMuted }]}>{u.age}</Text>
+                      {u.age != null && (
+                        <Text style={[styles.viewerAge, { color: c.textMuted }]}>{u.age}</Text>
+                      )}
                     </>
                   )}
                 </Pressable>
@@ -143,12 +159,12 @@ export default function MatchesScreen() {
               const blurred = !isPremium && i >= FREE_VISIBLE_LIKED;
               return (
                 <Pressable
-                  key={u.id}
-                  onPress={() => blurred ? router.push("/premium") : router.push(`/user/${u.id}`)}
+                  key={u.uid}
+                  onPress={() => blurred ? router.push("/premium") : router.push(`/user/${u.uid}`)}
                   style={({ pressed }) => [styles.card, { opacity: pressed ? 0.92 : 1 }]}
                 >
                   <Image
-                    source={{ uri: u.photo }}
+                    source={{ uri: u.photoURL || u.photos?.[0] }}
                     style={styles.cardPhoto}
                     blurRadius={blurred ? 22 : 0}
                   />
@@ -174,12 +190,14 @@ export default function MatchesScreen() {
                   ) : (
                     <View style={styles.cardInfo}>
                       <Text style={styles.cardName} numberOfLines={1}>
-                        {u.name}, {u.age}
+                        {u.name}{u.age != null ? `, ${u.age}` : ""}
                       </Text>
-                      <View style={styles.cardMeta}>
-                        <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
-                        <Text style={styles.cardCity} numberOfLines={1}>{u.city}</Text>
-                      </View>
+                      {u.city ? (
+                        <View style={styles.cardMeta}>
+                          <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
+                          <Text style={styles.cardCity} numberOfLines={1}>{u.city}</Text>
+                        </View>
+                      ) : null}
                     </View>
                   )}
 
@@ -215,12 +233,12 @@ export default function MatchesScreen() {
             >
               {myLikedList.map((u) => (
                 <Pressable
-                  key={u.id}
-                  onPress={() => router.push(`/user/${u.id}`)}
+                  key={u.uid}
+                  onPress={() => router.push(`/user/${u.uid}`)}
                   style={styles.likedItem}
                 >
                   <View style={[styles.likedRing, { borderColor: "#FF4D6D" }]}>
-                    <Image source={{ uri: u.photo }} style={styles.likedAvatar} />
+                    <Image source={{ uri: u.photoURL || u.photos?.[0] }} style={styles.likedAvatar} />
                     <View style={[styles.likedHeart, { backgroundColor: "#FF4D6D" }]}>
                       <Ionicons name="heart" size={10} color="#fff" />
                     </View>

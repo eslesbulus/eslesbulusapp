@@ -78,7 +78,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
   function handleBlock() {
     handleClose();
     if (targetId && targetName && targetPhoto !== undefined) {
-      blockUser({ id: targetId, name: targetName, photo: targetPhoto ?? "", online: false, photos: [], age: 0, gender: "erkek", city: "", vip: false, verified: false, hasStory: false, bio: "", interests: [] });
+      blockUser({ uid: targetId, name: targetName, photoURL: targetPhoto ?? "" });
       Alert.alert("Engellendi", `${targetName} engellendi.`);
       onBlock?.();
     }

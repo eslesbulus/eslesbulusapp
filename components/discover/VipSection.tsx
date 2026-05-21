@@ -3,14 +3,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
-import { MockUser, VIP_USERS } from "@/constants/mockUsers";
+import type { UserProfile } from "@/context/AuthContext";
+import { useUsers } from "@/hooks/useUsers";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 
-type Props = { onPressUser?: (u: MockUser) => void };
+type Props = { onPressUser?: (u: UserProfile) => void };
 
 export function VipSection({ onPressUser }: Props) {
   const { theme } = useTheme();
   const s = styles(theme.colors);
+  const { users } = useUsers();
+  const vipUsers = users.filter((u) => u.vip).slice(0, 12);
+
+  if (vipUsers.length === 0) return null;
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={s.wrap}>
@@ -29,36 +34,41 @@ export function VipSection({ onPressUser }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.list}
       >
-        {VIP_USERS.map((u, i) => (
-          <Animated.View key={u.id} entering={FadeInDown.delay(80 * i).duration(350)}>
-            <Pressable onPress={() => onPressUser?.(u)} style={s.card}>
-              <Image source={{ uri: u.photo }} style={s.photo} />
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.85)"]}
-                style={s.gradient}
-              />
-              <View style={s.badge}>
-                <Ionicons name="diamond" size={10} color="#fff" />
-                <Text style={s.badgeText}>VIP</Text>
-              </View>
-              {u.online && <View style={[s.dot, { backgroundColor: theme.colors.online }]} />}
-              <View style={s.info}>
-                <View style={s.nameRow}>
-                  <Text style={s.nameText} numberOfLines={1}>
-                    {u.name}, {u.age}
-                  </Text>
-                  {u.verified && <VerifiedBadge size={12} />}
+        {vipUsers.map((u, i) => {
+          const photo = u.photoURL || u.photos?.[0];
+          return (
+            <Animated.View key={u.uid} entering={FadeInDown.delay(80 * i).duration(350)}>
+              <Pressable onPress={() => onPressUser?.(u)} style={s.card}>
+                {photo ? <Image source={{ uri: photo }} style={s.photo} /> : null}
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.85)"]}
+                  style={s.gradient}
+                />
+                <View style={s.badge}>
+                  <Ionicons name="diamond" size={10} color="#fff" />
+                  <Text style={s.badgeText}>VIP</Text>
                 </View>
-                <View style={s.cityRow}>
-                  <Ionicons name="location-outline" size={11} color="#fff" />
-                  <Text style={s.cityText} numberOfLines={1}>
-                    {u.city}
-                  </Text>
+                {u.online && <View style={[s.dot, { backgroundColor: theme.colors.online }]} />}
+                <View style={s.info}>
+                  <View style={s.nameRow}>
+                    <Text style={s.nameText} numberOfLines={1}>
+                      {u.name}{u.age != null ? `, ${u.age}` : ""}
+                    </Text>
+                    {u.verified && <VerifiedBadge size={12} />}
+                  </View>
+                  {u.city ? (
+                    <View style={s.cityRow}>
+                      <Ionicons name="location-outline" size={11} color="#fff" />
+                      <Text style={s.cityText} numberOfLines={1}>
+                        {u.city}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              </View>
-            </Pressable>
-          </Animated.View>
-        ))}
+              </Pressable>
+            </Animated.View>
+          );
+        })}
       </ScrollView>
     </Animated.View>
   );

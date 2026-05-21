@@ -12,15 +12,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
-import { MockUser } from "@/constants/mockUsers";
+import type { UserProfile } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { usePremium, DAILY_LIKE_LIMIT } from "@/context/PremiumContext";
 
 type Props = {
-  user: MockUser;
-  onPressHi: (user: MockUser) => void;
-  onPress?: (user: MockUser) => void;
+  user: UserProfile;
+  onPressHi: (user: UserProfile) => void;
+  onPress?: (user: UserProfile) => void;
 };
 
 const SCREEN = Dimensions.get("window").width;
@@ -34,8 +34,8 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
   const { canLike, useLike } = usePremium();
   const router = useRouter();
   const c = theme.colors;
-  const sent = hasSent(user.id);
-  const liked = isLiked(user.id);
+  const sent = hasSent(user.uid);
+  const liked = isLiked(user.uid);
 
   const scale = useSharedValue(1);
   const heartScale = useSharedValue(1);
@@ -74,7 +74,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
       const allowed = await useLike();
       if (!allowed) return;
     }
-    toggleLike(user);
+    await toggleLike(user);
   }
 
   return (
@@ -85,7 +85,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
       ]}
       onPress={() => onPress?.(user)}
     >
-      <Image source={{ uri: user.photo }} style={styles.photo} />
+      <Image source={{ uri: user.photoURL || user.photos?.[0] }} style={styles.photo} />
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.85)"]}
         style={styles.gradient}
@@ -106,7 +106,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
           ]}
         />
         <Text style={styles.statusText}>
-          {user.online ? "Çevrimiçi" : user.lastActive ?? "Çevrimdışı"}
+          {user.online ? "Çevrimiçi" : "Çevrimdışı"}
         </Text>
       </View>
 

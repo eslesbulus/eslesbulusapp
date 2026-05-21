@@ -33,7 +33,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
-import { getUserById, MockUser } from "@/constants/mockUsers";
+import { useUser } from "@/hooks/useUser";
+import type { UserProfile } from "@/context/AuthContext";
 import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
 import { Gift } from "@/constants/gifts";
 import { GiftSheet } from "@/components/chat/GiftSheet";
@@ -68,7 +69,7 @@ type Message = {
 };
 
 // Each conversation gets a different mock seed based on userId
-function buildMockChat(user: MockUser): Message[] {
+function buildMockChat(user: UserProfile): Message[] {
   const intros: Record<string, Message[]> = {
     default: [
       { id: "m1", text: `Selam ${user.name}! 👋`, fromMe: true, time: "14:02", status: "read" },
@@ -86,8 +87,9 @@ function buildMockChat(user: MockUser): Message[] {
 
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
-  const user = getUserById(id ?? "");
+  const { user, loading: userLoading } = useUser(id);
   const router = useRouter();
+  const userPhoto = user?.photoURL || user?.photos?.[0] || "";
   const { theme, mode } = useTheme();
   const { balance: tokenBalance, spend: spendTokens } = useCoins();
   const c = theme.colors;
@@ -98,7 +100,7 @@ export default function ChatDetailScreen() {
     if (!user) return [];
     const base = buildMockChat(user);
     // Paylaşılan gönderileri mesajlara ekle
-    const shared = getSharedPosts(user.id);
+    const shared = getSharedPosts(user.uid);
     const sharedMsgs: Message[] = shared.map((sp) => ({
       id: sp.id,
       text: "",
@@ -113,7 +115,7 @@ export default function ChatDetailScreen() {
         image: sp.image,
       },
     }));
-    if (shared.length > 0) clearSharedPosts(user.id);
+    if (shared.length > 0) clearSharedPosts(user.uid);
     return [...base, ...sharedMsgs];
   });
   // draft param ile gelen öneri mesajını başlangıç metni olarak kullan
@@ -235,11 +237,15 @@ export default function ChatDetailScreen() {
     }, 2400);
   }
 
-  if (!user) {
+  if (userLoading || !user) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
         <View style={styles.notFound}>
-          <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
+          {userLoading ? (
+            <Text style={[styles.notFoundText, { color: c.textMuted }]}>Yükleniyor…</Text>
+          ) : (
+            <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -257,16 +263,16 @@ export default function ChatDetailScreen() {
 
         <Pressable
           style={styles.userBlock}
-          onPress={() => router.push(`/user/${user.id}`)}
+          onPress={() => router.push(`/user/${user.uid}`)}
         >
           <View style={styles.headerAvatarWrap}>
-            <Image source={{ uri: user.photo }} style={styles.headerAvatar} />
+            <Image source={{ uri: userPhoto }} style={styles.headerAvatar} />
             {user.online && <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerName, { color: c.text }]}>{user.name}</Text>
             <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
-              {typing ? "yazıyor..." : user.online ? "çevrimiçi" : `son görülme ${user.lastActive ?? "bilinmiyor"}`}
+              {typing ? "yazıyor..." : user.online ? "çevrimiçi" : "çevrimdışı"}
             </Text>
           </View>
         </Pressable>
@@ -280,10 +286,10 @@ export default function ChatDetailScreen() {
           <Text style={styles.tokenPillText}>🪙 {tokenBalance}</Text>
         </Pressable>
 
-        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.id}?type=video`)}>
+        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=video`)}>
           <Ionicons name="videocam-outline" size={22} color={c.text} />
         </Pressable>
-        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.id}?type=voice`)}>
+        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=voice`)}>
           <Ionicons name="call-outline" size={20} color={c.text} />
         </Pressable>
       </View>
@@ -302,7 +308,7 @@ export default function ChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <Animated.View entering={FadeIn.duration(400)} style={styles.matchedCard}>
-              <Image source={{ uri: user.photo }} style={styles.matchedAvatar} />
+              <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
               <Text style={[styles.matchedText, { color: c.text }]}>
                 <Text style={{ fontWeight: "700" }}>{user.name} </Text>
                 ile eşleştiniz
@@ -322,7 +328,7 @@ export default function ChatDetailScreen() {
                 msg={item}
                 isFirstOfGroup={isFirstOfGroup}
                 isLastOfGroup={isLastOfGroup}
-                avatar={item.fromMe ? null : user.photo}
+                avatar={item.fromMe ? null : userPhoto}
                 colors={c}
               />
             );
@@ -330,7 +336,7 @@ export default function ChatDetailScreen() {
           ListFooterComponent={
             typing ? (
               <Animated.View entering={FadeInUp.duration(220)} style={styles.typingRow}>
-                <Image source={{ uri: user.photo }} style={styles.typingAvatar} />
+                <Image source={{ uri: userPhoto }} style={styles.typingAvatar} />
                 <View style={[styles.typingBubble, { backgroundColor: c.surface }]}>
                   <TypingDots color={c.textMuted} />
                 </View>
@@ -402,7 +408,7 @@ export default function ChatDetailScreen() {
                 <GiftSheet
                   onSend={(g) => { handleSendGift(g); setPanelTab(null); }}
                   recipientName={user.name}
-                  recipientPhoto={user.photo}
+                  recipientPhoto={userPhoto}
                   colors={c}
                 />
               )}

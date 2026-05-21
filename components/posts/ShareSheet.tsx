@@ -12,22 +12,23 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MOCK_USERS, MockUser } from "@/constants/mockUsers";
-import { MockPost } from "@/constants/mockPosts";
+import { useUsers } from "@/hooks/useUsers";
+import type { UserProfile } from "@/context/AuthContext";
+import { type DisplayPost } from "@/constants/mockPosts";
 import { addSharedPost } from "@/constants/sharedPostsStore";
 
 type Props = {
   visible: boolean;
-  post: MockPost | null;
+  post: DisplayPost | null;
   onClose: () => void;
-  onSent: (toUsers: MockUser[], post: MockPost) => void;
+  onSent: () => void;
   colors: any;
 };
 
-const CHAT_USERS: MockUser[] = MOCK_USERS.slice(0, 6);
-
 export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props) {
   const insets = useSafeAreaInsets();
+  const { users } = useUsers();
+  const chatUsers = users.slice(0, 6);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
 
@@ -45,23 +46,23 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
     setSending(true);
     await new Promise((r) => setTimeout(r, 600));
     setSending(false);
-    const recipients = CHAT_USERS.filter((u) => selected.has(u.id));
+    const recipients = chatUsers.filter((u) => selected.has(u.uid));
     const sentAt = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 
     // Store'a kaydet — chat ekranı açıldığında okuyacak
     recipients.forEach((u) => {
-      addSharedPost(u.id, {
-        id: `sp_${Date.now()}_${u.id}`,
+      addSharedPost(u.uid, {
+        id: `sp_${Date.now()}_${u.uid}`,
         postId: post.id,
         userName: post.userName,
         userPhoto: post.userPhoto,
         text: post.text,
-        image: post.image,
+        image: post.imageUrl,
         sentAt,
       });
     });
 
-    onSent(recipients, post);
+    onSent();
     setSelected(new Set());
     onClose();
     Alert.alert("Gönderildi", `Gönderi ${recipients.map((u) => u.name).join(", ")} kişisine paylaşıldı.`);
@@ -121,7 +122,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
           {/* Post önizleme */}
           {post && (
             <View style={[styles.postPreview, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <Image source={{ uri: post.userPhoto }} style={styles.postPreviewAvatar} />
+              {post.userPhoto ? <Image source={{ uri: post.userPhoto }} style={styles.postPreviewAvatar} /> : null}
               <Text style={[styles.postPreviewText, { color: c.text }]} numberOfLines={2}>
                 {post.text || "Fotoğraf"}
               </Text>
@@ -131,14 +132,15 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
           {/* Kullanıcı Listesi */}
           <Text style={[styles.subTitle, { color: c.textMuted }]}>Kişi Seç</Text>
           <FlatList
-            data={CHAT_USERS}
-            keyExtractor={(u) => u.id}
+            data={chatUsers}
+            keyExtractor={(u) => u.uid}
             scrollEnabled={false}
             renderItem={({ item }) => {
-              const isSelected = selected.has(item.id);
+              const isSelected = selected.has(item.uid);
+              const photo = item.photoURL || item.photos?.[0];
               return (
                 <Pressable
-                  onPress={() => toggleUser(item.id)}
+                  onPress={() => toggleUser(item.uid)}
                   style={[
                     styles.userRow,
                     {
@@ -148,7 +150,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                   ]}
                 >
                   <View style={styles.avatarWrap}>
-                    <Image source={{ uri: item.photo }} style={styles.avatar} />
+                    {photo ? <Image source={{ uri: photo }} style={styles.avatar} /> : null}
                     {item.online && (
                       <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />
                     )}
@@ -156,7 +158,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                   <View style={styles.userInfo}>
                     <Text style={[styles.userName, { color: c.text }]}>{item.name}</Text>
                     <Text style={[styles.userMeta, { color: c.textMuted }]}>
-                      {item.online ? "Çevrimiçi" : `Son görülme ${item.lastActive ?? "bilinmiyor"}`}
+                      {item.online ? "Çevrimiçi" : "Çevrimdışı"}
                     </Text>
                   </View>
                   <View

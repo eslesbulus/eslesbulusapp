@@ -36,6 +36,7 @@ module.exports = {
       // "@react-native-google-signin/google-signin",
       "expo-video",
       "expo-web-browser",
+      "@react-native-community/datetimepicker",
     ],
     extra: {
       router: {},

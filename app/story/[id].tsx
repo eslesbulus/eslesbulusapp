@@ -9,6 +9,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +24,12 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { STORY_USERS, MockUser } from "@/constants/mockUsers";
+import { useUsers } from "@/hooks/useUsers";
+import { useStories, type Story } from "@/hooks/useStories";
+import type { UserProfile } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
+import { usePremium, DAILY_STORY_LIKE_LIMIT } from "@/context/PremiumContext";
 import { StoryProgressBar } from "@/components/story/StoryProgressBar";
 import { StoryReactions } from "@/components/story/StoryReactions";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
@@ -33,33 +39,69 @@ const SCREEN_H = Dimensions.get("window").height;
 const DURATION = 5000;
 const EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-function getStoryMedia(u: MockUser): string[] {
-  return u.photos.slice(0, 3);
-}
-
-function timeAgo(_u: MockUser): string {
-  return _u.online ? "az önce" : _u.lastActive ?? "bugün";
+function timeAgo(d: Date): string {
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "az önce";
+  if (mins < 60) return `${mins}dk önce`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}sa önce`;
+  return "bugün";
 }
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { users } = useUsers();
+  const { storiesByUser, storyUserIds, likeStory, replyToStory } = useStories();
+  const { profile } = useAuth();
+  const { balance: tokenBalance } = useCoins();
+  const { canLikeStory, useStoryLike } = usePremium();
+
+  // Build list of users who have stories, VIP first
+  const storyUsers = useMemo(() => {
+    const list = users.filter((u) => storyUserIds.has(u.uid));
+    list.sort((a, b) => {
+      if (a.vip && !b.vip) return -1;
+      if (!a.vip && b.vip) return 1;
+      return 0;
+    });
+    // Also include current user if they have stories
+    if (profile && storyUserIds.has(profile.uid) && !list.find((u) => u.uid === profile.uid)) {
+      list.unshift(profile as UserProfile);
+    }
+    return list;
+  }, [users, storyUserIds, profile]);
 
   const initialIdx = useMemo(() => {
-    const i = STORY_USERS.findIndex((u) => u.id === id);
+    const i = storyUsers.findIndex((u) => u.uid === id);
     return i >= 0 ? i : 0;
-  }, [id]);
+  }, [id, storyUsers]);
 
-  const [userIdx, setUserIdx] = useState(initialIdx);
+  const [userIdx, setUserIdx] = useState(0);
   const [slideIdx, setSlideIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [shouldClose, setShouldClose] = useState(false);
 
-  const user = STORY_USERS[userIdx];
-  const media = useMemo(() => getStoryMedia(user), [user]);
-  const totalSlides = media.length;
+  useEffect(() => {
+    setUserIdx(initialIdx);
+  }, [initialIdx]);
+
+  // Fix setState during render: defer close to effect
+  useEffect(() => {
+    if (shouldClose) router.back();
+  }, [shouldClose]);
+
+  const currentUser = storyUsers[userIdx];
+  const currentStories = useMemo(
+    () => (currentUser ? storiesByUser.get(currentUser.uid) ?? [] : []),
+    [currentUser, storiesByUser]
+  );
+  const totalSlides = currentStories.length;
+  const currentStory = currentStories[slideIdx];
 
   const progress = useSharedValue(0);
   const translateX = useSharedValue(0);
@@ -70,7 +112,7 @@ export default function StoryScreen() {
   const advance = useCallback(() => {
     if (slideIdx < totalSlides - 1) {
       setSlideIdx((i) => i + 1);
-    } else if (userIdx < STORY_USERS.length - 1) {
+    } else if (userIdx < storyUsers.length - 1) {
       slideOutTo("left");
     } else {
       close();
@@ -96,7 +138,7 @@ export default function StoryScreen() {
 
   function commitUserChange(dir: "left" | "right") {
     if (dir === "left") {
-      setUserIdx((i) => Math.min(i + 1, STORY_USERS.length - 1));
+      setUserIdx((i) => Math.min(i + 1, storyUsers.length - 1));
       setSlideIdx(0);
     } else {
       setUserIdx((i) => {
@@ -189,7 +231,7 @@ export default function StoryScreen() {
       panX.value = 0;
       panY.value = 0;
 
-      if (goNext && userIdx < STORY_USERS.length - 1) {
+      if (goNext && userIdx < storyUsers.length - 1) {
         runOnJS(slideOutTo)("left");
       } else if (goPrev && userIdx > 0) {
         runOnJS(slideOutTo)("right");
@@ -213,11 +255,40 @@ export default function StoryScreen() {
     setTimeout(() => setToast(null), 1400);
   }
 
-  function handleSend(kind: "emoji" | "message", payload: string) {
+  async function handleSend(kind: "emoji" | "message", payload: string) {
+    if (!currentStory) return;
     if (kind === "emoji") {
+      // Emoji = story like (5/day limit, premium unlimited)
+      if (!canLikeStory) {
+        Alert.alert(
+          "Günlük Limit Doldu",
+          `Bugün ${DAILY_STORY_LIKE_LIMIT} hikaye beğeni hakkını kullandın. Premium ile sınırsız beğen!`,
+          [
+            { text: "İptal", style: "cancel" },
+            { text: "Premium Al 👑", onPress: () => router.push("/premium") },
+          ]
+        );
+        return;
+      }
+      const allowed = await useStoryLike();
+      if (!allowed) return;
+      await likeStory(currentStory.id);
       showToast(`${payload} gönderildi`);
     } else {
-      showToast(`Mesaj gönderildi`);
+      // Text = story reply (costs tokens like message)
+      if (tokenBalance < TOKENS_PER_MESSAGE) {
+        Alert.alert(
+          "Jeton Yetersiz 🪙",
+          `Yanıt göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor.`,
+          [
+            { text: "İptal", style: "cancel" },
+            { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+          ]
+        );
+        return;
+      }
+      await replyToStory(currentStory.id, payload);
+      showToast("Yanıt gönderildi");
     }
   }
 
@@ -229,8 +300,8 @@ export default function StoryScreen() {
     advance();
   }
 
-  if (!user) {
-    close();
+  if (!currentUser || totalSlides === 0) {
+    if (!shouldClose) setShouldClose(true);
     return null;
   }
 
@@ -242,7 +313,7 @@ export default function StoryScreen() {
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.canvas, animatedContainer]}>
           <Image
-            source={{ uri: media[slideIdx] }}
+            source={{ uri: currentStory?.imageUrl }}
             style={styles.media}
             resizeMode="cover"
           />
@@ -269,14 +340,14 @@ export default function StoryScreen() {
               progress={progress}
             />
             <View style={styles.userHeader}>
-              <Image source={{ uri: user.photo }} style={styles.userAvatar} />
+              <Image source={{ uri: currentUser.photoURL || currentUser.photos?.[0] }} style={styles.userAvatar} />
               <View style={{ flex: 1 }}>
                 <View style={styles.userRow}>
                   <Text style={styles.userName} numberOfLines={1}>
-                    {user.name}
+                    {currentUser.name}
                   </Text>
-                  {user.verified && <VerifiedBadge size={13} />}
-                  <Text style={styles.userTime}>· {timeAgo(user)}</Text>
+                  {currentUser.verified && <VerifiedBadge size={13} />}
+                  <Text style={styles.userTime}>· {currentStory ? timeAgo(currentStory.createdAt) : ""}</Text>
                 </View>
               </View>
               {paused && (
@@ -326,7 +397,7 @@ export default function StoryScreen() {
         pointerEvents="box-none"
       >
         <StoryReactions
-          userName={user.name}
+          userName={currentUser.name}
           onSend={handleSend}
           onFocusInput={() => setInputActive(true)}
           onBlurInput={() => setInputActive(false)}
