@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import { useInteractions } from "@/context/InteractionsContext";
 import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ReportSheet } from "@/components/common/ReportSheet";
+import { api } from "@/config/api";
 
 const SCREEN_W = Dimensions.get("window").width;
 const HERO_H = SCREEN_W * 1.15;
@@ -57,6 +58,13 @@ export default function UserDetail() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [toast, setToast] = useState<{ user: UserProfile; text: string; emoji: string } | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+
+  // Record profile view
+  useEffect(() => {
+    if (id) {
+      api.post(`/api/users/${id}/view`).catch(() => {});
+    }
+  }, [id]);
 
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler({

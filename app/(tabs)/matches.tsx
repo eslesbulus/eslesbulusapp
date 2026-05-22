@@ -13,13 +13,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useUsers } from "@/hooks/useUsers";
 import { VipName } from "@/components/common/VipName";
+import { api } from "@/config/api";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 16 * 2 - 12) / 2;
@@ -38,15 +39,25 @@ export default function MatchesScreen() {
   const { isPremium } = usePremium();
   const { users: allUsers } = useUsers();
 
-  // Filter to opposite gender so previews stay relevant.
-  const candidates = useMemo(() => {
-    const g = profile?.gender === "Erkek" ? "Kadın" : profile?.gender === "Kadın" ? "Erkek" : null;
-    return g ? allUsers.filter((u) => u.gender === g) : allUsers;
-  }, [allUsers, profile?.gender]);
+  // Fetch real "liked-me" and "viewers" from API
+  const [likedMeUsers, setLikedMeUsers] = useState<any[]>([]);
+  const [viewers, setViewers] = useState<any[]>([]);
 
-  // Placeholder until real "viewers" / "liked-me" collections exist.
-  const VIEWERS = candidates.slice(0, 6);
-  const LIKED_ME = candidates.slice(3, 9);
+  const fetchMatchData = useCallback(async () => {
+    try {
+      const [likedMe, viewed] = await Promise.all([
+        api.get<any[]>("/api/users/me/liked-by").catch(() => []),
+        api.get<any[]>("/api/users/me/viewers").catch(() => []),
+      ]);
+      setLikedMeUsers(likedMe);
+      setViewers(viewed);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchMatchData(); }, [fetchMatchData]);
+
+  const VIEWERS = viewers;
+  const LIKED_ME = likedMeUsers;
 
   // Resolve my-liked uids against the live user list.
   const myLikedList = useMemo(() => {

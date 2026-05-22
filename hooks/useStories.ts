@@ -12,6 +12,10 @@ export type Story = {
   expiresAt: Date;
 };
 
+/* ── Cross-instance refresh ── */
+const _listeners = new Set<() => void>();
+function _notifyAll() { _listeners.forEach((fn) => fn()); }
+
 export function useStories() {
   const { user } = useAuth();
   const [allStories, setAllStories] = useState<Story[]>([]);
@@ -37,6 +41,12 @@ export function useStories() {
   }, [user]);
 
   useEffect(() => { fetchStories(); }, [fetchStories]);
+
+  // Listen for refresh signals from other useStories instances
+  useEffect(() => {
+    _listeners.add(fetchStories);
+    return () => { _listeners.delete(fetchStories); };
+  }, [fetchStories]);
 
   const storiesByUser = useMemo(() => {
     const m = new Map<string, Story[]>();
@@ -67,7 +77,8 @@ export function useStories() {
         imageUrl: uploaded.url,
         caption: caption ?? "",
       });
-      await fetchStories(); // refresh
+      await fetchStories();
+      _notifyAll(); // refresh all other useStories instances
     },
     [user, fetchStories]
   );

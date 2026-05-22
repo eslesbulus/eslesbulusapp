@@ -160,12 +160,14 @@ export default function ChatDetailScreen() {
     setText((t) => t + emoji);
   }
 
-  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
 
   async function handleSend() {
-    if (!text.trim() || !user || sending) return;
+    if (!text.trim() || !user || sendingRef.current) return;
+    sendingRef.current = true;
 
     if (tokenBalance < TOKENS_PER_MESSAGE) {
+      sendingRef.current = false;
       Alert.alert(
         "Jeton Yetersiz 🪙",
         `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
@@ -177,14 +179,15 @@ export default function ChatDetailScreen() {
       return;
     }
 
-    setSending(true);
     const spent = await spendTokens(TOKENS_PER_MESSAGE);
-    if (!spent) { setSending(false); return; }
+    if (!spent) { sendingRef.current = false; return; }
 
     const msgText = text.trim();
     setText("");
     sendText(msgText);
-    setSending(false);
+
+    // 500ms debounce to prevent rapid fire
+    setTimeout(() => { sendingRef.current = false; }, 500);
   }
 
   if (userLoading || !user) {

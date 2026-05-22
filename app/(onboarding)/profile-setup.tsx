@@ -35,7 +35,7 @@ const GENDERS = ["Erkek", "Kadın", "Diğer"] as const;
 type Step = "photo" | "info" | "about";
 
 export default function ProfileSetupScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>("photo");
@@ -129,6 +129,7 @@ export default function ProfileSetupScreen() {
   }
 
   async function handleSave() {
+    if (saving) return;
     if (interests.length === 0) {
       Alert.alert("Hata", "En az bir ilgi alanı seç.");
       return;
@@ -159,6 +160,7 @@ export default function ProfileSetupScreen() {
         updates.name = currentName.trim();
       }
       await api.put("/api/users/me", updates);
+      await refreshProfile();
     } catch (e: any) {
       Alert.alert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
     } finally {
