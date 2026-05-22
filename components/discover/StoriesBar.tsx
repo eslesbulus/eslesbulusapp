@@ -8,6 +8,7 @@ import type { UserProfile } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
 import { useStories } from "@/hooks/useStories";
 import { useAuth } from "@/context/AuthContext";
+import { VipName } from "@/components/common/VipName";
 
 type Props = {
   onPressUser?: (user: UserProfile) => void;
@@ -39,12 +40,14 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
 
   function handlePressMyStory() {
     if (hasMyStory && profile) {
-      // Kendi hikayesini görüntüle
       router.push(`/story/${profile.uid}` as any);
     } else {
-      // Yeni hikaye ekle
       onPressAdd?.();
     }
+  }
+
+  function handleAddMore() {
+    onPressAdd?.();
   }
 
   return (
@@ -57,22 +60,30 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
         {/* Add / My story button */}
         <Pressable onPress={handlePressMyStory} style={s.item}>
           {hasMyStory ? (
-            <LinearGradient
-              colors={[theme.colors.primary, theme.colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.ring}
-            >
-              <View style={[s.inner, { backgroundColor: theme.colors.background }]}>
-                {/* Hikayenin önizleme fotoğrafını göster */}
-                {(myStoryPreview || profile?.photoURL) ? (
-                  <Image
-                    source={{ uri: myStoryPreview || profile!.photoURL! }}
-                    style={s.avatar}
-                  />
-                ) : null}
-              </View>
-            </LinearGradient>
+            <View>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.ring}
+              >
+                <View style={[s.inner, { backgroundColor: theme.colors.background }]}>
+                  {(myStoryPreview || profile?.photoURL) ? (
+                    <Image
+                      source={{ uri: myStoryPreview || profile!.photoURL! }}
+                      style={s.avatar}
+                    />
+                  ) : null}
+                </View>
+              </LinearGradient>
+              <Pressable
+                onPress={handleAddMore}
+                style={[s.addBadge, { backgroundColor: theme.colors.primary, borderColor: theme.colors.background }]}
+                hitSlop={6}
+              >
+                <Text style={s.addBadgeText}>+</Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={[s.addOuter, { borderColor: theme.colors.border }]}>
               <View style={[s.addInner, { backgroundColor: theme.colors.surface }]}>
@@ -89,12 +100,12 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
           // Kullanıcının hikaye önizleme fotoğrafı
           const storyPreview = getStoriesForUser(u.uid)[0]?.imageUrl;
           const profilePhoto = u.photoURL || u.photos?.[0];
-          const displayPhoto = storyPreview || profilePhoto;
+          const displayPhoto = storyPreview || profilePhoto || null;
           return (
             <Animated.View key={u.uid} entering={FadeInRight.delay(i * 60).duration(350)}>
               <Pressable onPress={() => onPressUser?.(u)} style={s.item}>
                 <LinearGradient
-                  colors={[theme.colors.primary, theme.colors.secondary]}
+                  colors={u.vip ? ["#FFD700", "#FFA500", "#FFD700"] : [theme.colors.primary, theme.colors.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={s.ring}
@@ -103,9 +114,7 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
                     {displayPhoto ? <Image source={{ uri: displayPhoto }} style={s.avatar} /> : null}
                   </View>
                 </LinearGradient>
-                <Text style={s.name} numberOfLines={1}>
-                  {u.name}
-                </Text>
+                <VipName name={u.name} vip={u.vip} style={{ color: theme.colors.text }} fontSize={11} />
               </Pressable>
             </Animated.View>
           );
@@ -156,6 +165,18 @@ const styles = (c: any) =>
       justifyContent: "center",
     },
     plus: { fontSize: 28, fontWeight: "300", lineHeight: 30 },
+    addBadge: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    addBadgeText: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 16 },
     name: {
       marginTop: 6,
       fontSize: 11,

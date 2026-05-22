@@ -15,6 +15,7 @@ import { useTheme } from "@/context/ThemeContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { VipName } from "@/components/common/VipName";
 import { usePremium, DAILY_LIKE_LIMIT } from "@/context/PremiumContext";
 
 type Props = {
@@ -85,7 +86,11 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
       ]}
       onPress={() => onPress?.(user)}
     >
-      <Image source={{ uri: user.photoURL || user.photos?.[0] }} style={styles.photo} />
+      {(user.photoURL || user.photos?.[0]) ? (
+        <Image source={{ uri: user.photoURL || user.photos![0] }} style={styles.photo} />
+      ) : (
+        <View style={[styles.photo, { backgroundColor: c.border }]} />
+      )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.85)"]}
         style={styles.gradient}
@@ -112,9 +117,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
 
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {user.name}, {user.age}
-          </Text>
+          <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: "#fff" }} fontSize={20} />
           {user.verified && <VerifiedBadge size={13} />}
           <Pressable onPress={handleLike} hitSlop={8} style={styles.heartBtn}>
             <Animated.View style={heartAnim}>

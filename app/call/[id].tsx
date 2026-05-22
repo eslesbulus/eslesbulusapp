@@ -32,7 +32,7 @@ export default function CallScreen() {
   const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useUser(id);
+  const { user, loading: userLoading } = useUser(id);
   const userPhoto = user?.photoURL || user?.photos?.[0] || "";
   const userName = user?.name ?? "";
   const isVideo = type === "video";
@@ -120,8 +120,12 @@ export default function CallScreen() {
     router.back();
   }
 
+  // Defer navigation to effect to avoid setState-during-render
+  useEffect(() => {
+    if (!user && !userLoading) router.back();
+  }, [user, userLoading]);
+
   if (!user) {
-    router.back();
     return null;
   }
 

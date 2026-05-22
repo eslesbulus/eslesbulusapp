@@ -39,7 +39,7 @@ export default function StoryCreateScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [9, 16],
       quality: 0.9,

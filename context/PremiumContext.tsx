@@ -91,6 +91,11 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       setIsPremium(active);
       setPremiumExpiry(expiry);
 
+      // Sync vip field with premium status
+      if (!active && data.vip === true && user) {
+        updateDoc(doc(db, "users", user.uid), { vip: false }).catch(() => {});
+      }
+
       // Daily reset logic
       const today = getToday();
       const lastReset = data.lastResetDate ?? "";
@@ -173,6 +178,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, "users", user.uid), {
       isPremium: true,
       premiumExpiry: expiry,
+      vip: true,
     });
   }, [user, isDevAdmin]);
 

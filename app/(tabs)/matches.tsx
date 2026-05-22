@@ -19,6 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useUsers } from "@/hooks/useUsers";
+import { VipName } from "@/components/common/VipName";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 16 * 2 - 12) / 2;
@@ -122,9 +123,7 @@ export default function MatchesScreen() {
                     <Text style={[styles.viewerName, { color: c.textMuted }]}>???</Text>
                   ) : (
                     <>
-                      <Text style={[styles.viewerName, { color: c.text }]} numberOfLines={1}>
-                        {u.name.split(" ")[0]}
-                      </Text>
+                      <VipName name={u.name.split(" ")[0]} vip={u.vip} style={{ color: c.text }} fontSize={11} />
                       {u.age != null && (
                         <Text style={[styles.viewerAge, { color: c.textMuted }]}>{u.age}</Text>
                       )}
@@ -189,9 +188,7 @@ export default function MatchesScreen() {
                     </View>
                   ) : (
                     <View style={styles.cardInfo}>
-                      <Text style={styles.cardName} numberOfLines={1}>
-                        {u.name}{u.age != null ? `, ${u.age}` : ""}
-                      </Text>
+                      <VipName name={`${u.name}${u.age != null ? `, ${u.age}` : ""}`} vip={u.vip} style={{ color: "#fff" }} fontSize={14} />
                       {u.city ? (
                         <View style={styles.cardMeta}>
                           <Ionicons name="location-outline" size={10} color="rgba(255,255,255,0.8)" />
@@ -243,9 +240,7 @@ export default function MatchesScreen() {
                       <Ionicons name="heart" size={10} color="#fff" />
                     </View>
                   </View>
-                  <Text style={[styles.likedName, { color: c.text }]} numberOfLines={1}>
-                    {u.name.split(" ")[0]}
-                  </Text>
+                  <VipName name={u.name.split(" ")[0]} vip={u.vip} style={{ color: c.text }} fontSize={11} />
                 </Pressable>
               ))}
             </ScrollView>

@@ -59,6 +59,7 @@ export function useChat(otherUid: string) {
   const chatId = myUid && otherUid ? makeChatId(myUid, otherUid) : "";
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Real-time listener
@@ -77,6 +78,7 @@ export function useChat(otherUid: string) {
         ...d.data(),
       })) as ChatMessage[];
       setMessages(msgs);
+      setPendingMessages([]);
       setLoading(false);
     }, (err) => {
       console.error("[useChat] snapshot error:", err);
@@ -105,24 +107,32 @@ export function useChat(otherUid: string) {
   const sendText = useCallback(async (text: string) => {
     if (!chatId || !myUid || !text.trim()) return;
 
-    // Ensure chat doc exists (upsert participants)
+    const optimistic: ChatMessage = {
+      id: `pending_${Date.now()}`,
+      senderId: myUid,
+      text: text.trim(),
+      type: "text",
+      createdAt: Timestamp.now(),
+      status: "sent",
+    };
+    setPendingMessages((prev) => [...prev, optimistic]);
+
     const chatRef = doc(db, "chats", chatId);
-    // We write the chat meta alongside the message
-    // Using setDoc with merge would be cleaner but addDoc for messages
-    const { setDoc } = await import("firebase/firestore");
-    await setDoc(chatRef, {
+    setDoc(chatRef, {
       participants: [myUid, otherUid].sort(),
       lastMessage: text.trim(),
       lastMessageAt: serverTimestamp(),
       lastSenderId: myUid,
-    }, { merge: true });
+    }, { merge: true }).catch(() => {});
 
-    await addDoc(collection(db, "chats", chatId, "messages"), {
+    addDoc(collection(db, "chats", chatId, "messages"), {
       senderId: myUid,
       text: text.trim(),
       type: "text",
       createdAt: serverTimestamp(),
       status: "sent",
+    }).catch(() => {
+      setPendingMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
     });
   }, [chatId, myUid, otherUid]);
 
@@ -188,8 +198,12 @@ export function useChat(otherUid: string) {
     });
   }, [chatId, myUid, otherUid]);
 
+  const allMessages = pendingMessages.length > 0
+    ? [...messages, ...pendingMessages]
+    : messages;
+
   return {
-    messages,
+    messages: allMessages,
     loading,
     sendText,
     sendGift,

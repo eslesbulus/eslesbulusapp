@@ -33,6 +33,18 @@ export const GIFTS: Gift[] = [
   { id: "castle", name: "Kale", emoji: "🏰", price: 2000, rarity: "legendary", color: "#7C3AED", particles: ["✨", "👑", "💎", "🌟"] },
 ];
 
+/** VIP-only exclusive gifts — extra animations, higher prices */
+export const VIP_GIFTS: Gift[] = [
+  { id: "vip-lambo", name: "Lamborghini", emoji: "🏎️", price: 500, rarity: "legendary", color: "#FFD700", particles: ["💨", "🔥", "✨", "💫", "🏁"] },
+  { id: "vip-yacht", name: "Yat", emoji: "🛥️", price: 800, rarity: "legendary", color: "#0EA5E9", particles: ["🌊", "☀️", "✨", "🐬", "🌴"] },
+  { id: "vip-jet", name: "Özel Jet", emoji: "✈️", price: 1200, rarity: "legendary", color: "#6366F1", particles: ["☁️", "✨", "🌟", "💫", "🌈"] },
+  { id: "vip-hearts", name: "Kalp Yağmuru", emoji: "💖", price: 300, rarity: "epic", color: "#EC4899", particles: ["❤️", "💕", "💗", "💓", "💞", "💝", "💘"] },
+  { id: "vip-fireworks", name: "Havai Fişek", emoji: "🎆", price: 400, rarity: "epic", color: "#F59E0B", particles: ["🎇", "✨", "🌟", "💫", "🎉", "🎊"] },
+  { id: "vip-mansion", name: "Malikane", emoji: "🏰", price: 2000, rarity: "legendary", color: "#A855F7", particles: ["👑", "💎", "✨", "🌟", "🏛️", "💫"] },
+  { id: "vip-roses", name: "Gül Buketi", emoji: "💐", price: 200, rarity: "epic", color: "#F43F5E", particles: ["🌹", "🌸", "🌺", "💕", "✨"] },
+  { id: "vip-galaxy", name: "Galaksi", emoji: "🌌", price: 1500, rarity: "legendary", color: "#8B5CF6", particles: ["⭐", "🌟", "💫", "✨", "🪐", "🌠"] },
+];
+
 export const EMOJI_CATEGORIES: { id: string; label: string; emojis: string[] }[] = [
   {
     id: "love",

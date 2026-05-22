@@ -116,15 +116,35 @@ export function useStories() {
     [storiesByUser]
   );
 
-  /** Like a story. Saves under user's story_likes subcollection. */
+  /** Like a story. Saves like + sends emoji to chat. */
   const likeStory = useCallback(
-    async (storyId: string) => {
+    async (storyId: string, emoji?: string) => {
       if (!user) return;
       await setDoc(doc(db, "users", user.uid, "story_likes", storyId), {
         at: serverTimestamp(),
       });
+      // Find story owner and send emoji to chat
+      const story = allStories.find((s) => s.id === storyId);
+      if (story && story.userId !== user.uid) {
+        const chatId = [user.uid, story.userId].sort().join("_");
+        const chatRef = doc(db, "chats", chatId);
+        const emojiText = emoji || "❤️";
+        await setDoc(chatRef, {
+          participants: [user.uid, story.userId].sort(),
+          lastMessage: `Hikayeni beğendi ${emojiText}`,
+          lastMessageAt: serverTimestamp(),
+          lastSenderId: user.uid,
+        }, { merge: true });
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          senderId: user.uid,
+          text: `Hikayeni beğendi ${emojiText}`,
+          type: "text",
+          createdAt: serverTimestamp(),
+          status: "sent",
+        });
+      }
     },
-    [user]
+    [user, allStories]
   );
 
   const unlikeStory = useCallback(
@@ -135,7 +155,7 @@ export function useStories() {
     [user]
   );
 
-  /** Save story reply to Firestore. */
+  /** Reply to story → saves reply + sends message to chat. */
   const replyToStory = useCallback(
     async (storyId: string, text: string) => {
       if (!user) return;
@@ -144,8 +164,27 @@ export function useStories() {
         text,
         at: serverTimestamp(),
       });
+      // Also send to chat
+      const story = allStories.find((s) => s.id === storyId);
+      if (story && story.userId !== user.uid) {
+        const chatId = [user.uid, story.userId].sort().join("_");
+        const chatRef = doc(db, "chats", chatId);
+        await setDoc(chatRef, {
+          participants: [user.uid, story.userId].sort(),
+          lastMessage: text,
+          lastMessageAt: serverTimestamp(),
+          lastSenderId: user.uid,
+        }, { merge: true });
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          senderId: user.uid,
+          text,
+          type: "text",
+          createdAt: serverTimestamp(),
+          status: "sent",
+        });
+      }
     },
-    [user]
+    [user, allStories]
   );
 
   return {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -41,12 +41,7 @@ export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const c = theme.colors;
 
-  // Discover defaults to the opposite gender. "Diğer" → show everyone.
-  const defaultGender = useMemo<Filters["gender"]>(() => {
-    if (profile?.gender === "Erkek") return "Kadın";
-    if (profile?.gender === "Kadın") return "Erkek";
-    return "all";
-  }, [profile?.gender]);
+  const defaultGender: Filters["gender"] = "all";
 
   const [viewMode, setViewMode] = useState<ViewMode>("album");
   const [filters, setFilters] = useState<Filters>(() => ({
@@ -61,16 +56,6 @@ export default function DiscoverScreen() {
     text: string;
     emoji: string;
   } | null>(null);
-
-  // Sync filter default if profile gender loads after mount.
-  useEffect(() => {
-    setFilters((prev) =>
-      prev.gender === "all" || prev.gender === "Erkek" || prev.gender === "Kadın"
-        ? { ...prev, gender: defaultGender }
-        : prev
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultGender]);
 
   const filterCount = activeFilterCount(filters);
   const unreadNotifs = 0; // notifications backend pending

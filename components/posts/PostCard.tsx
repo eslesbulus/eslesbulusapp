@@ -19,6 +19,7 @@ import Animated, {
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ReportSheet } from "@/components/common/ReportSheet";
+import { VipName } from "@/components/common/VipName";
 import { type DisplayPost, formatTimeAgo } from "@/constants/mockPosts";
 
 const { width: W } = Dimensions.get("window");
@@ -61,8 +62,10 @@ export function PostCard({
     onToggleLike();
   }, [onToggleLike]);
 
-  const avatarContent = (
+  const avatarContent = post.userPhoto ? (
     <Image source={{ uri: post.userPhoto }} style={styles.avatar} />
+  ) : (
+    <View style={[styles.avatar, { backgroundColor: c.border }]} />
   );
 
   return (
@@ -95,7 +98,7 @@ export function PostCard({
         )}
         <View style={styles.headerInfo}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: c.text }]}>{post.userName}</Text>
+            <VipName name={post.userName} vip={post.vip} style={{ color: c.text }} fontSize={14} />
             {post.verified && (
               <Ionicons name="checkmark-circle" size={14} color={c.primary} />
             )}

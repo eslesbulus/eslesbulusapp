@@ -11,12 +11,13 @@ import { applyFilters, type Filters } from "@/constants/filters";
  * - Only returns users with `profileComplete: true`.
  * - If `filters` is supplied, applies the same predicate as `applyFilters()`.
  */
-export function useUsers(filters?: Filters): {
+export function useUsers(filters?: Filters, opts?: { includeIncomplete?: boolean }): {
   users: UserProfile[];
   loading: boolean;
   error: Error | null;
 } {
   const { user } = useAuth();
+  const includeIncomplete = opts?.includeIncomplete ?? false;
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -28,7 +29,7 @@ export function useUsers(filters?: Filters): {
         const list: UserProfile[] = [];
         snap.forEach((d) => {
           const data = d.data() as UserProfile;
-          if (!data.profileComplete) return;
+          if (!includeIncomplete && !data.profileComplete) return;
           if (user && data.uid === user.uid) return;
           list.push(data);
         });
@@ -41,7 +42,7 @@ export function useUsers(filters?: Filters): {
       }
     );
     return unsub;
-  }, [user?.uid]);
+  }, [user?.uid, includeIncomplete]);
 
   const filtered = filters ? applyFilters(users, filters) : users;
   return { users: filtered, loading, error };

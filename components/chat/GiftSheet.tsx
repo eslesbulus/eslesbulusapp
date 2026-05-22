@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useCoins } from "@/context/CoinsContext";
-import { GIFTS, Gift } from "@/constants/gifts";
+import { GIFTS, VIP_GIFTS, Gift } from "@/constants/gifts";
 
 function hexToRgba(hex: string, alpha: number) {
   const m = hex.replace("#", "");
@@ -31,6 +31,7 @@ type Props = {
   recipientName: string;
   recipientPhoto: string;
   colors: any;
+  vipOnly?: boolean;
 };
 
 const RARITY_LABEL: Record<string, string> = {
@@ -47,7 +48,7 @@ const RARITY_GRAD: Record<string, [string, string]> = {
   legendary: ["#F59E0B", "#DC2626"],
 };
 
-export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: Props) {
+export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vipOnly = false }: Props) {
   const { balance, spend } = useCoins();
   const [selected, setSelected] = useState<Gift | null>(null);
 
@@ -82,7 +83,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c }: 
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
-        {GIFTS.map((g, i) => {
+        {(vipOnly ? VIP_GIFTS : GIFTS).map((g, i) => {
           const isSel = selected?.id === g.id;
           const canAfford = balance >= g.price;
           return (

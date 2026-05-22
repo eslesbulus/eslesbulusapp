@@ -31,8 +31,12 @@ import Animated, {
   Easing,
   SharedValue,
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
+import { usePremium } from "@/context/PremiumContext";
+import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@/hooks/useUser";
 import { useChat, type ChatMessage } from "@/hooks/useChat";
 import type { UserProfile } from "@/context/AuthContext";
@@ -41,6 +45,7 @@ import { Gift } from "@/constants/gifts";
 import { GiftSheet } from "@/components/chat/GiftSheet";
 import { GiftAnimation } from "@/components/chat/GiftAnimation";
 import { EmojiPicker } from "@/components/chat/EmojiPicker";
+import { VipName } from "@/components/common/VipName";
 
 function hexToRgba(hex: string, alpha: number) {
   const m = hex.replace("#", "");
@@ -56,16 +61,20 @@ export default function ChatDetailScreen() {
   const { user, loading: userLoading } = useUser(id);
   const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendSharedPost, myUid, formatTime } = useChat(id);
   const router = useRouter();
-  const userPhoto = user?.photoURL || user?.photos?.[0] || "";
+  const userPhoto = user?.photoURL || user?.photos?.[0] || null;
   const { theme, mode } = useTheme();
   const { balance: tokenBalance, spend: spendTokens } = useCoins();
+  const { isPremium } = usePremium();
+  const { profile } = useAuth();
+  const myVip = profile?.vip ?? isPremium;
+  const otherVip = user?.vip ?? false;
   const c = theme.colors;
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
 
   const [text, setText] = useState(draft ? decodeURIComponent(draft as string) : "");
   const [attachOpen, setAttachOpen] = useState(false);
-  const [panelTab, setPanelTab] = useState<"emoji" | "gift" | null>(null);
+  const [panelTab, setPanelTab] = useState<"emoji" | "gift" | "vip" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
   const [giftAnimKey, setGiftAnimKey] = useState(0);
   const inputRef = useRef<TextInput>(null);
@@ -102,7 +111,7 @@ export default function ChatDetailScreen() {
     }
   }
 
-  function switchTab(t: "emoji" | "gift") {
+  function switchTab(t: "emoji" | "gift" | "vip") {
     setPanelTab(t);
   }
 
@@ -117,6 +126,30 @@ export default function ChatDetailScreen() {
     }
   }, [messages.length]);
 
+  // Play gift animation for receiver on first view
+  const giftAnimPlayed = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!myUid || messages.length === 0) return;
+    (async () => {
+      const key = `seen_gifts_${myUid}`;
+      const raw = await AsyncStorage.getItem(key);
+      const seen: string[] = raw ? JSON.parse(raw) : [];
+      const seenSet = new Set(seen);
+
+      for (const m of messages) {
+        if (m.type === "gift" && m.gift && m.senderId !== myUid && !seenSet.has(m.id) && !giftAnimPlayed.current.has(m.id)) {
+          giftAnimPlayed.current.add(m.id);
+          seenSet.add(m.id);
+          setGiftAnimKey((k) => k + 1);
+          setActiveGiftAnim(m.gift!);
+          break;
+        }
+      }
+
+      await AsyncStorage.setItem(key, JSON.stringify([...seenSet]));
+    })();
+  }, [messages, myUid]);
+
   async function handleSendGift(g: Gift) {
     setGiftAnimKey((k) => k + 1);
     setActiveGiftAnim(g);
@@ -127,10 +160,11 @@ export default function ChatDetailScreen() {
     setText((t) => t + emoji);
   }
 
-  async function handleSend() {
-    if (!text.trim() || !user) return;
+  const [sending, setSending] = useState(false);
 
-    // Jeton kontrolü
+  async function handleSend() {
+    if (!text.trim() || !user || sending) return;
+
     if (tokenBalance < TOKENS_PER_MESSAGE) {
       Alert.alert(
         "Jeton Yetersiz 🪙",
@@ -143,12 +177,14 @@ export default function ChatDetailScreen() {
       return;
     }
 
+    setSending(true);
     const spent = await spendTokens(TOKENS_PER_MESSAGE);
-    if (!spent) return;
+    if (!spent) { setSending(false); return; }
 
     const msgText = text.trim();
     setText("");
-    await sendText(msgText);
+    sendText(msgText);
+    setSending(false);
   }
 
   if (userLoading || !user) {
@@ -180,11 +216,15 @@ export default function ChatDetailScreen() {
           onPress={() => router.push(`/user/${user.uid}`)}
         >
           <View style={styles.headerAvatarWrap}>
-            <Image source={{ uri: userPhoto }} style={styles.headerAvatar} />
+            {userPhoto ? (
+              <Image source={{ uri: userPhoto }} style={styles.headerAvatar} />
+            ) : (
+              <View style={[styles.headerAvatar, { backgroundColor: c.surface }]} />
+            )}
             {user.online && <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerName, { color: c.text }]}>{user.name}</Text>
+            <VipName name={user.name} vip={user.vip} style={{ color: c.text }} fontSize={15} />
             <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
               {user.online ? "çevrimiçi" : "çevrimdışı"}
             </Text>
@@ -222,7 +262,11 @@ export default function ChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <Animated.View entering={FadeIn.duration(400)} style={styles.matchedCard}>
-              <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
+              {userPhoto ? (
+                <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
+              ) : (
+                <View style={[styles.matchedAvatar, { backgroundColor: c.surface }]} />
+              )}
               <Text style={[styles.matchedText, { color: c.text }]}>
                 <Text style={{ fontWeight: "700" }}>{user.name} </Text>
                 ile eşleştiniz
@@ -256,6 +300,7 @@ export default function ChatDetailScreen() {
                 avatar={fromMe ? null : userPhoto}
                 colors={c}
                 timeStr={formatTime(item.createdAt)}
+                senderVip={fromMe ? myVip : otherVip}
               />
             );
           }}
@@ -313,16 +358,45 @@ export default function ChatDetailScreen() {
                 <Text style={[styles.panelTabLabel, { color: panelTab === "gift" ? c.primary : c.textMuted }]}>Hediye</Text>
                 {panelTab === "gift" && <View style={[styles.panelTabUnderline, { backgroundColor: c.primary }]} />}
               </Pressable>
+              <Pressable onPress={() => switchTab("vip")} style={styles.panelTabBtn}>
+                <Text style={{ fontSize: 16 }}>👑</Text>
+                <Text style={[styles.panelTabLabel, { color: panelTab === "vip" ? "#D4AF37" : c.textMuted }]}>VIP</Text>
+                {panelTab === "vip" && <View style={[styles.panelTabUnderline, { backgroundColor: "#D4AF37" }]} />}
+              </Pressable>
             </View>
 
             <View style={styles.panelContent}>
               {panelTab === "emoji" ? (
                 <EmojiPicker onPick={handlePickEmoji} colors={c} />
+              ) : panelTab === "vip" ? (
+                myVip ? (
+                  <GiftSheet
+                    onSend={(g) => { handleSendGift(g); setPanelTab(null); }}
+                    recipientName={user.name}
+                    recipientPhoto={userPhoto ?? ""}
+                    colors={c}
+                    vipOnly
+                  />
+                ) : (
+                  <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 }}>
+                    <Text style={{ fontSize: 40 }}>👑</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#D4AF37" }}>VIP Hediyeler</Text>
+                    <Text style={{ fontSize: 13, color: c.textMuted, textAlign: "center" }}>
+                      Özel VIP hediyeler göndermek için Premium üyelik gerekiyor.
+                    </Text>
+                    <Pressable
+                      onPress={() => { setPanelTab(null); router.push("/premium"); }}
+                      style={{ backgroundColor: "#D4AF37", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16, marginTop: 4 }}
+                    >
+                      <Text style={{ color: "#000", fontWeight: "800", fontSize: 14 }}>Premium'a Geç</Text>
+                    </Pressable>
+                  </View>
+                )
               ) : (
                 <GiftSheet
                   onSend={(g) => { handleSendGift(g); setPanelTab(null); }}
                   recipientName={user.name}
-                  recipientPhoto={userPhoto}
+                  recipientPhoto={userPhoto ?? ""}
                   colors={c}
                 />
               )}
@@ -414,6 +488,7 @@ function Bubble({
   avatar,
   colors: c,
   timeStr,
+  senderVip = false,
 }: {
   msg: ChatMessage;
   fromMe: boolean;
@@ -422,6 +497,7 @@ function Bubble({
   avatar: string | null;
   colors: any;
   timeStr: string;
+  senderVip?: boolean;
 }) {
   const router = useRouter();
   const tailRadius = 6;
@@ -521,6 +597,45 @@ function Bubble({
             )}
           </View>
         </View>
+      ) : senderVip ? (
+        <LinearGradient
+          colors={fromMe ? ["#D4AF37", "#B8860B"] : ["#D4AF37", "#F5D97A"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[{ padding: 1.5, maxWidth: "78%", marginHorizontal: 4 }, bubbleRadius]}
+        >
+          <View
+            style={[
+              styles.bubble,
+              {
+                backgroundColor: fromMe ? "rgba(30,20,5,0.92)" : "rgba(255,250,235,0.95)",
+                maxWidth: "100%",
+                marginHorizontal: 0,
+              },
+              bubbleRadius,
+            ]}
+          >
+            {isFirstOfGroup && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 }}>
+                <Text style={{ fontSize: 10, color: "#D4AF37" }}>👑</Text>
+                <Text style={{ fontSize: 10, fontWeight: "800", color: "#D4AF37" }}>VIP</Text>
+              </View>
+            )}
+            <Text style={[styles.bubbleText, { color: fromMe ? "#F5D97A" : "#5A4100" }]}>{msg.text}</Text>
+            <View style={styles.metaRow}>
+              <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(245,217,122,0.7)" : "rgba(90,65,0,0.5)" }]}>
+                {timeStr}
+              </Text>
+              {fromMe && msg.status && (
+                <Ionicons
+                  name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                  size={14}
+                  color={msg.status === "read" ? "#7DD3FC" : "rgba(245,217,122,0.7)"}
+                />
+              )}
+            </View>
+          </View>
+        </LinearGradient>
       ) : (
         <View
           style={[
@@ -557,7 +672,7 @@ function PanelToggleIcon({
   primaryColor,
 }: {
   panelOpen: boolean;
-  tab: "emoji" | "gift" | null;
+  tab: "emoji" | "gift" | "vip" | null;
   mutedColor: string;
   primaryColor: string;
 }) {

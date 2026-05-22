@@ -30,6 +30,7 @@ import { enrichPosts, type DisplayPost } from "@/constants/mockPosts";
 import { PostCard } from "@/components/posts/PostCard";
 import { CommentSheet } from "@/components/posts/CommentSheet";
 import { ShareSheet } from "@/components/posts/ShareSheet";
+import { VipName } from "@/components/common/VipName";
 
 export default function PostsScreen() {
   const { theme } = useTheme();
@@ -37,8 +38,9 @@ export default function PostsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { users } = useUsers();
+  const { users, loading: usersLoading } = useUsers(undefined, { includeIncomplete: true });
   const { posts: rawPosts, loading: postsLoading, createPost, isPostLiked, togglePostLike, deletePost } = usePosts();
+  const feedLoading = postsLoading || usersLoading;
   const { hasStory, storyUserIds, myStories, getStoriesForUser } = useStories();
 
   const userMap = useMemo(() => {
@@ -76,7 +78,7 @@ export default function PostsScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -90,7 +92,7 @@ export default function PostsScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ["videos"],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -132,7 +134,7 @@ export default function PostsScreen() {
       </View>
 
       {/* Feed */}
-      {postsLoading ? (
+      {feedLoading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={c.primary} />
         </View>
@@ -169,16 +171,14 @@ export default function PostsScreen() {
                       style={styles.storyGradientRing}
                     >
                       <View style={[styles.storyAvatarInner, { borderColor: c.background }]}>
-                        <Image
-                          source={{
-                            uri:
-                              myStories[0]?.imageUrl ||
-                              profile.photoURL ||
-                              profile.photos?.[0] ||
-                              "",
-                          }}
-                          style={styles.storyAvatar}
-                        />
+                        {(myStories[0]?.imageUrl || profile.photoURL || profile.photos?.[0]) ? (
+                          <Image
+                            source={{
+                              uri: myStories[0]?.imageUrl || profile.photoURL || profile.photos?.[0],
+                            }}
+                            style={styles.storyAvatar}
+                          />
+                        ) : null}
                       </View>
                     </LinearGradient>
                     <Text style={[styles.storyName, { color: c.textMuted }]} numberOfLines={1}>
@@ -188,7 +188,7 @@ export default function PostsScreen() {
                 )}
                 {storyBarUsers.map((u) => {
                   const storyPreview = getStoriesForUser(u.uid)[0]?.imageUrl;
-                  const displayPhoto = storyPreview || u.photoURL || u.photos?.[0] || "";
+                  const displayPhoto = storyPreview || u.photoURL || u.photos?.[0] || null;
                   return (
                     <Pressable
                       key={u.uid}
@@ -196,19 +196,19 @@ export default function PostsScreen() {
                       style={styles.storyItem}
                     >
                       <LinearGradient
-                        colors={[c.primary, c.secondary]}
+                        colors={u.vip ? ["#FFD700", "#FFA500", "#FFD700"] : [c.primary, c.secondary]}
                         style={styles.storyGradientRing}
                       >
                         <View style={[styles.storyAvatarInner, { borderColor: c.background }]}>
-                          <Image
-                            source={{ uri: displayPhoto }}
-                            style={styles.storyAvatar}
-                          />
+                          {displayPhoto ? (
+                            <Image
+                              source={{ uri: displayPhoto }}
+                              style={styles.storyAvatar}
+                            />
+                          ) : null}
                         </View>
                       </LinearGradient>
-                      <Text style={[styles.storyName, { color: c.textMuted }]} numberOfLines={1}>
-                        {u.name}
-                      </Text>
+                      <VipName name={u.name} vip={u.vip} style={{ color: c.textMuted }} fontSize={11} />
                     </Pressable>
                   );
                 })}

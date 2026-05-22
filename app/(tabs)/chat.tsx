@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { useChats } from "@/hooks/useChats";
 import { useUser } from "@/hooks/useUser";
+import { VipName } from "@/components/common/VipName";
 import type { Timestamp } from "firebase/firestore";
 
 function formatChatTime(ts: Timestamp | null): string {
@@ -116,9 +117,7 @@ function ChatRow({
       </View>
       <View style={styles.middle}>
         <View style={styles.topRow}>
-          <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-            {name}
-          </Text>
+          <VipName name={name} vip={user?.vip} style={{ color: c.text }} fontSize={15} />
           <Text style={[styles.time, { color: c.textMuted }]}>
             {formatChatTime(lastMessageAt)}
           </Text>

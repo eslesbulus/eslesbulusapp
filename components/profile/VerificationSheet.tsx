@@ -35,7 +35,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.85,

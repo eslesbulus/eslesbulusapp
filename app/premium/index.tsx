@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -107,6 +107,24 @@ export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<PremiumPlan>("week");
   const [loading, setLoading] = useState(false);
+  const [remaining, setRemaining] = useState("");
+
+  useEffect(() => {
+    if (!isPremium || !premiumExpiry) { setRemaining(""); return; }
+    function calc() {
+      const diff = premiumExpiry!.getTime() - Date.now();
+      if (diff <= 0) { setRemaining("Süresi doldu"); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (d > 0) setRemaining(`${d}g ${h}sa ${m}dk kaldı`);
+      else if (h > 0) setRemaining(`${h}sa ${m}dk kaldı`);
+      else setRemaining(`${m}dk kaldı`);
+    }
+    calc();
+    const timer = setInterval(calc, 60000);
+    return () => clearInterval(timer);
+  }, [isPremium, premiumExpiry]);
 
   async function handlePurchase() {
     const pkg = PACKAGES.find((p) => p.id === selected)!;
@@ -327,10 +345,15 @@ export default function PremiumScreen() {
             {loading ? (
               <ActivityIndicator color="#000" />
             ) : isPremium ? (
-              <>
-                <Ionicons name="checkmark-circle" size={20} color="#000" />
-                <Text style={styles.ctaBtnText}>Premium Aktif ✓</Text>
-              </>
+              <View style={{ alignItems: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="checkmark-circle" size={20} color="#000" />
+                  <Text style={styles.ctaBtnText}>Premium Aktif ✓</Text>
+                </View>
+                {remaining ? (
+                  <Text style={{ color: "rgba(0,0,0,0.6)", fontSize: 11, fontWeight: "700", marginTop: 2 }}>{remaining}</Text>
+                ) : null}
+              </View>
             ) : (
               <>
                 <Ionicons name="diamond" size={20} color="#000" />

@@ -142,6 +142,8 @@ export function usePosts(userId?: string) {
   }, []);
 
   const archivePost = useCallback(async (postId: string, archived: boolean) => {
+    // Optimistic local update
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, archived } : p)));
     await updateDoc(doc(db, "posts", postId), { archived });
   }, []);
 

@@ -33,6 +33,7 @@ import { usePremium, DAILY_STORY_LIKE_LIMIT } from "@/context/PremiumContext";
 import { StoryProgressBar } from "@/components/story/StoryProgressBar";
 import { StoryReactions } from "@/components/story/StoryReactions";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { VipName } from "@/components/common/VipName";
 
 const SCREEN_W = Dimensions.get("window").width;
 const SCREEN_H = Dimensions.get("window").height;
@@ -54,7 +55,7 @@ export default function StoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { users } = useUsers();
-  const { storiesByUser, storyUserIds, likeStory, replyToStory } = useStories();
+  const { storiesByUser, storyUserIds, likeStory, replyToStory, loading: storiesLoading } = useStories();
   const { profile } = useAuth();
   const { balance: tokenBalance } = useCoins();
   const { canLikeStory, useStoryLike } = usePremium();
@@ -272,7 +273,7 @@ export default function StoryScreen() {
       }
       const allowed = await useStoryLike();
       if (!allowed) return;
-      await likeStory(currentStory.id);
+      await likeStory(currentStory.id, payload);
       showToast(`${payload} gönderildi`);
     } else {
       // Text = story reply (costs tokens like message)
@@ -298,6 +299,15 @@ export default function StoryScreen() {
 
   function handleTapRight() {
     advance();
+  }
+
+  if (storiesLoading) {
+    return (
+      <View style={styles.root}>
+        <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+      </View>
+    );
   }
 
   if (!currentUser || totalSlides === 0) {
@@ -340,12 +350,14 @@ export default function StoryScreen() {
               progress={progress}
             />
             <View style={styles.userHeader}>
-              <Image source={{ uri: currentUser.photoURL || currentUser.photos?.[0] }} style={styles.userAvatar} />
+              {(currentUser.photoURL || currentUser.photos?.[0]) ? (
+                <Image source={{ uri: currentUser.photoURL || currentUser.photos![0] }} style={styles.userAvatar} />
+              ) : (
+                <View style={[styles.userAvatar, { backgroundColor: "rgba(255,255,255,0.2)" }]} />
+              )}
               <View style={{ flex: 1 }}>
                 <View style={styles.userRow}>
-                  <Text style={styles.userName} numberOfLines={1}>
-                    {currentUser.name}
-                  </Text>
+                  <VipName name={currentUser.name} vip={currentUser.vip} style={{ color: "#fff" }} fontSize={14} />
                   {currentUser.verified && <VerifiedBadge size={13} />}
                   <Text style={styles.userTime}>· {currentStory ? timeAgo(currentStory.createdAt) : ""}</Text>
                 </View>
@@ -389,7 +401,8 @@ export default function StoryScreen() {
       </GestureDetector>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -100}
         style={[
           styles.reactions,
           { paddingBottom: insets.bottom + 10 },

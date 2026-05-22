@@ -12,6 +12,7 @@ export type DisplayPost = Post & {
   userAge?: number;
   userCity?: string;
   verified: boolean;
+  vip?: boolean;
 };
 
 /** Build enriched posts from raw posts + user map */
@@ -32,6 +33,7 @@ export function enrichPosts(
       userAge: u?.age,
       userCity: u?.city,
       verified: u?.verified ?? false,
+      vip: u?.vip ?? false,
     };
   });
 }

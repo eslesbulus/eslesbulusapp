@@ -69,7 +69,7 @@ export default function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -182,7 +182,8 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* ── Premium & Jeton Kartları ── */}
-        <Animated.View entering={FadeInDown.delay(80).duration(350)} style={styles.quickCardsRow}>
+        <Animated.View entering={FadeInDown.delay(80).duration(350)}>
+        <View style={styles.quickCardsRow}>
           {/* Premium kart */}
           <Pressable
             onPress={() => router.push("/premium")}
@@ -239,6 +240,7 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </Pressable>
+        </View>
         </Animated.View>
 
         {/* ── Bio ── */}
