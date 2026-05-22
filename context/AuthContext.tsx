@@ -1,15 +1,16 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { auth, db } from "@/config/firebase";
+import { auth } from "@/config/firebase";
+import { api } from "@/config/api";
+import { connectSocket, disconnectSocket } from "@/config/socket";
 
 export type UserProfile = {
   uid: string;
   name: string;
   email: string;
   photoURL?: string;
-  birthDate?: string;     // ISO yyyy-mm-dd
-  age?: number;           // computed at register, stored for cheap filtering
+  birthDate?: string;
+  age?: number;
   gender?: "Erkek" | "Kadın" | "Diğer";
   bio?: string;
   city?: string;
@@ -18,10 +19,20 @@ export type UserProfile = {
   job?: string;
   height?: number;
   online?: boolean;
-  lastActive?: number;    // unix ms
+  lastActive?: number;
   verified?: boolean;
   vip?: boolean;
   profileComplete: boolean;
+  // Premium
+  isPremium?: boolean;
+  premiumExpiry?: string | null;
+  // Coins
+  tokens?: number;
+  // Daily limits
+  dailyLikesUsed?: number;
+  dailyHisUsed?: number;
+  dailyStoryLikesUsed?: number;
+  dailyResetDate?: string;
 };
 
 type AuthContextType = {
@@ -32,6 +43,7 @@ type AuthContextType = {
   signInAsDevAdmin: () => void;
   signOut: () => Promise<void>;
   updateProfile: (fields: Partial<Omit<UserProfile, "uid" | "email">>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -42,6 +54,7 @@ const AuthContext = createContext<AuthContextType>({
   signInAsDevAdmin: () => {},
   signOut: async () => {},
   updateProfile: async () => {},
+  refreshProfile: async () => {},
 });
 
 const DEV_ADMIN_USER = {
@@ -65,9 +78,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isDevAdmin, setIsDevAdmin] = useState(false);
   const isDevAdminRef = useRef(false);
-  // Track whether we've received at least one real auth callback with a user.
-  // Firebase RN persistence fires null first, then user — we must not set
-  // loading=false on the initial null until a grace period passes.
   const hasReceivedUserRef = useRef(false);
   const nullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,28 +87,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isDevAdminRef.current) return;
 
       if (u) {
-        // Clear any pending "no user" timer — a real user arrived
         if (nullTimerRef.current) {
           clearTimeout(nullTimerRef.current);
           nullTimerRef.current = null;
         }
         hasReceivedUserRef.current = true;
         setUser(u);
-        // loading stays true until Firestore profile snapshot resolves
       } else {
         if (hasReceivedUserRef.current) {
-          // We previously had a user and now got null → real sign-out
           setUser(null);
           setProfile(null);
           setLoading(false);
+          disconnectSocket();
         } else {
-          // First callback is null — might be persistence race.
-          // Wait 1.5s: if no user arrives, accept null as real.
           if (!nullTimerRef.current) {
             nullTimerRef.current = setTimeout(() => {
               nullTimerRef.current = null;
               if (!hasReceivedUserRef.current) {
-                if (__DEV__) console.log("[Auth] persistence grace expired — no user");
                 setUser(null);
                 setProfile(null);
                 setLoading(false);
@@ -114,26 +119,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Fetch profile from API when user is set
   useEffect(() => {
     if (isDevAdmin) return;
     if (!user) return;
-    const unsubscribeDoc = onSnapshot(
-      doc(db, "users", user.uid),
-      (snap) => {
-        if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
-        } else {
-          setProfile(null);
+
+    let cancelled = false;
+
+    async function fetchProfile() {
+      try {
+        const data = await api.post<{ uid: string; profile: UserProfile }>("/api/auth/verify");
+        if (!cancelled) {
+          setProfile(data.profile);
+          setLoading(false);
+          // Connect Socket.IO
+          connectSocket().catch((e) => {
+            if (__DEV__) console.warn("[Socket] connect failed:", e.message);
+          });
         }
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[AuthContext] profile snapshot error:", err);
-        setProfile(null);
-        setLoading(false);
-      },
-    );
-    return unsubscribeDoc;
+      } catch (err) {
+        if (__DEV__) console.error("[Auth] fetch profile error:", err);
+        if (!cancelled) {
+          setProfile(null);
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchProfile();
+    return () => { cancelled = true; };
   }, [user, isDevAdmin]);
 
   // Safety: if loading hangs >10s, unblock the router.
@@ -155,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    disconnectSocket();
     if (isDevAdminRef.current) {
       isDevAdminRef.current = false;
       setIsDevAdmin(false);
@@ -163,7 +178,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fbSignOut(auth).catch(() => {});
       return;
     }
-    // Reset the flag so next launch can do the grace period again
     hasReceivedUserRef.current = false;
     await fbSignOut(auth);
   }
@@ -174,12 +188,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), fields as Record<string, unknown>);
+    const updated = await api.put<UserProfile>("/api/users/me", fields);
+    setProfile(updated);
+  }
+
+  async function refreshProfile() {
+    if (isDevAdmin || !user) return;
+    try {
+      const data = await api.post<{ uid: string; profile: UserProfile }>("/api/auth/verify");
+      setProfile(data.profile);
+    } catch {}
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile }}
+      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,15 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
+import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
 import { HI_MESSAGES } from "@/constants/messageTemplates";
 
@@ -37,64 +28,39 @@ type Ctx = {
 
 const InteractionsContext = createContext<Ctx | null>(null);
 
-function tsToMs(v: unknown): number {
-  if (v instanceof Timestamp) return v.toMillis();
-  if (typeof v === "number") return v;
-  return Date.now();
-}
-
 export function InteractionsProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [sentHis, setSentHis] = useState<Record<string, SentHi>>({});
   const [likedUsers, setLikedUsers] = useState<Record<string, LikedRef>>({});
 
-  // Subscribe to sent_his
+  // Load from profile
   useEffect(() => {
-    if (!user?.uid) {
+    if (!profile) {
       setSentHis({});
-      return;
-    }
-    const unsub = onSnapshot(
-      collection(db, "users", user.uid, "sent_his"),
-      (snap) => {
-        const next: Record<string, SentHi> = {};
-        snap.forEach((d) => {
-          const data = d.data();
-          next[d.id] = {
-            userId: d.id,
-            messageId: data.messageId ?? "",
-            text: data.text ?? "",
-            emoji: data.emoji ?? "",
-            at: tsToMs(data.at),
-          };
-        });
-        setSentHis(next);
-      },
-      () => setSentHis({})
-    );
-    return unsub;
-  }, [user?.uid]);
-
-  // Subscribe to liked
-  useEffect(() => {
-    if (!user?.uid) {
       setLikedUsers({});
       return;
     }
-    const unsub = onSnapshot(
-      collection(db, "users", user.uid, "liked"),
-      (snap) => {
-        const next: Record<string, LikedRef> = {};
-        snap.forEach((d) => {
-          const data = d.data();
-          next[d.id] = { uid: d.id, at: tsToMs(data.at) };
-        });
-        setLikedUsers(next);
-      },
-      () => setLikedUsers({})
-    );
-    return unsub;
-  }, [user?.uid]);
+
+    // sentHis
+    const his: Record<string, SentHi> = {};
+    (profile as any).sentHis?.forEach((h: any) => {
+      his[h.userId] = {
+        userId: h.userId,
+        messageId: h.messageId ?? "",
+        text: h.text ?? "",
+        emoji: h.emoji ?? "",
+        at: h.at ? new Date(h.at).getTime() : Date.now(),
+      };
+    });
+    setSentHis(his);
+
+    // likedUsers
+    const liked: Record<string, LikedRef> = {};
+    (profile as any).likedUsers?.forEach((l: any) => {
+      liked[l.uid] = { uid: l.uid, at: l.at ? new Date(l.at).getTime() : Date.now() };
+    });
+    setLikedUsers(liked);
+  }, [profile]);
 
   const hasSent = useCallback((id: string) => !!sentHis[id], [sentHis]);
 
@@ -111,32 +77,25 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
         emoji: msg.emoji,
         at: Date.now(),
       };
-      await setDoc(doc(db, "users", user.uid, "sent_his", userId), {
+
+      // Send hi via API
+      await api.post("/api/users/me/send-hi", {
+        userId,
         messageId: msg.id,
         text: msg.text,
         emoji: msg.emoji,
-        at: serverTimestamp(),
       });
 
-      // Also create a chat message so it shows in the chat screen
-      const chatId = [user.uid, userId].sort().join("_");
-      const chatRef = doc(db, "chats", chatId);
-      const hiText = `${msg.emoji} ${msg.text}`;
-      await setDoc(chatRef, {
-        participants: [user.uid, userId].sort(),
-        lastMessage: hiText,
-        lastMessageAt: serverTimestamp(),
-        lastSenderId: user.uid,
-      }, { merge: true });
-      await addDoc(collection(db, "chats", chatId, "messages"), {
-        senderId: user.uid,
-        text: hiText,
-        type: "text",
-        createdAt: serverTimestamp(),
-        status: "sent",
-      });
+      // Also send as chat message via socket
+      const socket = getSocket();
+      if (socket) {
+        socket.emit("chat:send", {
+          to: userId,
+          text: `${msg.emoji} ${msg.text}`,
+          type: "text",
+        });
+      }
 
-      // Optimistic local update — snapshot will overwrite shortly.
       setSentHis((prev) => ({ ...prev, [userId]: sent }));
       return sent;
     },
@@ -148,13 +107,24 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
   const toggleLike = useCallback(
     async (u: { uid: string }): Promise<boolean> => {
       if (!user?.uid) return false;
-      const ref = doc(db, "users", user.uid, "liked", u.uid);
-      if (likedUsers[u.uid]) {
-        await deleteDoc(ref);
-        return false;
+      const wasLiked = !!likedUsers[u.uid];
+
+      // Optimistic update
+      if (wasLiked) {
+        setLikedUsers((prev) => {
+          const next = { ...prev };
+          delete next[u.uid];
+          return next;
+        });
+      } else {
+        setLikedUsers((prev) => ({
+          ...prev,
+          [u.uid]: { uid: u.uid, at: Date.now() },
+        }));
       }
-      await setDoc(ref, { at: serverTimestamp() });
-      return true;
+
+      await api.post(`/api/users/me/toggle-like`, { targetUid: u.uid });
+      return !wasLiked;
     },
     [likedUsers, user?.uid]
   );

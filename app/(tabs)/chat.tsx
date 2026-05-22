@@ -7,11 +7,10 @@ import { useTheme } from "@/context/ThemeContext";
 import { useChats } from "@/hooks/useChats";
 import { useUser } from "@/hooks/useUser";
 import { VipName } from "@/components/common/VipName";
-import type { Timestamp } from "firebase/firestore";
 
-function formatChatTime(ts: Timestamp | null): string {
+function formatChatTime(ts: string | null): string {
   if (!ts) return "";
-  const d = ts.toDate();
+  const d = new Date(ts);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const mins = Math.floor(diff / 60000);
@@ -84,7 +83,7 @@ function ChatRow({
 }: {
   otherUid: string;
   lastMessage: string;
-  lastMessageAt: Timestamp | null;
+  lastMessageAt: string | null;
   colors: any;
   onPress: () => void;
 }) {

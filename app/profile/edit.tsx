@@ -16,8 +16,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { CityPicker } from "@/components/common/CityPicker";
@@ -93,16 +92,11 @@ export default function EditProfileScreen() {
     });
   }, []);
 
-  // Uploads a local file:// URI to Firebase Storage; returns download URL.
-  // If the URI is already http(s), returns it as-is (already uploaded).
-  async function uploadToStorage(localUri: string, path: string): Promise<string> {
+  async function uploadToStorage(localUri: string, folder: string): Promise<string> {
     if (!localUri) return "";
     if (localUri.startsWith("http")) return localUri;
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, blob);
-    return await getDownloadURL(storageRef);
+    const result = await api.upload(folder.includes("avatar") ? "avatars" : "photos", localUri);
+    return result.url;
   }
 
   async function handleSave() {

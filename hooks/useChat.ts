@@ -1,41 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  collection,
-  doc,
-  query,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  setDoc,
-  serverTimestamp,
-  Timestamp,
-  limit,
-  updateDoc,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
+import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
 import type { Gift } from "@/constants/gifts";
 
-/* ── Firestore schema ──
-   chats/{chatId}                → { participants: [uidA, uidB], lastMessage, lastMessageAt, ... }
-   chats/{chatId}/messages/{id}  → ChatMessage
-   chatId = sorted uids joined by "_"
-*/
-
 export type ChatMessage = {
   id: string;
+  _id?: string;
   senderId: string;
   text: string;
   type: "text" | "gift" | "image" | "sharedPost";
-  createdAt: Timestamp | null;
+  createdAt: string | null;
   status: "sent" | "delivered" | "read";
-  // gift
   gift?: Gift;
-  // shared post
   sharedPost?: {
     id: string;
-    userId?: string; // post sahibinin uid'si — profil navigasyonu için
+    userId?: string;
     userName: string;
     userPhoto: string;
     text: string;
@@ -43,174 +23,151 @@ export type ChatMessage = {
   };
 };
 
-function makeChatId(a: string, b: string): string {
+function makeChatKey(a: string, b: string): string {
   return [a, b].sort().join("_");
 }
 
-function formatTime(ts: Timestamp | null): string {
+function formatTime(ts: string | null): string {
   if (!ts) return "";
-  const d = ts.toDate();
+  const d = new Date(ts);
   return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
 
 export function useChat(otherUid: string) {
   const { user } = useAuth();
   const myUid = user?.uid ?? "";
-  const chatId = myUid && otherUid ? makeChatId(myUid, otherUid) : "";
+  const chatKey = myUid && otherUid ? makeChatKey(myUid, otherUid) : "";
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Real-time listener
+  // Fetch messages from API
   useEffect(() => {
-    if (!chatId) { setLoading(false); return; }
+    if (!chatKey || !otherUid) { setLoading(false); return; }
+    let cancelled = false;
 
-    const q = query(
-      collection(db, "chats", chatId, "messages"),
-      orderBy("createdAt", "asc"),
-      limit(200),
-    );
+    api.get<any[]>(`/api/chats/${otherUid}/messages`)
+      .then((msgs) => {
+        if (cancelled) return;
+        const mapped: ChatMessage[] = msgs.map((m: any) => ({
+          id: m._id || m.id || String(Math.random()),
+          senderId: m.senderId,
+          text: m.text ?? "",
+          type: m.type ?? "text",
+          createdAt: m.createdAt ?? null,
+          status: m.status ?? "sent",
+          gift: m.gift ?? undefined,
+          sharedPost: m.sharedPost ?? undefined,
+        }));
+        setMessages(mapped);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
 
-    const unsub = onSnapshot(q, (snap) => {
-      const msgs: ChatMessage[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as ChatMessage[];
-      setMessages(msgs);
-      setPendingMessages([]);
-      setLoading(false);
-    }, (err) => {
-      console.error("[useChat] snapshot error:", err);
-      setLoading(false);
-    });
+    return () => { cancelled = true; };
+  }, [chatKey, otherUid]);
 
-    return unsub;
-  }, [chatId]);
-
-  // Mark incoming messages as read
+  // Listen for real-time messages via Socket.IO
   useEffect(() => {
-    if (!chatId || !myUid) return;
-    // Find unread messages from the other party and mark as read
-    const unread = messages.filter(
-      (m) => m.senderId !== myUid && m.status !== "read"
-    );
-    if (unread.length === 0) return;
+    const socket = getSocket();
+    if (!socket || !chatKey) return;
 
-    const batch = writeBatch(db);
-    unread.forEach((m) => {
-      batch.update(doc(db, "chats", chatId, "messages", m.id), { status: "read" });
-    });
-    batch.commit().catch((e) => console.warn("[useChat] mark read error:", e));
-  }, [messages, chatId, myUid]);
+    const handleMessage = (data: { chatKey: string; message: any }) => {
+      if (data.chatKey !== chatKey) return;
+      const m = data.message;
+      const newMsg: ChatMessage = {
+        id: m._id || m.id || String(Date.now()),
+        senderId: m.senderId,
+        text: m.text ?? "",
+        type: m.type ?? "text",
+        createdAt: m.createdAt ?? new Date().toISOString(),
+        status: m.status ?? "sent",
+        gift: m.gift ?? undefined,
+        sharedPost: m.sharedPost ?? undefined,
+      };
+      setMessages((prev) => {
+        if (prev.some((p) => p.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    };
+
+    socket.on("chat:message", handleMessage);
+    return () => { socket.off("chat:message", handleMessage); };
+  }, [chatKey]);
 
   const sendText = useCallback(async (text: string) => {
-    if (!chatId || !myUid || !text.trim()) return;
+    if (!chatKey || !myUid || !text.trim()) return;
 
     const optimistic: ChatMessage = {
       id: `pending_${Date.now()}`,
       senderId: myUid,
       text: text.trim(),
       type: "text",
-      createdAt: Timestamp.now(),
+      createdAt: new Date().toISOString(),
       status: "sent",
     };
-    setPendingMessages((prev) => [...prev, optimistic]);
+    setMessages((prev) => [...prev, optimistic]);
 
-    const chatRef = doc(db, "chats", chatId);
-    setDoc(chatRef, {
-      participants: [myUid, otherUid].sort(),
-      lastMessage: text.trim(),
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: myUid,
-    }, { merge: true }).catch(() => {});
-
-    addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: myUid,
-      text: text.trim(),
-      type: "text",
-      createdAt: serverTimestamp(),
-      status: "sent",
-    }).catch(() => {
-      setPendingMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-    });
-  }, [chatId, myUid, otherUid]);
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("chat:send", {
+        to: otherUid,
+        text: text.trim(),
+        type: "text",
+      });
+    }
+  }, [chatKey, myUid, otherUid]);
 
   const sendGift = useCallback(async (gift: Gift) => {
-    if (!chatId || !myUid) return;
+    if (!chatKey || !myUid) return;
 
-    const chatRef = doc(db, "chats", chatId);
-    await setDoc(chatRef, {
-      participants: [myUid, otherUid].sort(),
-      lastMessage: `🎁 ${gift.name}`,
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: myUid,
-    }, { merge: true });
-
-    await addDoc(collection(db, "chats", chatId, "messages"), {
+    const optimistic: ChatMessage = {
+      id: `pending_${Date.now()}`,
       senderId: myUid,
       text: `🎁 ${gift.name}`,
       type: "gift",
-      gift: { name: gift.name, emoji: gift.emoji, price: gift.price, color: gift.color },
-      createdAt: serverTimestamp(),
+      createdAt: new Date().toISOString(),
       status: "sent",
-    });
-  }, [chatId, myUid, otherUid]);
+      gift: { name: gift.name, emoji: gift.emoji, price: gift.price, color: gift.color } as Gift,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("chat:send", {
+        to: otherUid,
+        text: `🎁 ${gift.name}`,
+        type: "gift",
+        gift: { name: gift.name, emoji: gift.emoji, price: gift.price, color: gift.color },
+      });
+    }
+  }, [chatKey, myUid, otherUid]);
 
   const sendImage = useCallback(async (label: string) => {
-    if (!chatId || !myUid) return;
-
-    const chatRef = doc(db, "chats", chatId);
-    await setDoc(chatRef, {
-      participants: [myUid, otherUid].sort(),
-      lastMessage: label,
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: myUid,
-    }, { merge: true });
-
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: myUid,
-      text: label,
-      type: "image",
-      createdAt: serverTimestamp(),
-      status: "sent",
-    });
-  }, [chatId, myUid, otherUid]);
+    if (!chatKey || !myUid) return;
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("chat:send", { to: otherUid, text: label, type: "image" });
+    }
+  }, [chatKey, myUid, otherUid]);
 
   const sendSharedPost = useCallback(async (post: ChatMessage["sharedPost"]) => {
-    if (!chatId || !myUid || !post) return;
-
-    const chatRef = doc(db, "chats", chatId);
-    await setDoc(chatRef, {
-      participants: [myUid, otherUid].sort(),
-      lastMessage: "Gönderi paylaşıldı",
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: myUid,
-    }, { merge: true });
-
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: myUid,
-      text: "",
-      type: "sharedPost",
-      sharedPost: post,
-      createdAt: serverTimestamp(),
-      status: "sent",
-    });
-  }, [chatId, myUid, otherUid]);
-
-  const allMessages = pendingMessages.length > 0
-    ? [...messages, ...pendingMessages]
-    : messages;
+    if (!chatKey || !myUid || !post) return;
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("chat:send", { to: otherUid, text: "", type: "sharedPost", sharedPost: post });
+    }
+  }, [chatKey, myUid, otherUid]);
 
   return {
-    messages: allMessages,
+    messages,
     loading,
     sendText,
     sendGift,
     sendImage,
     sendSharedPost,
     myUid,
-    chatId,
+    chatId: chatKey,
     formatTime,
   };
 }

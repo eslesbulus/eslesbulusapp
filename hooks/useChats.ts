@@ -1,19 +1,14 @@
 import { useState, useEffect } from "react";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
+import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
 
 export type ChatPreviewData = {
   chatId: string;
+  chatKey: string;
   otherUid: string;
   lastMessage: string;
-  lastMessageAt: Timestamp | null;
+  lastMessageAt: string | null;
   lastSenderId: string;
 };
 
@@ -23,42 +18,70 @@ export function useChats() {
   const [chats, setChats] = useState<ChatPreviewData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch chats from API
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
+    let cancelled = false;
 
-    // Only filter by participants — sort client-side to avoid composite index requirement
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", uid),
-    );
+    api.get<any[]>("/api/chats")
+      .then((list) => {
+        if (cancelled) return;
+        const mapped: ChatPreviewData[] = list.map((c) => {
+          const otherUid = (c.participants as string[]).find((p) => p !== uid) ?? "";
+          return {
+            chatId: c._id,
+            chatKey: c.chatKey,
+            otherUid,
+            lastMessage: c.lastMessage ?? "",
+            lastMessageAt: c.lastMessageAt ?? null,
+            lastSenderId: c.lastSenderId ?? "",
+          };
+        });
+        mapped.sort((a, b) => {
+          const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+          const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+          return tb - ta;
+        });
+        setChats(mapped);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list: ChatPreviewData[] = snap.docs.map((d) => {
-        const data = d.data();
-        const participants: string[] = data.participants ?? [];
-        const otherUid = participants.find((p: string) => p !== uid) ?? "";
-        return {
-          chatId: d.id,
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  // Listen for new messages → update chat list
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !uid) return;
+
+    const handleMessage = (data: { chatKey: string; message: any }) => {
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => c.chatKey === data.chatKey);
+        const otherUid = data.chatKey.split("_").find((p) => p !== uid) ?? "";
+        const updated: ChatPreviewData = {
+          chatId: idx >= 0 ? prev[idx].chatId : data.chatKey,
+          chatKey: data.chatKey,
           otherUid,
-          lastMessage: data.lastMessage ?? "",
-          lastMessageAt: data.lastMessageAt ?? null,
-          lastSenderId: data.lastSenderId ?? "",
+          lastMessage: data.message.text || "",
+          lastMessageAt: data.message.createdAt,
+          lastSenderId: data.message.senderId,
         };
+        const next = idx >= 0
+          ? prev.map((c, i) => i === idx ? updated : c)
+          : [updated, ...prev];
+        // Re-sort
+        next.sort((a, b) => {
+          const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+          const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+          return tb - ta;
+        });
+        return next;
       });
-      // Sort by most recent first (client-side)
-      list.sort((a, b) => {
-        const ta = a.lastMessageAt?.toMillis() ?? 0;
-        const tb = b.lastMessageAt?.toMillis() ?? 0;
-        return tb - ta;
-      });
-      setChats(list);
-      setLoading(false);
-    }, (err) => {
-      console.error("[useChats] snapshot error:", err);
-      setLoading(false);
-    });
+    };
 
-    return unsub;
+    socket.on("chat:message", handleMessage);
+    return () => { socket.off("chat:message", handleMessage); };
   }, [uid]);
 
   return { chats, loading };

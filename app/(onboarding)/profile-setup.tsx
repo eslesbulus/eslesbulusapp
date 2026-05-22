@@ -23,10 +23,9 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInDown, FadeInUp } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
-import { doc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateProfile } from "firebase/auth";
-import { auth, db, storage } from "@/config/firebase";
+import { auth } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import { palette } from "@/constants/theme";
 import { INTERESTS_LIST, INTERESTS_MAX } from "@/constants/interests";
@@ -107,14 +106,11 @@ export default function ProfileSetupScreen() {
     });
   }
 
-  async function uploadPhoto(uid: string): Promise<string> {
+  async function uploadPhoto(_uid: string): Promise<string> {
     if (!photoUri) return "";
     if (photoUri.startsWith("http")) return photoUri;
-    const response = await fetch(photoUri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, `profilePhotos/${uid}.jpg`);
-    await uploadBytes(storageRef, blob);
-    return await getDownloadURL(storageRef);
+    const result = await api.upload("avatars", photoUri);
+    return result.url;
   }
 
   function goNext() {
@@ -162,7 +158,7 @@ export default function ProfileSetupScreen() {
       if (currentName.trim()) {
         updates.name = currentName.trim();
       }
-      await updateDoc(doc(db, "users", uid), updates);
+      await api.put("/api/users/me", updates);
     } catch (e: any) {
       Alert.alert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
     } finally {

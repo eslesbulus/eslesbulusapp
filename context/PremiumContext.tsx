@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 
 export const DAILY_LIKE_LIMIT = 10;
@@ -60,7 +59,7 @@ function getPremiumExpiry(plan: PremiumPlan): Date {
 }
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const { user, isDevAdmin } = useAuth();
+  const { user, profile, isDevAdmin, refreshProfile } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
   const [premiumExpiry, setPremiumExpiry] = useState<Date | null>(null);
   const [dailyLikesUsed, setDailyLikesUsed] = useState(0);
@@ -68,58 +67,42 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
   const [dailyStoryLikesUsed, setDailyStoryLikesUsed] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Sync from profile
   useEffect(() => {
-    if (isDevAdmin) {
-      setLoading(false);
-      return;
+    if (isDevAdmin) { setLoading(false); return; }
+    if (!profile) { setLoading(false); return; }
+
+    const expiry = profile.premiumExpiry ? new Date(profile.premiumExpiry) : null;
+    const active = profile.isPremium === true && expiry !== null && expiry > new Date();
+    setIsPremium(active);
+    setPremiumExpiry(expiry);
+
+    // Sync vip if expired
+    if (!active && profile.vip === true) {
+      api.put("/api/users/me", { vip: false }).catch(() => {});
     }
-    if (!user) {
-      setLoading(false);
-      return;
+
+    // Daily reset
+    const today = getToday();
+    const lastReset = profile.dailyResetDate ?? "";
+    if (lastReset !== today) {
+      api.put("/api/users/me", {
+        dailyLikesUsed: 0,
+        dailyHisUsed: 0,
+        dailyStoryLikesUsed: 0,
+        dailyResetDate: today,
+      }).catch(() => {});
+      setDailyLikesUsed(0);
+      setDailyHisUsed(0);
+      setDailyStoryLikesUsed(0);
+    } else {
+      setDailyLikesUsed(profile.dailyLikesUsed ?? 0);
+      setDailyHisUsed(profile.dailyHisUsed ?? 0);
+      setDailyStoryLikesUsed(profile.dailyStoryLikesUsed ?? 0);
     }
 
-    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (!snap.exists()) {
-        setLoading(false);
-        return;
-      }
-      const data = snap.data();
-
-      // Check premium validity
-      const expiry = data.premiumExpiry?.toDate?.() ?? null;
-      const active = data.isPremium === true && expiry !== null && expiry > new Date();
-      setIsPremium(active);
-      setPremiumExpiry(expiry);
-
-      // Sync vip field with premium status
-      if (!active && data.vip === true && user) {
-        updateDoc(doc(db, "users", user.uid), { vip: false }).catch(() => {});
-      }
-
-      // Daily reset logic
-      const today = getToday();
-      const lastReset = data.lastResetDate ?? "";
-      if (lastReset !== today) {
-        updateDoc(doc(db, "users", user.uid), {
-          dailyLikesUsed: 0,
-          dailyHisUsed: 0,
-          dailyStoryLikesUsed: 0,
-          lastResetDate: today,
-        }).catch(() => {});
-        setDailyLikesUsed(0);
-        setDailyHisUsed(0);
-        setDailyStoryLikesUsed(0);
-      } else {
-        setDailyLikesUsed(data.dailyLikesUsed ?? 0);
-        setDailyHisUsed(data.dailyHisUsed ?? 0);
-        setDailyStoryLikesUsed(data.dailyStoryLikesUsed ?? 0);
-      }
-
-      setLoading(false);
-    });
-
-    return unsub;
-  }, [user, isDevAdmin]);
+    setLoading(false);
+  }, [profile, isDevAdmin]);
 
   const canLike = isDevAdmin || isPremium || dailyLikesUsed < DAILY_LIKE_LIMIT;
   const canSendHi = isDevAdmin || isPremium || dailyHisUsed < DAILY_HI_LIMIT;
@@ -132,12 +115,8 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     if (isDevAdmin || isPremium) return true;
     if (!user) return false;
     if (dailyLikesUsed >= DAILY_LIKE_LIMIT) return false;
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        dailyLikesUsed: increment(1),
-      });
-    } catch {}
     setDailyLikesUsed((p) => p + 1);
+    api.put("/api/users/me", { dailyLikesUsed: dailyLikesUsed + 1 }).catch(() => {});
     return true;
   }, [user, isDevAdmin, isPremium, dailyLikesUsed]);
 
@@ -145,12 +124,8 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     if (isDevAdmin || isPremium) return true;
     if (!user) return false;
     if (dailyHisUsed >= DAILY_HI_LIMIT) return false;
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        dailyHisUsed: increment(1),
-      });
-    } catch {}
     setDailyHisUsed((p) => p + 1);
+    api.put("/api/users/me", { dailyHisUsed: dailyHisUsed + 1 }).catch(() => {});
     return true;
   }, [user, isDevAdmin, isPremium, dailyHisUsed]);
 
@@ -158,12 +133,8 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     if (isDevAdmin || isPremium) return true;
     if (!user) return false;
     if (dailyStoryLikesUsed >= DAILY_STORY_LIKE_LIMIT) return false;
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        dailyStoryLikesUsed: increment(1),
-      });
-    } catch {}
     setDailyStoryLikesUsed((p) => p + 1);
+    api.put("/api/users/me", { dailyStoryLikesUsed: dailyStoryLikesUsed + 1 }).catch(() => {});
     return true;
   }, [user, isDevAdmin, isPremium, dailyStoryLikesUsed]);
 
@@ -175,32 +146,25 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), {
+    await api.put("/api/users/me", {
       isPremium: true,
-      premiumExpiry: expiry,
+      premiumExpiry: expiry.toISOString(),
       vip: true,
     });
-  }, [user, isDevAdmin]);
+    setIsPremium(true);
+    setPremiumExpiry(expiry);
+    await refreshProfile();
+  }, [user, isDevAdmin, refreshProfile]);
 
   return (
     <PremiumContext.Provider
       value={{
-        isPremium,
-        premiumExpiry,
-        dailyLikesUsed,
-        dailyHisUsed,
-        dailyStoryLikesUsed,
-        likesRemaining,
-        hisRemaining,
-        storyLikesRemaining,
-        canLike,
-        canSendHi,
-        canLikeStory,
-        useLike,
-        useHi,
-        useStoryLike,
-        activatePremium,
-        loading,
+        isPremium, premiumExpiry,
+        dailyLikesUsed, dailyHisUsed, dailyStoryLikesUsed,
+        likesRemaining, hisRemaining, storyLikesRemaining,
+        canLike, canSendHi, canLikeStory,
+        useLike, useHi, useStoryLike,
+        activatePremium, loading,
       }}
     >
       {children}

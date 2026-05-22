@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
 import type { UserProfile } from "@/context/AuthContext";
 
 /**
- * Real-time subscription to a single user doc by UID.
- * Returns { user: null, loading: false } if the doc doesn't exist.
+ * Fetch a single user by UID from the API.
  */
 export function useUser(uid: string | null | undefined): {
   user: UserProfile | null;
@@ -23,18 +21,24 @@ export function useUser(uid: string | null | undefined): {
       return;
     }
     setLoading(true);
-    const unsub = onSnapshot(
-      doc(db, "users", uid),
-      (snap) => {
-        setUser(snap.exists() ? (snap.data() as UserProfile) : null);
-        setLoading(false);
-      },
-      (e) => {
-        setError(e as Error);
-        setLoading(false);
-      }
-    );
-    return unsub;
+    let cancelled = false;
+
+    api.get<UserProfile>(`/api/users/${uid}`)
+      .then((data) => {
+        if (!cancelled) {
+          setUser(data);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e);
+          setUser(null);
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
   }, [uid]);
 
   return { user, loading, error };

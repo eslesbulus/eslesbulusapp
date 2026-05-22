@@ -1,14 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 
 type BlockedUser = {
@@ -27,51 +18,36 @@ type Ctx = {
 
 const BlockedUsersContext = createContext<Ctx | null>(null);
 
-function tsToMs(v: unknown): number {
-  if (v instanceof Timestamp) return v.toMillis();
-  if (typeof v === "number") return v;
-  return Date.now();
-}
-
 export function BlockedUsersProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
 
+  // Load from profile
   useEffect(() => {
-    if (!user?.uid) {
+    if (!profile) {
       setBlocked([]);
       return;
     }
-    const unsub = onSnapshot(
-      collection(db, "users", user.uid, "blocked"),
-      (snap) => {
-        const list: BlockedUser[] = [];
-        snap.forEach((d) => {
-          const data = d.data();
-          list.push({
-            id: d.id,
-            name: data.name ?? "",
-            photo: data.photo ?? "",
-            blockedAt: tsToMs(data.at),
-          });
-        });
-        list.sort((a, b) => b.blockedAt - a.blockedAt);
-        setBlocked(list);
-      },
-      () => setBlocked([])
-    );
-    return unsub;
-  }, [user?.uid]);
+    const list: BlockedUser[] = ((profile as any).blockedUsers ?? []).map((b: any) => ({
+      id: b.uid,
+      name: b.name ?? "",
+      photo: b.photo ?? "",
+      blockedAt: b.at ? new Date(b.at).getTime() : Date.now(),
+    }));
+    list.sort((a, b) => b.blockedAt - a.blockedAt);
+    setBlocked(list);
+  }, [profile]);
 
   const blockUser = useCallback(
     async (u: { uid: string; name: string; photoURL?: string; photos?: string[] }) => {
       if (!user?.uid || u.uid === user.uid) return;
       const photo = u.photoURL || u.photos?.[0] || "";
-      await setDoc(doc(db, "users", user.uid, "blocked", u.uid), {
-        name: u.name,
-        photo,
-        at: serverTimestamp(),
-      });
+      // Optimistic
+      setBlocked((prev) => [
+        { id: u.uid, name: u.name, photo, blockedAt: Date.now() },
+        ...prev,
+      ]);
+      await api.post("/api/users/me/block", { targetUid: u.uid, name: u.name, photo });
     },
     [user?.uid]
   );
@@ -79,7 +55,8 @@ export function BlockedUsersProvider({ children }: { children: React.ReactNode }
   const unblockUser = useCallback(
     async (userId: string) => {
       if (!user?.uid) return;
-      await deleteDoc(doc(db, "users", user.uid, "blocked", userId));
+      setBlocked((prev) => prev.filter((b) => b.id !== userId));
+      await api.post("/api/users/me/unblock", { targetUid: userId });
     },
     [user?.uid]
   );

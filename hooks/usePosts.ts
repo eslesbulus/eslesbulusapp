@@ -1,20 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  where,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  setDoc,
-  serverTimestamp,
-  increment,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 
 export type Post = {
@@ -36,188 +21,128 @@ export type PostComment = {
   createdAt: Date;
 };
 
-/**
- * Real-time subscription to `posts` collection.
- * If userId supplied, filters to that user's posts only.
- * Hides archived posts from non-owners.
- */
 export function usePosts(userId?: string) {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
 
-  // Subscribe to posts
-  useEffect(() => {
-    const q = userId
-      ? query(collection(db, "posts"), where("userId", "==", userId), orderBy("createdAt", "desc"))
-      : query(collection(db, "posts"), orderBy("createdAt", "desc"));
+  const fetchPosts = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
+    try {
+      const path = userId ? `/api/posts/user/${userId}` : "/api/posts";
+      const raw = await api.get<any[]>(path);
+      const list: Post[] = raw.map((d) => ({
+        id: d._id || d.id,
+        userId: d.userId,
+        text: d.text ?? "",
+        imageUrl: d.imageUrl ?? undefined,
+        createdAt: new Date(d.createdAt),
+        archived: d.archived ?? false,
+        likesCount: d.likesCount ?? 0,
+      }));
+      setPosts(list);
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list: Post[] = [];
-        snap.forEach((d) => {
-          const data = d.data();
-          // Hide archived from others
-          if (data.archived && data.userId !== user?.uid) return;
-          list.push({
-            id: d.id,
-            userId: data.userId,
-            text: data.text ?? "",
-            imageUrl: data.imageUrl ?? undefined,
-            createdAt: data.createdAt?.toDate?.() ?? new Date(),
-            archived: data.archived ?? false,
-            likesCount: data.likesCount ?? 0,
-          });
-        });
-        setPosts(list);
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-    return unsub;
-  }, [userId, user?.uid]);
+      const liked = new Set<string>();
+      raw.forEach((d) => {
+        if ((d.likedBy ?? []).includes(user.uid)) {
+          liked.add(d._id || d.id);
+        }
+      });
+      setLikedPostIds(liked);
+      setLoading(false);
+    } catch {
+      setLoading(false);
+    }
+  }, [user, userId]);
 
-  // Subscribe to current user's liked posts
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(
-      collection(db, "users", user.uid, "post_likes"),
-      (snap) => {
-        const ids = new Set<string>();
-        snap.forEach((d) => ids.add(d.id));
-        setLikedPostIds(ids);
-      }
-    );
-    return unsub;
-  }, [user?.uid]);
+  useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   const isPostLiked = useCallback(
     (postId: string) => likedPostIds.has(postId),
     [likedPostIds]
   );
 
-  const togglePostLike = useCallback(
-    async (postId: string) => {
-      if (!user) return;
-      const liked = likedPostIds.has(postId);
-      if (liked) {
-        await deleteDoc(doc(db, "users", user.uid, "post_likes", postId));
-        await updateDoc(doc(db, "posts", postId), { likesCount: increment(-1) });
-      } else {
-        await setDoc(doc(db, "users", user.uid, "post_likes", postId), { at: serverTimestamp() });
-        await updateDoc(doc(db, "posts", postId), { likesCount: increment(1) });
-      }
-    },
-    [user, likedPostIds]
-  );
+  const togglePostLike = useCallback(async (postId: string) => {
+    if (!user) return;
+    const liked = likedPostIds.has(postId);
+    if (liked) {
+      setLikedPostIds((prev) => { const n = new Set(prev); n.delete(postId); return n; });
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, likesCount: Math.max(0, p.likesCount - 1) } : p));
+    } else {
+      setLikedPostIds((prev) => new Set(prev).add(postId));
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, likesCount: p.likesCount + 1 } : p));
+    }
+    await api.post(`/api/posts/${postId}/like`);
+  }, [user, likedPostIds]);
 
-  const createPost = useCallback(
-    async (text: string, imageUri?: string) => {
-      if (!user) return;
-      let imageUrl: string | undefined;
-      if (imageUri) {
-        const filename = `posts/${user.uid}/${Date.now()}.jpg`;
-        const storageRef = ref(storage, filename);
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        await uploadBytes(storageRef, blob);
-        imageUrl = await getDownloadURL(storageRef);
-      }
-      await addDoc(collection(db, "posts"), {
-        userId: user.uid,
-        text,
-        imageUrl: imageUrl ?? null,
-        createdAt: serverTimestamp(),
-        archived: false,
-        likesCount: 0,
-      });
-    },
-    [user]
-  );
+  const createPost = useCallback(async (text: string, imageUri?: string) => {
+    if (!user) return;
+    let imageUrl: string | undefined;
+    if (imageUri) {
+      const uploaded = await api.upload("posts", imageUri);
+      imageUrl = uploaded.url;
+    }
+    await api.post("/api/posts", { text, imageUrl: imageUrl ?? null });
+    await fetchPosts();
+  }, [user, fetchPosts]);
 
   const deletePost = useCallback(async (postId: string) => {
-    await deleteDoc(doc(db, "posts", postId));
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    await api.delete(`/api/posts/${postId}`);
   }, []);
 
   const archivePost = useCallback(async (postId: string, archived: boolean) => {
-    // Optimistic local update
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, archived } : p)));
-    await updateDoc(doc(db, "posts", postId), { archived });
+    await api.put(`/api/posts/${postId}`, { archived });
   }, []);
 
   const editPost = useCallback(async (postId: string, text: string) => {
-    await updateDoc(doc(db, "posts", postId), { text });
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, text } : p)));
+    await api.put(`/api/posts/${postId}`, { text });
   }, []);
 
-  return {
-    posts,
-    loading,
-    likedPostIds,
-    isPostLiked,
-    togglePostLike,
-    createPost,
-    deletePost,
-    archivePost,
-    editPost,
-  };
+  return { posts, loading, likedPostIds, isPostLiked, togglePostLike, createPost, deletePost, archivePost, editPost };
 }
 
-/**
- * Real-time comments subscription for a specific post.
- */
 export function usePostComments(postId: string | null) {
   const { user, profile } = useAuth();
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!postId) {
-      setComments([]);
-      setLoading(false);
-      return;
-    }
-    const q = query(
-      collection(db, "posts", postId, "comments"),
-      orderBy("createdAt", "asc")
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list: PostComment[] = [];
-        snap.forEach((d) => {
-          const data = d.data();
-          list.push({
-            id: d.id,
-            userId: data.userId ?? "",
-            userName: data.userName ?? "",
-            userPhoto: data.userPhoto ?? "",
-            text: data.text ?? "",
-            createdAt: data.createdAt?.toDate?.() ?? new Date(),
-          });
-        });
+    if (!postId) { setComments([]); setLoading(false); return; }
+    let cancelled = false;
+    api.get<any>(`/api/posts/${postId}`)
+      .then((post) => {
+        if (cancelled) return;
+        const list: PostComment[] = (post.comments ?? []).map((c: any) => ({
+          id: c._id || String(Math.random()),
+          userId: c.userId ?? "",
+          userName: c.userName ?? "",
+          userPhoto: c.userPhoto ?? "",
+          text: c.text ?? "",
+          createdAt: new Date(c.createdAt),
+        }));
         setComments(list);
         setLoading(false);
-      },
-      () => setLoading(false)
-    );
-    return unsub;
+      })
+      .catch(() => setLoading(false));
+    return () => { cancelled = true; };
   }, [postId]);
 
-  const addComment = useCallback(
-    async (text: string) => {
-      if (!user || !postId) return;
-      await addDoc(collection(db, "posts", postId, "comments"), {
-        userId: user.uid,
-        userName: profile?.name ?? "Anonim",
-        userPhoto: profile?.photoURL ?? "",
-        text,
-        createdAt: serverTimestamp(),
-      });
-    },
-    [user, postId, profile]
-  );
+  const addComment = useCallback(async (text: string) => {
+    if (!user || !postId) return;
+    const result = await api.post<any>(`/api/posts/${postId}/comment`, { text });
+    setComments((prev) => [...prev, {
+      id: result._id || String(Date.now()),
+      userId: user.uid,
+      userName: profile?.name ?? "Anonim",
+      userPhoto: profile?.photoURL ?? "",
+      text,
+      createdAt: new Date(),
+    }]);
+  }, [user, postId, profile]);
 
   return { comments, loading, addComment };
 }

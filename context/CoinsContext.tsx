@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore";
-import { db } from "@/config/firebase";
+import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 
 export const INITIAL_TOKENS = 100;
@@ -19,26 +18,16 @@ const CoinsContext = createContext<CoinsContextType>({
 });
 
 export function CoinsProvider({ children }: { children: React.ReactNode }) {
-  const { user, isDevAdmin } = useAuth();
+  const { user, profile, isDevAdmin, refreshProfile } = useAuth();
   const [balance, setBalance] = useState(INITIAL_TOKENS);
 
+  // Sync balance from profile
   useEffect(() => {
-    if (isDevAdmin || !user) return;
-
-    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      if (typeof data.tokens === "number") {
-        setBalance(data.tokens);
-      } else {
-        // Initialize tokens for new users
-        updateDoc(doc(db, "users", user.uid), { tokens: INITIAL_TOKENS }).catch(() => {});
-        setBalance(INITIAL_TOKENS);
-      }
-    });
-
-    return unsub;
-  }, [user, isDevAdmin]);
+    if (isDevAdmin) return;
+    if (profile && typeof profile.tokens === "number") {
+      setBalance(profile.tokens);
+    }
+  }, [profile, isDevAdmin]);
 
   const add = useCallback(async (n: number) => {
     if (isDevAdmin) {
@@ -46,8 +35,10 @@ export function CoinsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), { tokens: increment(n) });
-  }, [user, isDevAdmin]);
+    setBalance((b) => b + n); // optimistic
+    await api.put("/api/users/me", { tokens: balance + n });
+    await refreshProfile();
+  }, [user, isDevAdmin, balance, refreshProfile]);
 
   const spend = useCallback(async (n: number): Promise<boolean> => {
     if (isDevAdmin) {
@@ -56,7 +47,8 @@ export function CoinsProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     if (!user || balance < n) return false;
-    await updateDoc(doc(db, "users", user.uid), { tokens: increment(-n) });
+    setBalance((b) => b - n); // optimistic
+    await api.put("/api/users/me", { tokens: balance - n });
     return true;
   }, [user, isDevAdmin, balance]);
 

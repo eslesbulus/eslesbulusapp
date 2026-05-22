@@ -21,8 +21,8 @@ import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/config/firebase";
+import { auth } from "@/config/firebase";
+import { api } from "@/config/api";
 import { palette } from "@/constants/theme";
 import { firebaseAuthErrorMessage } from "@/constants/firebaseErrors";
 import { calculateAge } from "@/lib/age";
@@ -123,15 +123,11 @@ export default function RegisterScreen() {
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(user, { displayName: name.trim() });
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
+      // API auto-creates user on first token verify, but let's set the initial data
+      await api.put("/api/users/me", {
         name: name.trim(),
-        email: email.trim(),
         birthDate: birthDate.toISOString().slice(0, 10),
         age,
-        coins: 100,
-        createdAt: serverTimestamp(),
-        profileComplete: false,
       });
       // RootNavigator routes to onboarding automatically
     } catch (e: any) {
