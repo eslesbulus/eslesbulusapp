@@ -25,6 +25,7 @@ import Animated, {
   FadeInUp,
 } from "react-native-reanimated";
 import { useUser } from "@/hooks/useUser";
+import { useAuth } from "@/context/AuthContext";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -33,7 +34,9 @@ export default function CallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loading: userLoading } = useUser(id);
+  const { profile } = useAuth();
   const userPhoto = user?.photoURL || user?.photos?.[0] || "";
+  const myPhoto = profile?.photoURL || profile?.photos?.[0] || "";
   const userName = user?.name ?? "";
   const isVideo = type === "video";
 
@@ -171,7 +174,7 @@ export default function CallScreen() {
           style={[styles.selfPreview, { bottom: insets.bottom + 160, right: 16 }]}
         >
           <Image
-            source={{ uri: "https://i.pravatar.cc/400?img=68" }}
+            source={{ uri: myPhoto || "https://via.placeholder.com/200" }}
             style={styles.selfPreviewImg}
           />
           {cameraOff && (

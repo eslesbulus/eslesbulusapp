@@ -97,15 +97,20 @@ export function useStories() {
     async (storyId: string, emoji?: string) => {
       if (!user) return;
       await api.post(`/api/stories/${storyId}/like`);
-      // Also send to chat
       const story = allStories.find((s) => s.id === storyId);
       if (story && story.userId !== user.uid) {
         const socket = getSocket();
         if (socket) {
           socket.emit("chat:send", {
             to: story.userId,
-            text: `Hikayeni beğendi ${emoji || "❤️"}`,
-            type: "text",
+            text: emoji || "❤️",
+            type: "storyReply",
+            storyReply: {
+              storyId: story.id,
+              storyImageUrl: story.imageUrl,
+              storyOwnerId: story.userId,
+              isEmoji: true,
+            },
           });
         }
       }
@@ -116,7 +121,6 @@ export function useStories() {
   const unlikeStory = useCallback(
     async (storyId: string) => {
       if (!user) return;
-      // Could add an unlike endpoint if needed
     },
     [user]
   );
@@ -125,7 +129,6 @@ export function useStories() {
     async (storyId: string, text: string) => {
       if (!user) return;
       await api.post(`/api/stories/${storyId}/reply`, { text });
-      // Also send to chat
       const story = allStories.find((s) => s.id === storyId);
       if (story && story.userId !== user.uid) {
         const socket = getSocket();
@@ -133,7 +136,13 @@ export function useStories() {
           socket.emit("chat:send", {
             to: story.userId,
             text,
-            type: "text",
+            type: "storyReply",
+            storyReply: {
+              storyId: story.id,
+              storyImageUrl: story.imageUrl,
+              storyOwnerId: story.userId,
+              isEmoji: false,
+            },
           });
         }
       }

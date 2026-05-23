@@ -37,6 +37,14 @@ module.exports = {
       "expo-video",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#FF4D6D",
+          defaultChannel: "default",
+        },
+      ],
     ],
     extra: {
       router: {},

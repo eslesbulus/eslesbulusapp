@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Keyboard,
   Modal,
   Alert,
+  BackHandler,
+  Share,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +23,8 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
+  SlideInUp,
+  SlideOutUp,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -38,7 +42,9 @@ import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@/hooks/useUser";
+import { api } from "@/config/api";
 import { useChat, type ChatMessage } from "@/hooks/useChat";
+import { useChats, setActiveChat } from "@/hooks/useChats";
 import type { UserProfile } from "@/context/AuthContext";
 import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
 import { Gift } from "@/constants/gifts";
@@ -46,6 +52,24 @@ import { GiftSheet } from "@/components/chat/GiftSheet";
 import { GiftAnimation } from "@/components/chat/GiftAnimation";
 import { EmojiPicker } from "@/components/chat/EmojiPicker";
 import { VipName } from "@/components/common/VipName";
+import * as Clipboard from "expo-clipboard";
+
+function formatLastSeen(lastActive?: number | string | null): string {
+  if (!lastActive) return "çevrimdışı";
+  const d = typeof lastActive === "number" ? new Date(lastActive) : new Date(lastActive);
+  if (isNaN(d.getTime())) return "çevrimdışı";
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "az önce görüldü";
+  if (mins < 60) return `${mins} dk önce görüldü`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} sa önce görüldü`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "dün görüldü";
+  if (days < 7) return `${days} gün önce görüldü`;
+  return `son görülme ${d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}`;
+}
 
 function hexToRgba(hex: string, alpha: number) {
   const m = hex.replace("#", "");
@@ -59,7 +83,8 @@ function hexToRgba(hex: string, alpha: number) {
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { user, loading: userLoading } = useUser(id);
-  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendSharedPost, myUid, formatTime } = useChat(id);
+  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendSharedPost, reactToMessage, myUid, formatTime } = useChat(id);
+  const { markRead } = useChats();
   const router = useRouter();
   const userPhoto = user?.photoURL || user?.photos?.[0] || null;
   const { theme, mode } = useTheme();
@@ -73,6 +98,11 @@ export default function ChatDetailScreen() {
   const listRef = useRef<FlatList>(null);
 
   const [text, setText] = useState(draft ? decodeURIComponent(draft as string) : "");
+  const textRef = useRef(text); // senkron text takibi — hizli yazimda state gecikmesini onler
+  const setTextSync = useCallback((val: string) => {
+    textRef.current = val;
+    setText(val);
+  }, []);
   const [attachOpen, setAttachOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | "vip" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
@@ -80,6 +110,121 @@ export default function ChatDetailScreen() {
   const inputRef = useRef<TextInput>(null);
   const panelOpen = panelTab !== null;
   const sharedPostsSent = useRef(false);
+
+  // WhatsApp tarzı mesaj secimi
+  const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set());
+  const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(new Set());
+  const [deletedForAllIds, setDeletedForAllIds] = useState<Set<string>>(new Set());
+  const isMsgSelecting = selectedMsgIds.size > 0;
+
+  // Emoji reaction bar — tek seferde yalnizca bir mesajda acik
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
+
+  // Filtrelenmis mesajlar — silinen mesajlari gizle veya "silindi" olarak goster
+  const displayMessages = messages.filter((m) => !localDeletedIds.has(m.id));
+  // inverted FlatList icin ters sira
+  const invertedMessages = [...displayMessages].reverse();
+
+  const toggleMsgSelect = useCallback((msgId: string) => {
+    setSelectedMsgIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(msgId)) next.delete(msgId);
+      else next.add(msgId);
+      return next;
+    });
+  }, []);
+
+  // Ref'ler — callback'lerin bagimliligini azalt, gereksiz re-render onle
+  const isMsgSelectingRef = useRef(isMsgSelecting);
+  isMsgSelectingRef.current = isMsgSelecting;
+  const activeReactionMsgIdRef = useRef(activeReactionMsgId);
+  activeReactionMsgIdRef.current = activeReactionMsgId;
+
+  const handleMsgPress = useCallback((msgId: string) => {
+    if (isMsgSelectingRef.current) toggleMsgSelect(msgId);
+  }, [toggleMsgSelect]);
+
+  const handleMsgLongPress = useCallback((msgId: string) => {
+    if (!isMsgSelectingRef.current) setSelectedMsgIds(new Set([msgId]));
+  }, []);
+
+  const handleToggleReaction = useCallback((msgId: string) => {
+    setActiveReactionMsgId((prev) => prev === msgId ? null : msgId);
+  }, []);
+
+  const handleReact = useCallback((msgId: string, emoji: string) => {
+    reactToMessage(msgId, emoji);
+  }, [reactToMessage]);
+
+  // Back handler
+  useEffect(() => {
+    if (!isMsgSelecting) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      setSelectedMsgIds(new Set());
+      return true;
+    });
+    return () => handler.remove();
+  }, [isMsgSelecting]);
+
+  function handleCopySelected() {
+    const selected = messages.filter((m) => selectedMsgIds.has(m.id));
+    const textToCopy = selected.map((m) => m.text).filter(Boolean).join("\n");
+    if (textToCopy) {
+      Clipboard.setStringAsync(textToCopy);
+    }
+    setSelectedMsgIds(new Set());
+  }
+
+  async function handleShareSelected() {
+    const selected = messages.filter((m) => selectedMsgIds.has(m.id));
+    const textToShare = selected.map((m) => m.text).filter(Boolean).join("\n");
+    if (textToShare) {
+      await Share.share({ message: textToShare });
+    }
+    setSelectedMsgIds(new Set());
+  }
+
+  function handleDeleteSelected() {
+    const ids = [...selectedMsgIds];
+    Alert.alert(
+      "Mesajları Sil",
+      `${ids.length} mesajı nasıl silmek istiyorsun?`,
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Benden Sil",
+          onPress: () => {
+            // Sadece local'den kaldir
+            deleteMessagesLocal(ids);
+            setSelectedMsgIds(new Set());
+          },
+        },
+        {
+          text: "Herkesten Sil",
+          style: "destructive",
+          onPress: () => {
+            deleteMessagesForAll(ids);
+            setSelectedMsgIds(new Set());
+          },
+        },
+      ]
+    );
+  }
+
+  function deleteMessagesLocal(msgIds: string[]) {
+    const set = new Set(msgIds);
+    // Client tarafinda sakla — API'ye gonder ki bir daha gostermesin
+    api.post(`/api/chats/${id}/delete-messages`, { messageIds: msgIds, mode: "me" }).catch(() => {});
+    // Local state'ten cikar (gorunmez yap — useChat'te filtreleme yapacagiz)
+    // Simdilik sadece local kaldir
+    setLocalDeletedIds((prev) => new Set([...prev, ...msgIds]));
+  }
+
+  function deleteMessagesForAll(msgIds: string[]) {
+    api.post(`/api/chats/${id}/delete-messages`, { messageIds: msgIds, mode: "all" }).catch(() => {});
+    // Mesajlari "silindi" olarak isaretle
+    setDeletedForAllIds((prev) => new Set([...prev, ...msgIds]));
+  }
 
   // Send shared posts on first load (from post sharing flow)
   useEffect(() => {
@@ -119,12 +264,17 @@ export default function ChatDetailScreen() {
     if (panelOpen) setPanelTab(null);
   }
 
-  // Auto-scroll when new messages arrive
+  // Mark chat as read + active chat tracking
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    if (id) {
+      markRead(id);
+      setActiveChat(id);
     }
-  }, [messages.length]);
+    return () => { setActiveChat(null); };
+  }, [id]);
+
+  // inverted FlatList kullaniyoruz — en altta basliyor, scroll yok
+  // Yeni mesaj gelince zaten en uste (inverted = en alta) ekleniyor
 
   // Play gift animation for receiver on first view
   const giftAnimPlayed = useRef<Set<string>>(new Set());
@@ -157,13 +307,14 @@ export default function ChatDetailScreen() {
   }
 
   function handlePickEmoji(emoji: string) {
-    setText((t) => t + emoji);
+    setTextSync(textRef.current + emoji);
   }
 
   const sendingRef = useRef(false);
 
-  async function handleSend() {
-    if (!text.trim() || !user || sendingRef.current) return;
+  function handleSend() {
+    const currentText = textRef.current.trim();
+    if (!currentText || !user || sendingRef.current) return;
     sendingRef.current = true;
 
     if (tokenBalance < TOKENS_PER_MESSAGE) {
@@ -179,15 +330,13 @@ export default function ChatDetailScreen() {
       return;
     }
 
-    const spent = await spendTokens(TOKENS_PER_MESSAGE);
-    if (!spent) { sendingRef.current = false; return; }
+    // Hemen mesaji gonder, token harcamayi arka planda yap
+    setTextSync("");
+    sendText(currentText);
+    spendTokens(TOKENS_PER_MESSAGE).catch(() => {});
 
-    const msgText = text.trim();
-    setText("");
-    sendText(msgText);
-
-    // 500ms debounce to prevent rapid fire
-    setTimeout(() => { sendingRef.current = false; }, 500);
+    // 150ms debounce — hizli ama cift tiklamayi onler
+    setTimeout(() => { sendingRef.current = false; }, 150);
   }
 
   if (userLoading || !user) {
@@ -208,48 +357,70 @@ export default function ChatDetailScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.card }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color={c.text} />
-        </Pressable>
-
-        <Pressable
-          style={styles.userBlock}
-          onPress={() => router.push(`/user/${user.uid}`)}
+      {/* Header / Selection Bar */}
+      {isMsgSelecting ? (
+        <Animated.View
+          entering={SlideInUp.duration(200)}
+          exiting={SlideOutUp.duration(200)}
+          style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.primary }]}
         >
-          <View style={styles.headerAvatarWrap}>
-            {userPhoto ? (
-              <Image source={{ uri: userPhoto }} style={styles.headerAvatar} />
-            ) : (
-              <View style={[styles.headerAvatar, { backgroundColor: c.surface }]} />
-            )}
-            {user.online && <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <VipName name={user.name} vip={user.vip} style={{ color: c.text }} fontSize={15} />
-            <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
-              {user.online ? "çevrimiçi" : "çevrimdışı"}
-            </Text>
-          </View>
-        </Pressable>
+          <Pressable onPress={() => setSelectedMsgIds(new Set())} hitSlop={10} style={styles.backBtn}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </Pressable>
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 }}>{selectedMsgIds.size}</Text>
+          <Pressable hitSlop={8} style={styles.headerBtn} onPress={handleCopySelected}>
+            <Ionicons name="copy-outline" size={20} color="#fff" />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.headerBtn} onPress={handleShareSelected}>
+            <Ionicons name="share-outline" size={20} color="#fff" />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.headerBtn} onPress={handleDeleteSelected}>
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+          </Pressable>
+        </Animated.View>
+      ) : (
+        <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.card }]}>
+          <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={26} color={c.text} />
+          </Pressable>
 
-        {/* Jeton bakiyesi */}
-        <Pressable
-          hitSlop={8}
-          style={styles.tokenPill}
-          onPress={() => router.push("/premium/coins")}
-        >
-          <Text style={styles.tokenPillText}>🪙 {tokenBalance}</Text>
-        </Pressable>
+          <Pressable
+            style={styles.userBlock}
+            onPress={() => router.push(`/user/${user.uid}`)}
+          >
+            <View style={styles.headerAvatarWrap}>
+              {userPhoto ? (
+                <Image source={{ uri: userPhoto }} style={styles.headerAvatar} />
+              ) : (
+                <View style={[styles.headerAvatar, { backgroundColor: c.surface }]} />
+              )}
+              {user.online && <View style={[styles.dot, { backgroundColor: c.online, borderColor: c.card }]} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <VipName name={user.name} vip={user.vip} style={{ color: c.text }} fontSize={15} />
+              <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
+                {user.online ? "çevrimiçi" : formatLastSeen(user.lastActive)}
+              </Text>
+            </View>
+          </Pressable>
 
-        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=video`)}>
-          <Ionicons name="videocam-outline" size={22} color={c.text} />
-        </Pressable>
-        <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=voice`)}>
-          <Ionicons name="call-outline" size={20} color={c.text} />
-        </Pressable>
-      </View>
+          {/* Jeton bakiyesi */}
+          <Pressable
+            hitSlop={8}
+            style={styles.tokenPill}
+            onPress={() => router.push("/premium/coins")}
+          >
+            <Text style={styles.tokenPillText}>🪙 {tokenBalance}</Text>
+          </Pressable>
+
+          <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=video`)}>
+            <Ionicons name="videocam-outline" size={22} color={c.text} />
+          </Pressable>
+          <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=voice`)}>
+            <Ionicons name="call-outline" size={20} color={c.text} />
+          </Pressable>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -259,12 +430,13 @@ export default function ChatDetailScreen() {
         {/* Messages */}
         <FlatList
           ref={listRef}
-          data={messages}
+          data={invertedMessages}
           keyExtractor={(it) => it.id}
+          inverted
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <Animated.View entering={FadeIn.duration(400)} style={styles.matchedCard}>
+          ListFooterComponent={
+            <View style={styles.matchedCard}>
               {userPhoto ? (
                 <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
               ) : (
@@ -277,7 +449,7 @@ export default function ChatDetailScreen() {
               <Text style={[styles.matchedSub, { color: c.textMuted }]}>
                 Selam de, sohbet başlasın
               </Text>
-            </Animated.View>
+            </View>
           }
           ListEmptyComponent={
             chatLoading ? (
@@ -287,16 +459,23 @@ export default function ChatDetailScreen() {
             ) : null
           }
           renderItem={({ item, index }) => {
-            const prev = messages[index - 1];
-            const next = messages[index + 1];
+            // inverted listede index 0 = en son mesaj
+            // prev/next hesaplamasi icin orijinal sirayi kullan
+            const origIdx = displayMessages.length - 1 - index;
+            const prev = origIdx > 0 ? displayMessages[origIdx - 1] : undefined;
+            const next = origIdx < displayMessages.length - 1 ? displayMessages[origIdx + 1] : undefined;
             const fromMe = item.senderId === myUid;
             const prevFromMe = prev ? prev.senderId === myUid : !fromMe;
             const nextFromMe = next ? next.senderId === myUid : !fromMe;
             const isFirstOfGroup = prevFromMe !== fromMe;
             const isLastOfGroup = nextFromMe !== fromMe;
+            const isDeleted = item.deleted || deletedForAllIds.has(item.id);
+            const displayMsg = isDeleted
+              ? { ...item, text: "Bu mesaj silindi", type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
+              : item;
             return (
-              <Bubble
-                msg={item}
+              <BubbleWrapper
+                item={displayMsg}
                 fromMe={fromMe}
                 isFirstOfGroup={isFirstOfGroup}
                 isLastOfGroup={isLastOfGroup}
@@ -304,6 +483,15 @@ export default function ChatDetailScreen() {
                 colors={c}
                 timeStr={formatTime(item.createdAt)}
                 senderVip={fromMe ? myVip : otherVip}
+                selected={selectedMsgIds.has(item.id)}
+                isSelecting={isMsgSelecting}
+                isDeleted={isDeleted}
+                onMsgPress={handleMsgPress}
+                onMsgLongPress={handleMsgLongPress}
+                onReact={handleReact}
+                myUid={myUid}
+                showReactionBar={activeReactionMsgId === item.id}
+                onToggleReaction={handleToggleReaction}
               />
             );
           }}
@@ -324,7 +512,7 @@ export default function ChatDetailScreen() {
               placeholder="Mesaj"
               placeholderTextColor={c.textMuted}
               value={text}
-              onChangeText={setText}
+              onChangeText={setTextSync}
               onFocus={handleInputFocus}
               multiline
               maxLength={500}
@@ -483,7 +671,72 @@ export default function ChatDetailScreen() {
   );
 }
 
-function Bubble({
+const BubbleWrapper = memo(function BubbleWrapper({
+  item,
+  fromMe,
+  isFirstOfGroup,
+  isLastOfGroup,
+  avatar,
+  colors,
+  timeStr,
+  senderVip,
+  selected,
+  isSelecting,
+  isDeleted,
+  onMsgPress,
+  onMsgLongPress,
+  onReact,
+  myUid,
+  showReactionBar,
+  onToggleReaction,
+}: {
+  item: ChatMessage;
+  fromMe: boolean;
+  isFirstOfGroup: boolean;
+  isLastOfGroup: boolean;
+  avatar: string | null;
+  colors: any;
+  timeStr: string;
+  senderVip: boolean;
+  selected: boolean;
+  isSelecting: boolean;
+  isDeleted: boolean;
+  onMsgPress: (id: string) => void;
+  onMsgLongPress: (id: string) => void;
+  onReact: (id: string, emoji: string) => void;
+  myUid: string;
+  showReactionBar: boolean;
+  onToggleReaction: (id: string) => void;
+}) {
+  const handlePress = useCallback(() => onMsgPress(item.id), [item.id, onMsgPress]);
+  const handleLongPress = useCallback(() => onMsgLongPress(item.id), [item.id, onMsgLongPress]);
+  const handleReact = useCallback((emoji: string) => onReact(item.id, emoji), [item.id, onReact]);
+  const handleToggle = useCallback(() => onToggleReaction(item.id), [item.id, onToggleReaction]);
+
+  return (
+    <Bubble
+      msg={item}
+      fromMe={fromMe}
+      isFirstOfGroup={isFirstOfGroup}
+      isLastOfGroup={isLastOfGroup}
+      avatar={avatar}
+      colors={colors}
+      timeStr={timeStr}
+      senderVip={senderVip}
+      selected={selected}
+      isSelecting={isSelecting}
+      isDeleted={isDeleted}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      onReact={handleReact}
+      myUid={myUid}
+      showReactionBar={showReactionBar}
+      onToggleReactionBar={handleToggle}
+    />
+  );
+});
+
+const Bubble = memo(function Bubble({
   msg,
   fromMe,
   isFirstOfGroup,
@@ -492,6 +745,15 @@ function Bubble({
   colors: c,
   timeStr,
   senderVip = false,
+  selected = false,
+  isSelecting = false,
+  isDeleted = false,
+  onPress,
+  onLongPress,
+  onReact,
+  myUid,
+  showReactionBar = false,
+  onToggleReactionBar,
 }: {
   msg: ChatMessage;
   fromMe: boolean;
@@ -501,6 +763,15 @@ function Bubble({
   colors: any;
   timeStr: string;
   senderVip?: boolean;
+  selected?: boolean;
+  isSelecting?: boolean;
+  isDeleted?: boolean;
+  onPress?: () => void;
+  onLongPress?: () => void;
+  onReact?: (emoji: string) => void;
+  myUid?: string;
+  showReactionBar?: boolean;
+  onToggleReactionBar?: () => void;
 }) {
   const router = useRouter();
   const tailRadius = 6;
@@ -520,13 +791,45 @@ function Bubble({
         borderBottomRightRadius: fullRadius,
       };
 
+  const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+  const reactions = msg.reactions ?? [];
+
   return (
-    <Animated.View
-      entering={FadeInDown.duration(220)}
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={150}
+      style={{ backgroundColor: selected ? `${c.primary}15` : "transparent", borderRadius: 4 }}
+    >
+    {/* Emoji reaction bar — mesajin ustunde */}
+    {showReactionBar && !isDeleted && (
+      <Animated.View
+        entering={FadeIn.duration(120)}
+        style={[
+          styles.reactionBar,
+          fromMe ? { alignSelf: "flex-end", marginRight: 36 } : { alignSelf: "flex-start", marginLeft: 36 },
+        ]}
+      >
+        {QUICK_EMOJIS.map((emoji) => (
+          <Pressable
+            key={emoji}
+            onPress={() => {
+              onReact?.(emoji);
+              onToggleReactionBar?.(); // kapat
+            }}
+            style={styles.reactionBarItem}
+          >
+            <Text style={{ fontSize: 22 }}>{emoji}</Text>
+          </Pressable>
+        ))}
+      </Animated.View>
+    )}
+    <View
       style={[
         styles.bubbleRow,
         fromMe ? styles.bubbleRowMe : styles.bubbleRowOther,
-        { marginTop: isFirstOfGroup ? 8 : 2, marginBottom: isLastOfGroup ? 4 : 1 },
+        { marginTop: isFirstOfGroup ? 8 : 2, marginBottom: (isLastOfGroup || reactions.length > 0) ? 4 : 1 },
       ]}
     >
       {!fromMe && (
@@ -537,7 +840,66 @@ function Bubble({
         </View>
       )}
 
-      {msg.sharedPost ? (
+      {/* Emoji trigger icon — fromMe ise solda */}
+      {fromMe && !isDeleted && !isSelecting && (
+        <Pressable
+          onPress={onToggleReactionBar}
+          hitSlop={6}
+          style={styles.emojiTrigger}
+        >
+          <Ionicons name="happy-outline" size={16} color={c.textMuted} style={{ opacity: 0.5 }} />
+        </Pressable>
+      )}
+
+      {msg.storyReply ? (
+        <Pressable
+          onPress={() => router.push(`/story/${msg.storyReply!.storyOwnerId}` as any)}
+          style={[
+            styles.storyReplyBubble,
+            fromMe
+              ? { backgroundColor: c.primary, alignSelf: "flex-end" }
+              : { backgroundColor: c.surface, alignSelf: "flex-start" },
+            bubbleRadius,
+          ]}
+        >
+          {/* Story thumbnail */}
+          <View style={styles.storyReplyPreview}>
+            <Image
+              source={{ uri: msg.storyReply!.storyImageUrl }}
+              style={styles.storyReplyImage}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.5)"]}
+              style={styles.storyReplyGradient}
+            />
+            <View style={styles.storyReplyLabel}>
+              <Ionicons name="play-circle-outline" size={14} color="#fff" />
+              <Text style={styles.storyReplyLabelText}>Hikaye</Text>
+            </View>
+          </View>
+          {/* Reply text/emoji */}
+          <View style={styles.storyReplyContent}>
+            {msg.storyReply!.isEmoji ? (
+              <Text style={{ fontSize: 28 }}>{msg.text}</Text>
+            ) : (
+              <Text style={[styles.bubbleText, { color: fromMe ? "#fff" : c.text }]}>{msg.text}</Text>
+            )}
+            <View style={styles.metaRow}>
+              <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]}>
+                {timeStr}
+              </Text>
+              {fromMe && msg.status && (
+                <Ionicons
+                  name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                  size={14}
+                  color={msg.status === "read" ? "#7DD3FC" : fromMe ? "rgba(255,255,255,0.7)" : c.textMuted}
+                />
+              )}
+            </View>
+          </View>
+        </Pressable>
+      ) : msg.sharedPost ? (
         <Pressable
           onPress={() => {
             router.push("/(tabs)/posts" as any);
@@ -644,12 +1006,16 @@ function Bubble({
           style={[
             styles.bubble,
             fromMe
-              ? { backgroundColor: c.primary, alignSelf: "flex-end" }
-              : { backgroundColor: c.surface, alignSelf: "flex-start" },
+              ? { backgroundColor: isDeleted ? `${c.primary}60` : c.primary, alignSelf: "flex-end" }
+              : { backgroundColor: isDeleted ? `${c.surface}80` : c.surface, alignSelf: "flex-start" },
             bubbleRadius,
           ]}
         >
-          <Text style={[styles.bubbleText, { color: fromMe ? "#fff" : c.text }]}>{msg.text}</Text>
+          <Text style={[
+            styles.bubbleText,
+            { color: fromMe ? "#fff" : c.text },
+            isDeleted && { fontStyle: "italic", opacity: 0.7 },
+          ]}>{msg.text}</Text>
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]}>
               {timeStr}
@@ -664,9 +1030,47 @@ function Bubble({
           </View>
         </View>
       )}
-    </Animated.View>
+
+      {/* Emoji trigger icon — karsi taraf mesaji ise sagda */}
+      {!fromMe && !isDeleted && !isSelecting && (
+        <Pressable
+          onPress={onToggleReactionBar}
+          hitSlop={6}
+          style={styles.emojiTrigger}
+        >
+          <Ionicons name="happy-outline" size={16} color={c.textMuted} style={{ opacity: 0.5 }} />
+        </Pressable>
+      )}
+    </View>
+    {/* Reactions display — bubble altinda */}
+    {reactions.length > 0 && (
+      <View style={[
+        styles.reactionsRow,
+        fromMe ? { alignSelf: "flex-end", marginRight: 8 } : { alignSelf: "flex-start", marginLeft: 36 },
+      ]}>
+        {(() => {
+          // Emoji'leri grupla
+          const grouped = new Map<string, number>();
+          reactions.forEach((r) => grouped.set(r.emoji, (grouped.get(r.emoji) ?? 0) + 1));
+          return [...grouped.entries()].map(([emoji, count]) => (
+            <Pressable
+              key={emoji}
+              onPress={() => onReact?.(emoji)}
+              style={[
+                styles.reactionChip,
+                { backgroundColor: c.surface, borderColor: reactions.some(r => r.userId === myUid && r.emoji === emoji) ? c.primary : c.border },
+              ]}
+            >
+              <Text style={{ fontSize: 13 }}>{emoji}</Text>
+              {count > 1 && <Text style={[styles.reactionCount, { color: c.textMuted }]}>{count}</Text>}
+            </Pressable>
+          ));
+        })()}
+      </View>
+    )}
+    </Pressable>
   );
-}
+});
 
 function PanelToggleIcon({
   panelOpen,
@@ -929,6 +1333,48 @@ const styles = StyleSheet.create({
   },
   attachLabel: { fontSize: 12, fontWeight: "500" },
 
+  // Story reply bubble
+  storyReplyBubble: {
+    width: 200,
+    overflow: "hidden",
+    marginHorizontal: 4,
+  },
+  storyReplyPreview: {
+    width: 200,
+    height: 180,
+    position: "relative",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: "hidden",
+  },
+  storyReplyImage: {
+    width: "100%",
+    height: "100%",
+  },
+  storyReplyGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 50,
+  },
+  storyReplyLabel: {
+    position: "absolute",
+    bottom: 6,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  storyReplyLabelText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  storyReplyContent: {
+    padding: 10,
+  },
+
   // Shared post bubble
   sharedPostBubble: {
     maxWidth: "78%",
@@ -987,4 +1433,45 @@ const styles = StyleSheet.create({
   },
   giftBubblePriceText: { fontSize: 12, fontWeight: "600" },
   giftBubbleTag: { fontSize: 11.5, fontWeight: "700", marginTop: 4 },
+
+  // Emoji trigger icon
+  emojiTrigger: {
+    padding: 4,
+    alignSelf: "center",
+    marginHorizontal: 2,
+  },
+
+  // Emoji reactions
+  reactionBar: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.85)",
+    borderRadius: 24,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginBottom: 4,
+    gap: 2,
+  },
+  reactionBarItem: {
+    padding: 4,
+    paddingHorizontal: 6,
+  },
+  reactionsRow: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: -2,
+    marginBottom: 2,
+  },
+  reactionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  reactionCount: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
 });

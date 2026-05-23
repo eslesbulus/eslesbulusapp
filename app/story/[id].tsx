@@ -54,7 +54,7 @@ export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { users } = useUsers();
+  const { users, loading: usersLoading } = useUsers();
   const { storiesByUser, storyUserIds, likeStory, replyToStory, loading: storiesLoading } = useStories();
   const { profile } = useAuth();
   const { balance: tokenBalance } = useCoins();
@@ -301,7 +301,7 @@ export default function StoryScreen() {
     advance();
   }
 
-  if (storiesLoading) {
+  if (storiesLoading || usersLoading) {
     return (
       <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
@@ -401,8 +401,8 @@ export default function StoryScreen() {
       </GestureDetector>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -100}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
         style={[
           styles.reactions,
           { paddingBottom: insets.bottom + 10 },

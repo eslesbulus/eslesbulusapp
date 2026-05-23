@@ -31,6 +31,7 @@ import { ProfileCardList } from "@/components/discover/ProfileCardList";
 import { SentToast } from "@/components/discover/SentToast";
 import { FilterSheet } from "@/components/discover/FilterSheet";
 import { NotificationsPopup } from "@/components/discover/NotificationsPopup";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function DiscoverScreen() {
   const { theme, mode } = useTheme();
@@ -58,7 +59,7 @@ export default function DiscoverScreen() {
   } | null>(null);
 
   const filterCount = activeFilterCount(filters);
-  const unreadNotifs = 0; // notifications backend pending
+  const { unreadCount: unreadNotifs } = useNotifications();
 
   const { users } = useUsers(filters);
 

@@ -10,6 +10,7 @@ export type Post = {
   createdAt: Date;
   archived: boolean;
   likesCount: number;
+  commentsCount: number;
 };
 
 export type PostComment = {
@@ -19,6 +20,8 @@ export type PostComment = {
   userPhoto: string;
   text: string;
   createdAt: Date;
+  replyTo?: string | null;
+  replyToUserName?: string;
 };
 
 export function usePosts(userId?: string) {
@@ -40,6 +43,7 @@ export function usePosts(userId?: string) {
         createdAt: new Date(d.createdAt),
         archived: d.archived ?? false,
         likesCount: d.likesCount ?? 0,
+        commentsCount: d.commentsCount ?? (d.comments ? d.comments.length : 0),
       }));
       setPosts(list);
 
@@ -116,14 +120,25 @@ export function usePostComments(postId: string | null) {
     api.get<any>(`/api/posts/${postId}`)
       .then((post) => {
         if (cancelled) return;
-        const list: PostComment[] = (post.comments ?? []).map((c: any) => ({
-          id: c._id || String(Math.random()),
-          userId: c.userId ?? "",
-          userName: c.userName ?? "",
-          userPhoto: c.userPhoto ?? "",
-          text: c.text ?? "",
-          createdAt: new Date(c.createdAt),
-        }));
+        const rawComments = post.comments ?? [];
+        const list: PostComment[] = rawComments.map((c: any) => {
+          // replyTo varsa parent yorumun kullanıcı adını bul
+          let replyToUserName: string | undefined;
+          if (c.replyTo) {
+            const parent = rawComments.find((p: any) => (p._id || p.id) === c.replyTo);
+            replyToUserName = parent?.userName || undefined;
+          }
+          return {
+            id: c._id || String(Math.random()),
+            userId: c.userId ?? "",
+            userName: c.userName ?? "",
+            userPhoto: c.userPhoto ?? "",
+            text: c.text ?? "",
+            createdAt: new Date(c.createdAt),
+            replyTo: c.replyTo ?? null,
+            replyToUserName,
+          };
+        });
         setComments(list);
         setLoading(false);
       })
@@ -131,9 +146,9 @@ export function usePostComments(postId: string | null) {
     return () => { cancelled = true; };
   }, [postId]);
 
-  const addComment = useCallback(async (text: string) => {
+  const addComment = useCallback(async (text: string, replyTo?: string, replyToUserName?: string) => {
     if (!user || !postId) return;
-    const result = await api.post<any>(`/api/posts/${postId}/comment`, { text });
+    const result = await api.post<any>(`/api/posts/${postId}/comment`, { text, replyTo: replyTo || null });
     setComments((prev) => [...prev, {
       id: result._id || String(Date.now()),
       userId: user.uid,
@@ -141,6 +156,8 @@ export function usePostComments(postId: string | null) {
       userPhoto: profile?.photoURL ?? "",
       text,
       createdAt: new Date(),
+      replyTo: replyTo || null,
+      replyToUserName,
     }]);
   }, [user, postId, profile]);
 

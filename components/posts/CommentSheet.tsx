@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,6 @@ import Animated, {
   withSpring,
   withSequence,
   FadeIn,
-  FadeInDown,
   Easing,
 } from "react-native-reanimated";
 import { useAuth } from "@/context/AuthContext";
@@ -31,6 +30,7 @@ import { usePostComments, type PostComment } from "@/hooks/usePosts";
 import { formatTimeAgo } from "@/constants/mockPosts";
 
 const { height: H } = Dimensions.get("window");
+const SHEET_HEIGHT = H * 0.65; // Sabit yukseklik — ekranin %65'i
 
 type Props = {
   postId: string | null;
@@ -46,6 +46,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
   const { comments, addComment } = usePostComments(visible ? postId : null);
   const [text, setText] = useState("");
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [replyingTo, setReplyingTo] = useState<PostComment | null>(null);
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList>(null);
 
@@ -74,13 +75,15 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
     if (visible) {
       setText("");
       setLikedIds(new Set());
+      setReplyingTo(null);
     }
   }, [postId, visible]);
 
   async function handleSend() {
     if (!text.trim()) return;
-    await addComment(text.trim());
+    await addComment(text.trim(), replyingTo?.id, replyingTo?.userName);
     setText("");
+    setReplyingTo(null);
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
   }
 
@@ -93,8 +96,14 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
     });
   }
 
+  const handleReply = useCallback((comment: PostComment) => {
+    setReplyingTo(comment);
+    inputRef.current?.focus();
+  }, []);
+
   function handleClose() {
     Keyboard.dismiss();
+    setReplyingTo(null);
     onClose();
   }
 
@@ -128,7 +137,9 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
 
           <View style={[styles.sheetHeader, { borderBottomColor: c.border }]}>
             <View style={{ width: 22 }} />
-            <Text style={[styles.sheetTitle, { color: c.text }]}>Yorumlar</Text>
+            <Text style={[styles.sheetTitle, { color: c.text }]}>
+              Yorumlar{comments.length > 0 ? ` (${comments.length})` : ""}
+            </Text>
             <Pressable onPress={handleClose} hitSlop={10}>
               <Ionicons name="close" size={22} color={c.textMuted} />
             </Pressable>
@@ -156,10 +167,27 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
                 item={item}
                 liked={likedIds.has(item.id)}
                 onLike={() => toggleLikeComment(item.id)}
+                onReply={() => handleReply(item)}
                 colors={c}
               />
             )}
           />
+
+          {/* Reply banner */}
+          {replyingTo && (
+            <View style={[styles.replyBanner, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+              <View style={styles.replyBannerContent}>
+                <Ionicons name="arrow-undo" size={14} color={c.primary} />
+                <Text style={[styles.replyBannerText, { color: c.textMuted }]} numberOfLines={1}>
+                  <Text style={{ fontWeight: "700", color: c.text }}>{replyingTo.userName}</Text>
+                  {" "}adlı kişiye yanıt veriyorsun
+                </Text>
+              </View>
+              <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
+                <Ionicons name="close" size={18} color={c.textMuted} />
+              </Pressable>
+            </View>
+          )}
 
           <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card }]}>
             {userPhoto ? <Image source={{ uri: userPhoto }} style={styles.inputAvatar} /> : null}
@@ -167,7 +195,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
               <TextInput
                 ref={inputRef}
                 style={[styles.input, { color: c.text }]}
-                placeholder={`${postUserName ?? ""} gönderisine yorum yaz...`}
+                placeholder={replyingTo ? `@${replyingTo.userName} yanıtla...` : `${postUserName ?? ""} gönderisine yorum yaz...`}
                 placeholderTextColor={c.textMuted}
                 value={text}
                 onChangeText={setText}
@@ -191,11 +219,13 @@ function CommentRow({
   item,
   liked,
   onLike,
+  onReply,
   colors: c,
 }: {
   item: PostComment;
   liked: boolean;
   onLike: () => void;
+  onReply: () => void;
   colors: any;
 }) {
   const heartScale = useSharedValue(1);
@@ -211,16 +241,21 @@ function CommentRow({
     onLike();
   }
 
+  const isReply = !!item.replyTo;
+
   return (
-    <View style={styles.commentRow}>
+    <View style={[styles.commentRow, isReply && styles.commentRowReply]}>
       {item.userPhoto ? (
-        <Image source={{ uri: item.userPhoto }} style={styles.commentAvatar} />
+        <Image source={{ uri: item.userPhoto }} style={[styles.commentAvatar, isReply && styles.commentAvatarSmall]} />
       ) : (
-        <View style={[styles.commentAvatar, { backgroundColor: "#ddd" }]} />
+        <View style={[styles.commentAvatar, isReply && styles.commentAvatarSmall, { backgroundColor: "#ddd" }]} />
       )}
       <View style={styles.commentBody}>
         <Text style={styles.commentLine}>
           <Text style={[styles.commentName, { color: c.text }]}>{item.userName} </Text>
+          {item.replyToUserName && (
+            <Text style={{ color: c.primary, fontWeight: "600", fontSize: 13 }}>@{item.replyToUserName} </Text>
+          )}
           <Text style={[styles.commentText, { color: c.text }]}>{item.text}</Text>
         </Text>
         <View style={styles.commentMeta}>
@@ -228,6 +263,9 @@ function CommentRow({
             {formatTimeAgo(item.createdAt)}
           </Text>
           {liked && <Text style={[styles.metaText, { color: c.textMuted }]}>1 beğeni</Text>}
+          <Pressable onPress={onReply} hitSlop={8}>
+            <Text style={[styles.metaText, { color: c.textMuted, fontWeight: "700" }]}>Yanıtla</Text>
+          </Pressable>
         </View>
       </View>
       <Pressable onPress={handleLike} hitSlop={10} style={styles.likeBtn}>
@@ -247,7 +285,7 @@ const styles = StyleSheet.create({
   kavWrap: { flex: 1, justifyContent: "flex-end" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   sheet: {
-    height: H * 0.78,
+    maxHeight: SHEET_HEIGHT,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
   },
@@ -280,7 +318,11 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
+  commentRowReply: {
+    marginLeft: 32,
+  },
   commentAvatar: { width: 32, height: 32, borderRadius: 16, marginTop: 2 },
+  commentAvatarSmall: { width: 26, height: 26, borderRadius: 13 },
   commentBody: { flex: 1, paddingRight: 8 },
   commentLine: { fontSize: 13.5, lineHeight: 19 },
   commentName: { fontWeight: "700" },
@@ -298,6 +340,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
   },
+  replyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  replyBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  replyBannerText: { fontSize: 12.5 },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",

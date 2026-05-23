@@ -183,6 +183,11 @@ export function PostCard({
 
         <Pressable style={styles.actionBtn} onPress={() => onPressComment(post)}>
           <Ionicons name="chatbubble-outline" size={21} color={c.textMuted} />
+          {post.commentsCount > 0 && (
+            <Text style={[styles.actionCount, { color: c.textMuted }]}>
+              {post.commentsCount}
+            </Text>
+          )}
         </Pressable>
 
         <Pressable style={styles.actionBtn} onPress={() => onPressShare(post)}>

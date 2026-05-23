@@ -13,8 +13,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
-import { MOCK_NOTIFS, Notif, notifLabel } from "@/constants/notifications";
-import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { useNotifications, type NotificationData } from "@/hooks/useNotifications";
+import { notifLabel, formatNotifTime } from "@/constants/notifications";
+import { usePremium } from "@/context/PremiumContext";
 
 type Props = {
   visible: boolean;
@@ -29,7 +30,8 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
   const { theme, mode } = useTheme();
   const router = useRouter();
   const c = theme.colors;
-  const unread = MOCK_NOTIFS.filter((n) => !n.read).length;
+  const { isPremium } = usePremium();
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
 
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -45,7 +47,6 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
     }
   }, [visible]);
 
-  // Üst-sağdan açılır his — transform-origin yok, translateX+Y offset ile fake et
   const panelStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
@@ -59,10 +60,36 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
     opacity: interpolate(progress.value, [0, 1], [0, 1]),
   }));
 
-  function handlePress(n: Notif) {
+  function handlePress(n: NotificationData) {
+    markRead(n.id);
     onClose();
-    setTimeout(() => router.push(`/user/${n.userId}`), 240);
+    setTimeout(() => {
+      switch (n.type) {
+        case "message":
+        case "story_reply":
+          router.push(`/chat/${n.fromUid}`);
+          break;
+        case "like":
+        case "profile_view":
+        case "hi":
+          router.push(`/user/${n.fromUid}`);
+          break;
+        case "match":
+          router.push("/(tabs)/matches");
+          break;
+        case "story_view":
+          if (n.storyId) router.push(`/story/${n.storyId}`);
+          else router.push(`/user/${n.fromUid}`);
+          break;
+      }
+    }, 240);
   }
+
+  // Premium olmayan kullanıcılar için fotoğraf bulanıklaştır
+  const shouldBlurPhoto = (n: NotificationData) => {
+    if (isPremium) return false;
+    return n.type === "profile_view" || n.type === "like";
+  };
 
   if (!mounted) return null;
 
@@ -90,26 +117,33 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
           <View style={styles.titleRow}>
             <Ionicons name="notifications" size={18} color={c.primary} />
             <Text style={[styles.title, { color: c.text }]}>Bildirimler</Text>
-            {unread > 0 && (
+            {unreadCount > 0 && (
               <View style={[styles.unreadPill, { backgroundColor: c.primary }]}>
-                <Text style={styles.unreadText}>{unread}</Text>
+                <Text style={styles.unreadText}>{unreadCount}</Text>
               </View>
             )}
           </View>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <Ionicons name="close" size={20} color={c.textMuted} />
-          </Pressable>
+          <View style={styles.headerRight}>
+            {unreadCount > 0 && (
+              <Pressable onPress={markAllRead} hitSlop={10} style={styles.readAllBtn}>
+                <Ionicons name="checkmark-done" size={18} color={c.primary} />
+              </Pressable>
+            )}
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={20} color={c.textMuted} />
+            </Pressable>
+          </View>
         </View>
 
         <FlatList
-          data={MOCK_NOTIFS}
+          data={notifications}
           keyExtractor={(it) => it.id}
           ItemSeparatorComponent={() => <View style={[styles.sep, { backgroundColor: c.border }]} />}
           contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
-            // Backend pending — render placeholder using only notif metadata.
-            const u = { name: "Bilinmeyen", photo: "", verified: false };
             const lbl = notifLabel(item.type);
+            const blurred = shouldBlurPhoto(item);
+
             return (
               <Animated.View entering={FadeIn.delay(80 + index * 35).duration(280)}>
                 <Pressable
@@ -127,7 +161,21 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
                   ]}
                 >
                   <View style={styles.avatarWrap}>
-                    <Image source={{ uri: u.photo }} style={styles.avatar} />
+                    {item.fromPhoto ? (
+                      <View>
+                        <Image source={{ uri: item.fromPhoto }} style={styles.avatar} />
+                        {blurred && (
+                          <BlurView
+                            intensity={20}
+                            style={[styles.avatar, StyleSheet.absoluteFill]}
+                          />
+                        )}
+                      </View>
+                    ) : (
+                      <View style={[styles.avatar, { backgroundColor: c.border }]}>
+                        <Ionicons name="person" size={20} color={c.textMuted} />
+                      </View>
+                    )}
                     <View
                       style={[
                         styles.typeBadge,
@@ -141,18 +189,30 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
                   <View style={{ flex: 1 }}>
                     <View style={styles.lineRow}>
                       <Text style={[styles.userName, { color: c.text }]} numberOfLines={1}>
-                        {u.name}
+                        {blurred && !isPremium ? "???" : item.fromName}
                       </Text>
-                      {u.verified && <VerifiedBadge size={12} />}
                       <Text style={[styles.action, { color: c.textMuted }]} numberOfLines={1}>
                         {" "}
                         {lbl.text}
                       </Text>
                     </View>
-                    <Text style={[styles.time, { color: c.textMuted }]}>{item.time}</Text>
+                    {item.text ? (
+                      <Text style={[styles.msgPreview, { color: c.textMuted }]} numberOfLines={1}>
+                        {item.text}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.time, { color: c.textMuted }]}>
+                      {formatNotifTime(item.createdAt)}
+                    </Text>
                   </View>
 
                   {!item.read && <View style={[styles.dot, { backgroundColor: c.primary }]} />}
+
+                  {blurred && !isPremium && (
+                    <View style={[styles.lockBadge, { backgroundColor: c.primary }]}>
+                      <Ionicons name="lock-closed" size={10} color="#fff" />
+                    </View>
+                  )}
                 </Pressable>
               </Animated.View>
             );
@@ -191,6 +251,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  readAllBtn: { padding: 2 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontSize: 16, fontWeight: "800" },
   unreadPill: {
@@ -206,7 +268,14 @@ const styles = StyleSheet.create({
   sep: { height: 1, marginHorizontal: 14 },
   item: { flexDirection: "row", alignItems: "center", padding: 12, paddingHorizontal: 14, gap: 12 },
   avatarWrap: { width: 44, height: 44, position: "relative" },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
   typeBadge: {
     position: "absolute",
     right: -4,
@@ -221,8 +290,16 @@ const styles = StyleSheet.create({
   lineRow: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   userName: { fontSize: 14, fontWeight: "700", maxWidth: "60%" },
   action: { fontSize: 13, fontWeight: "500", flex: 1 },
+  msgPreview: { fontSize: 12, fontWeight: "400", marginTop: 1 },
   time: { fontSize: 11, fontWeight: "500", marginTop: 2 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  lockBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   empty: { alignItems: "center", padding: 40, gap: 10 },
   emptyText: { fontSize: 14, fontWeight: "600" },
 });

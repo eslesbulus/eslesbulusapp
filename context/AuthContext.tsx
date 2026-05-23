@@ -133,8 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(data.profile);
           setLoading(false);
           // Connect Socket.IO
-          connectSocket().catch((e) => {
-            if (__DEV__) console.warn("[Socket] connect failed:", e.message);
+          connectSocket().catch(() => {
+            // Socket reconnect otomatik, ilk bağlantı hatası sessiz
           });
         }
       } catch (err) {
