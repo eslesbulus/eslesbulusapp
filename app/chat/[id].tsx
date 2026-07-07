@@ -44,6 +44,7 @@ import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@/hooks/useUser";
+import { useAppConfig } from "@/hooks/useAppConfig";
 import { api } from "@/config/api";
 import { useChat, type ChatMessage, type ReplyToData } from "@/hooks/useChat";
 import { useChats, setActiveChat } from "@/hooks/useChats";
@@ -122,6 +123,7 @@ export default function ChatDetailScreen() {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const { balance: tokenBalance, spend: spendTokens } = useCoins();
   const { isPremium } = usePremium();
+  const { callsEnabled } = useAppConfig();
   const { profile } = useAuth();
   const myVip = profile?.vip ?? isPremium;
   const otherVip = user?.vip ?? false;
@@ -489,12 +491,16 @@ export default function ChatDetailScreen() {
             <Text style={styles.tokenPillText}>🪙 {tokenBalance}</Text>
           </Pressable>
 
-          <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=video`)}>
-            <Ionicons name="videocam-outline" size={22} color={c.text} />
-          </Pressable>
-          <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=voice`)}>
-            <Ionicons name="call-outline" size={20} color={c.text} />
-          </Pressable>
+          {callsEnabled && (
+            <>
+              <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=video`)}>
+                <Ionicons name="videocam-outline" size={22} color={c.text} />
+              </Pressable>
+              <Pressable hitSlop={8} style={styles.headerBtn} onPress={() => router.push(`/call/${user.uid}?type=voice`)}>
+                <Ionicons name="call-outline" size={20} color={c.text} />
+              </Pressable>
+            </>
+          )}
         </View>
       )}
 

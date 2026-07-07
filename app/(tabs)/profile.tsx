@@ -384,6 +384,13 @@ export default function ProfileScreen() {
           visible={verificationOpen}
           onClose={() => setVerificationOpen(false)}
           colors={c}
+          currentStatus={
+            profile?.verified
+              ? "approved"
+              : ((profile as any)?.verificationStatus === "none" || !(profile as any)?.verificationStatus)
+              ? "idle"
+              : (profile as any).verificationStatus
+          }
         />
 
         {/* ── Sorun Bildir Modal ── */}

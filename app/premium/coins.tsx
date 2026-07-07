@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import Animated, { FadeInDown, FadeInUp, ZoomIn } from "react-native-reanimated"
 import { useRouter } from "expo-router";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const COIN = "#F59E0B";
@@ -131,8 +132,24 @@ export default function CoinsScreen() {
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState("pack_500");
   const [loading, setLoading] = useState(false);
+  const { coinPackages: cfgCoins } = useAppConfig();
 
-  const selectedPkg = COIN_PACKAGES.find((p) => p.id === selected)!;
+  // Paketler admin panelden yönetilir; boşsa yerel varsayılana düş
+  const packages = useMemo(() => {
+    if (!cfgCoins || cfgCoins.length === 0) return COIN_PACKAGES;
+    return cfgCoins.map((p, i) => ({
+      id: p.id,
+      tokens: p.tokens,
+      price: p.price,
+      messages: p.messages ?? Math.round((p.tokens || 0) / (TOKENS_PER_MESSAGE || 10)),
+      badge: p.popular ? "En Popüler" : p.bonus ? "En İyi Değer" : null,
+      popular: !!p.popular,
+      bonus: p.bonus || null,
+      coinCount: (i === 0 ? 1 : i === 1 ? 3 : "chest") as 1 | 3 | "chest",
+    }));
+  }, [cfgCoins]);
+
+  const selectedPkg = packages.find((p) => p.id === selected) ?? packages[0];
 
   async function handlePurchase() {
     Alert.alert(
@@ -247,7 +264,7 @@ export default function CoinsScreen() {
         >
           <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>Paket Seç</Text>
 
-          {COIN_PACKAGES.map((pkg) => {
+          {packages.map((pkg) => {
             const isSelected = selected === pkg.id;
             return (
               <Pressable

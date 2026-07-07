@@ -54,6 +54,7 @@ export function VoiceRecorder({
   const [locked, setLocked] = useState(false);
 
   const startedRef = useRef(false);     // record() gerçekten başladı mı
+  const startingRef = useRef(false);    // beginRecording çalışıyor mu (re-entry guard)
   const cancelRef = useRef(false);      // iptal işaretlendi mi
   const lockedRef = useRef(false);
   const startTimeRef = useRef(0);       // kayıt başlangıç zamanı (ms)
@@ -83,6 +84,10 @@ export function VoiceRecorder({
   }
 
   async function beginRecording() {
+    // Aynı anda ikinci bir başlatmayı engelle (gesture birden fazla tetikleyebilir)
+    if (startingRef.current || startedRef.current) return;
+    startingRef.current = true;
+
     cancelRef.current = false;
     lockedRef.current = false;
     pendingStopRef.current = null;
@@ -90,11 +95,18 @@ export function VoiceRecorder({
 
     const ok = await ensurePermission();
     if (!ok) {
+      startingRef.current = false;
       resetAnim();
       return;
     }
     try {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+
+      // Önceki oturum düzgün kapanmadıysa recorder "prepared" durumda kilitli kalır
+      // ve prepareToRecordAsync "already prepared" hatası fırlatır. Her zaman temiz
+      // başlamak için önce olası eski oturumu kapat (idle'da hata verirse yut).
+      try { await recorder.stop(); } catch {}
+
       await recorder.prepareToRecordAsync();
       recorder.record();
       startedRef.current = true;
@@ -110,10 +122,15 @@ export function VoiceRecorder({
         doStop(cancel);
       }
     } catch (e) {
-      console.error("record start error", e);
+      console.warn("record start error", e);
       startedRef.current = false;
       setRecording(false);
       resetAnim();
+      // Recorder'ı serbest bırak ki sonraki denemeler kilitli kalmasın
+      try { await recorder.stop(); } catch {}
+      setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    } finally {
+      startingRef.current = false;
     }
   }
 
@@ -123,13 +140,15 @@ export function VoiceRecorder({
       pendingStopRef.current = { cancel };
       return;
     }
+    // Çift durdurmayı engelle: hemen başlatılmadı olarak işaretle
+    startedRef.current = false;
     const durMs = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
     let uri: string | null = null;
     try {
       await recorder.stop();
       uri = recorder.uri ?? null;
     } catch (e) {
-      console.error("record stop error", e);
+      console.warn("record stop error", e);
     }
     startedRef.current = false;
     setRecording(false);

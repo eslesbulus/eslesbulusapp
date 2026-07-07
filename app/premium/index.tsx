@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import Animated, {
 import { useRouter } from "expo-router";
 import { usePremium, PremiumPlan } from "@/context/PremiumContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const GOLD = "#D4AF37";
@@ -108,6 +109,24 @@ export default function PremiumScreen() {
   const [selected, setSelected] = useState<PremiumPlan>("week");
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState("");
+  const { premiumPlans: cfgPlans } = useAppConfig();
+
+  // Planlar admin panelden yönetilir; boşsa yerel varsayılana düş
+  const packages = useMemo(() => {
+    if (!cfgPlans || cfgPlans.length === 0) return PACKAGES;
+    return cfgPlans.map((p) => {
+      const base = PACKAGES.find((x) => x.id === p.id);
+      return {
+        id: p.id as PremiumPlan,
+        label: p.label || base?.label || p.id,
+        duration: p.duration || base?.duration || "",
+        price: p.price,
+        perDay: p.perDay || base?.perDay || "",
+        badge: p.popular ? "En Popüler" : base?.badge ?? null,
+        popular: !!p.popular,
+      };
+    });
+  }, [cfgPlans]);
 
   useEffect(() => {
     if (!isPremium || !premiumExpiry) { setRemaining(""); return; }
@@ -127,7 +146,7 @@ export default function PremiumScreen() {
   }, [isPremium, premiumExpiry]);
 
   async function handlePurchase() {
-    const pkg = PACKAGES.find((p) => p.id === selected)!;
+    const pkg = packages.find((p) => p.id === selected) ?? packages[0];
     Alert.alert(
       "Premium'a Geç 👑",
       `${pkg.label} paket — ${pkg.price}\n\nSatın almak istiyor musun?`,
@@ -248,7 +267,7 @@ export default function PremiumScreen() {
           <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>Plan Seç</Text>
 
           <View style={styles.packagesRow}>
-            {PACKAGES.map((pkg) => {
+            {packages.map((pkg) => {
               const isSelected = selected === pkg.id;
               return (
                 <Pressable

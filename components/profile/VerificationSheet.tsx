@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { api } from "@/config/api";
 
 type VerificationStatus = "idle" | "pending" | "approved" | "rejected";
 
@@ -49,10 +50,15 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
   async function handleSend() {
     if (!photo) return;
     setSending(true);
-    // Firebase'e bağlandığında buraya upload + Firestore kayıt gelecek
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      // Selfie'yi yükle, sonra doğrulama talebi oluştur
+      const uploaded = await api.upload("verifications", photo, "image");
+      await api.post("/api/users/me/verification", { photo: uploaded.url });
+      setSent(true);
+    } catch (e: any) {
+      Alert.alert("Hata", e?.message ?? "Doğrulama gönderilemedi. Lütfen tekrar dene.");
+    }
     setSending(false);
-    setSent(true);
   }
 
   function handleClose() {
