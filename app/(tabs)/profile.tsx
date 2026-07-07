@@ -571,8 +571,15 @@ function NavRow({
       <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
         <Ionicons name={icon} size={18} color={c.primary} />
       </View>
-      <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>{label}</Text>
-      {value ? <Text style={[styles.rowValue, { color: c.textMuted }]}>{value}</Text> : null}
+      <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{label}</Text>
+      {value ? (
+        <Text
+          style={[styles.rowValue, { color: c.textMuted, flexShrink: 1, textAlign: "right", marginLeft: 8 }]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      ) : null}
       {badge ? (
         <View style={[styles.badge, { backgroundColor: c.primary }]}>
           <Text style={styles.badgeText}>{badge}</Text>
