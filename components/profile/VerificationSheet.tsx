@@ -14,6 +14,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/config/api";
+import { useAuth } from "@/context/AuthContext";
 
 type VerificationStatus = "idle" | "pending" | "approved" | "rejected";
 
@@ -25,6 +26,7 @@ type Props = {
 };
 
 export function VerificationSheet({ visible, onClose, colors: c, currentStatus = "idle" }: Props) {
+  const { refreshProfile } = useAuth();
   const [photo, setPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -55,6 +57,8 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
       const uploaded = await api.upload("verifications", photo, "image");
       await api.post("/api/users/me/verification", { photo: uploaded.url });
       setSent(true);
+      // Profil ekranındaki alt-satır (İnceleniyor…) hemen güncellensin
+      refreshProfile().catch(() => {});
     } catch (e: any) {
       Alert.alert("Hata", e?.message ?? "Doğrulama gönderilemedi. Lütfen tekrar dene.");
     }

@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { api } from "@/config/api";
-import { connectSocket, disconnectSocket } from "@/config/socket";
+import { connectSocket, disconnectSocket, getSocket } from "@/config/socket";
 
 export type UserProfile = {
   uid: string;
@@ -23,6 +24,11 @@ export type UserProfile = {
   verified?: boolean;
   vip?: boolean;
   profileComplete: boolean;
+  // Hesap doğrulama (selfie ile) — admin onaylı
+  verificationStatus?: "none" | "pending" | "approved" | "rejected";
+  verificationPhoto?: string;
+  verificationSubmittedAt?: string | null;
+  verificationNote?: string;
   // Premium
   isPremium?: boolean;
   premiumExpiry?: string | null;
@@ -156,6 +162,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     fetchProfile();
     return () => { cancelled = true; };
+  }, [user, isDevAdmin]);
+
+  // Admin doğrulama onay/red anında yansısın — socket üzerinden dinle.
+  // Backend admin PATCH /verifications/:uid işleminde `verification:update` emit ediyor.
+  useEffect(() => {
+    if (!user || isDevAdmin) return;
+
+    const handler = (data: { status: string; verified: boolean; note?: string }) => {
+      setProfile((prev) => prev ? {
+        ...prev,
+        verified: !!data.verified,
+        verificationStatus: (data.status as UserProfile["verificationStatus"]) ?? prev.verificationStatus,
+        verificationNote: data.note ?? prev.verificationNote,
+      } : prev);
+      if (data.status === "approved") {
+        Alert.alert("Hesabın Doğrulandı ✓", "Tebrikler! Profilinde onay rozeti gösteriliyor.");
+      } else if (data.status === "rejected") {
+        Alert.alert(
+          "Doğrulama Reddedildi",
+          data.note ? `Sebep: ${data.note}` : "Kurallara uygun yeni bir selfie ile tekrar deneyebilirsin."
+        );
+      }
+    };
+
+    // Socket her an yeniden bağlanabilir; polling ile dinleyiciyi güncel tut.
+    let attached: any = null;
+    const attach = () => {
+      const s = getSocket();
+      if (s && s !== attached) {
+        if (attached) attached.off("verification:update", handler);
+        s.off("verification:update", handler);
+        s.on("verification:update", handler);
+        attached = s;
+      }
+    };
+    attach();
+    const interval = setInterval(attach, 2000);
+    return () => {
+      clearInterval(interval);
+      if (attached) attached.off("verification:update", handler);
+    };
   }, [user, isDevAdmin]);
 
   // Safety: if loading hangs >10s, unblock the router.

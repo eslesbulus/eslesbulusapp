@@ -135,6 +135,9 @@ export default function ProfileScreen() {
               {displayName}
               {age ? `, ${age}` : ""}
             </Text>
+            {profile?.verified && (
+              <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />
+            )}
             {isPremium && (
               <View style={styles.vipBadge}>
                 <Ionicons name="diamond" size={10} color="#000" />
@@ -322,8 +325,24 @@ export default function ProfileScreen() {
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
               icon="shield-checkmark-outline"
-              label="Hesabı Doğrula"
-              value="Onaylı rozet kazan"
+              label={
+                profile?.verified
+                  ? "Hesabın Doğrulandı ✓"
+                  : profile?.verificationStatus === "pending"
+                  ? "Doğrulama İnceleniyor…"
+                  : profile?.verificationStatus === "rejected"
+                  ? "Doğrulama Reddedildi"
+                  : "Hesabı Doğrula"
+              }
+              value={
+                profile?.verified
+                  ? "Profilinde onay rozeti gösteriliyor"
+                  : profile?.verificationStatus === "pending"
+                  ? "En geç 24 saat içinde sonuçlanır"
+                  : profile?.verificationStatus === "rejected"
+                  ? "Tekrar denemek için dokun"
+                  : "Onaylı rozet kazan"
+              }
               onPress={() => setVerificationOpen(true)}
               c={c}
             />
@@ -387,7 +406,7 @@ export default function ProfileScreen() {
           currentStatus={
             profile?.verified
               ? "approved"
-              : ((profile as any)?.verificationStatus === "none" || !(profile as any)?.verificationStatus)
+              : (profile?.verificationStatus === "none" || !profile?.verificationStatus)
               ? "idle"
               : (profile as any).verificationStatus
           }
