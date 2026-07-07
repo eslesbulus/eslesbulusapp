@@ -127,21 +127,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function fetchProfile() {
-      try {
-        const data = await api.post<{ uid: string; profile: UserProfile }>("/api/auth/verify");
-        if (!cancelled) {
-          setProfile(data.profile);
-          setLoading(false);
-          // Connect Socket.IO
-          connectSocket().catch(() => {
-            // Socket reconnect otomatik, ilk bağlantı hatası sessiz
-          });
-        }
-      } catch (err) {
-        if (__DEV__) console.error("[Auth] fetch profile error:", err);
-        if (!cancelled) {
-          setProfile(null);
-          setLoading(false);
+      // Ağ hatasında bir kez deneyip pes etmek yerine artan beklemeyle tekrar dene.
+      // Böylece arkadaşının bağlantısı ilk anda takılırsa oturum kalıcı bozulmaz;
+      // ağ gelince profil kendiliğinden yüklenir. profile=null YAPMIYORUZ —
+      // aksi halde kullanıcı yanlışlıkla onboarding'e atılabilir.
+      let attempt = 0;
+      while (!cancelled) {
+        try {
+          const data = await api.post<{ uid: string; profile: UserProfile }>("/api/auth/verify");
+          if (!cancelled) {
+            setProfile(data.profile);
+            setLoading(false);
+            // Connect Socket.IO
+            connectSocket().catch(() => {
+              // Socket reconnect otomatik, ilk bağlantı hatası sessiz
+            });
+          }
+          return; // başarılı
+        } catch (err) {
+          attempt++;
+          if (__DEV__) console.warn(`[Auth] fetch profile error (deneme ${attempt}):`, err);
+          // Artan bekleme: 1s, 2s, 4s, 8s… (max 10s). loading'i güvenlik timeout'u yönetir.
+          const wait = Math.min(1000 * 2 ** (attempt - 1), 10000);
+          await new Promise((r) => setTimeout(r, wait));
         }
       }
     }
