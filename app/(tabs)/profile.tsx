@@ -30,6 +30,7 @@ import { useCoins } from "@/context/CoinsContext";
 import { VerificationSheet } from "@/components/profile/VerificationSheet";
 import { MyPostsSection } from "@/components/profile/MyPostsSection";
 import { usePosts } from "@/hooks/usePosts";
+import { api } from "@/config/api";
 
 const SCREEN_W = Dimensions.get("window").width;
 const PHOTO_GAP = 6;
@@ -84,12 +85,27 @@ export default function ProfileScreen() {
       return;
     }
     setReportSending(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      // Varsa ekran görüntüsünü önce yükle
+      let photoUrl: string | undefined;
+      if (reportPhoto) {
+        const uploaded = await api.upload("reports", reportPhoto, "image");
+        photoUrl = uploaded.url;
+      }
+      await api.post("/api/reports", {
+        type: "support",
+        reason: "Sorun Bildir",
+        details: reportText.trim(),
+        photo: photoUrl,
+      });
+      setReportModalOpen(false);
+      setReportText("");
+      setReportPhoto(null);
+      Alert.alert("Teşekkürler", "Sorun bildiriminiz alındı, en kısa sürede inceleyeceğiz.");
+    } catch (e: any) {
+      Alert.alert("Hata", e?.message ?? "Bildirim gönderilemedi. Tekrar dene.");
+    }
     setReportSending(false);
-    setReportModalOpen(false);
-    setReportText("");
-    setReportPhoto(null);
-    Alert.alert("Teşekkürler", "Sorun bildiriminiz alındı, en kısa sürede inceleyeceğiz.");
   }
 
   function handleLogout() {

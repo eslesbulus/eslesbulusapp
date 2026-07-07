@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
+import { api } from "@/config/api";
 
 const { height: H } = Dimensions.get("window");
 
@@ -84,8 +85,22 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
     }
   }
 
-  function handleReport(reason: string) {
+  async function handleReport(reason: string) {
+    // Backend'e gerçekten gönder — admin panel /reports listesine düşer.
+    // Optimistik olarak "done" ekranını göster; hata olursa bilgilendir.
     setStep("done");
+    try {
+      await api.post("/api/reports", {
+        type,
+        reason,
+        reportedUid: type === "user" ? targetId : undefined,
+        reportedPostId: type === "post" ? targetId : undefined,
+      });
+    } catch (e: any) {
+      handleClose();
+      Alert.alert("Hata", e?.message ?? "Şikayet gönderilemedi. Tekrar dene.");
+      return;
+    }
     setTimeout(() => {
       handleClose();
       Alert.alert("Şikayet Alındı", "Şikayetin incelemeye alındı. Teşekkürler.");

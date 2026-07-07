@@ -285,7 +285,9 @@ const styles = StyleSheet.create({
   kavWrap: { flex: 1, justifyContent: "flex-end" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   sheet: {
-    maxHeight: SHEET_HEIGHT,
+    // maxHeight yerine sabit height ver — aksi halde FlatList `flex:1` parent
+    // yüksekliği belirsiz olduğu için 0 yükseklik alır ve yorumlar görünmez.
+    height: SHEET_HEIGHT,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
   },
