@@ -1,6 +1,6 @@
 import { auth } from "./firebase";
 
-const BASE_URL = "http://178.251.238.228";
+const BASE_URL = "https://api.eslesbulus.com";
 
 async function getToken(): Promise<string> {
   const user = auth.currentUser;
@@ -48,13 +48,31 @@ export const api = {
   delete: <T = any>(path: string) =>
     apiFetch<T>(path, { method: "DELETE" }),
 
-  /** Upload a file (image) — uses FormData, not JSON */
-  upload: async (folder: string, uri: string): Promise<{ url: string; filename: string }> => {
+  /** Upload a file (image / video / audio) — uses FormData, not JSON */
+  upload: async (
+    folder: string,
+    uri: string,
+    kind: "image" | "video" | "audio" = "image"
+  ): Promise<{ url: string; filename: string; type?: string }> => {
     const token = await getToken();
     const formData = new FormData();
-    const filename = uri.split("/").pop() || "photo.jpg";
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : "image/jpeg";
+    let filename = uri.split("/").pop() || "file";
+    const ext = (/\.(\w+)$/.exec(filename)?.[1] || "").toLowerCase();
+
+    // Doğru MIME type belirle — server video/audio'yu mimetype ile ayırt ediyor
+    const MIME: Record<string, string> = {
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", heic: "image/heic",
+      mp4: "video/mp4", mov: "video/quicktime", avi: "video/x-msvideo", mkv: "video/x-matroska", webm: "video/webm",
+      m4a: "audio/m4a", mp3: "audio/mpeg", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", caf: "audio/x-caf", "3gp": "audio/3gpp", amr: "audio/amr",
+    };
+    let type = MIME[ext];
+    if (!type) {
+      // Uzantı yoksa kind'e göre varsayılan ata
+      type = kind === "video" ? "video/mp4" : kind === "audio" ? "audio/m4a" : "image/jpeg";
+      if (!/\.\w+$/.test(filename)) {
+        filename += kind === "video" ? ".mp4" : kind === "audio" ? ".m4a" : ".jpg";
+      }
+    }
 
     formData.append("file", {
       uri,

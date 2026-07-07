@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { auth } from "./firebase";
 
-const BASE_URL = "http://178.251.238.228";
+const BASE_URL = "https://api.eslesbulus.com";
 
 let socket: Socket | null = null;
 let isConnecting = false;

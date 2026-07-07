@@ -31,7 +31,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
   const router = useRouter();
   const c = theme.colors;
   const { isPremium } = usePremium();
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification, clearAll } = useNotifications();
 
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -129,6 +129,11 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
                 <Ionicons name="checkmark-done" size={18} color={c.primary} />
               </Pressable>
             )}
+            {notifications.length > 0 && (
+              <Pressable onPress={clearAll} hitSlop={10} style={styles.readAllBtn}>
+                <Ionicons name="trash-outline" size={17} color={c.textMuted} />
+              </Pressable>
+            )}
             <Pressable onPress={onClose} hitSlop={10}>
               <Ionicons name="close" size={20} color={c.textMuted} />
             </Pressable>
@@ -145,12 +150,13 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
             const blurred = shouldBlurPhoto(item);
 
             return (
-              <Animated.View entering={FadeIn.delay(80 + index * 35).duration(280)}>
+              <Animated.View entering={FadeIn.delay(80 + index * 35).duration(280)} style={styles.itemRow}>
                 <Pressable
                   onPress={() => handlePress(item)}
                   style={({ pressed }) => [
                     styles.item,
                     {
+                      flex: 1,
                       backgroundColor: !item.read
                         ? mode === "dark"
                           ? "rgba(128,0,32,0.10)"
@@ -214,6 +220,9 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
                     </View>
                   )}
                 </Pressable>
+                <Pressable onPress={() => deleteNotification(item.id)} hitSlop={8} style={styles.notifDeleteBtn}>
+                  <Ionicons name="close" size={16} color={c.textMuted} />
+                </Pressable>
               </Animated.View>
             );
           }}
@@ -267,6 +276,8 @@ const styles = StyleSheet.create({
   list: { paddingBottom: 8 },
   sep: { height: 1, marginHorizontal: 14 },
   item: { flexDirection: "row", alignItems: "center", padding: 12, paddingHorizontal: 14, gap: 12 },
+  itemRow: { flexDirection: "row", alignItems: "center" },
+  notifDeleteBtn: { paddingHorizontal: 12, paddingVertical: 8, alignSelf: "stretch", justifyContent: "center" },
   avatarWrap: { width: 44, height: 44, position: "relative" },
   avatar: {
     width: 44,

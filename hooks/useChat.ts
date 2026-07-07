@@ -16,17 +16,27 @@ export type MessageReaction = {
   userId: string;
 };
 
+export type ReplyToData = {
+  messageId: string;
+  senderId: string;
+  text: string;
+  type: string;
+};
+
 export type ChatMessage = {
   id: string;
   _id?: string;
   senderId: string;
   text: string;
-  type: "text" | "gift" | "image" | "video" | "sharedPost" | "storyReply";
+  type: "text" | "gift" | "image" | "video" | "audio" | "sharedPost" | "storyReply";
   createdAt: string | null;
   status: "sent" | "delivered" | "read";
   deleted?: boolean;
   reactions?: MessageReaction[];
   imageUrl?: string | null;
+  audioUrl?: string | null;
+  audioDuration?: number; // milisaniye
+  replyTo?: ReplyToData | null;
   gift?: Gift;
   storyReply?: StoryReplyData;
   sharedPost?: {
@@ -75,6 +85,9 @@ export function useChat(otherUid: string) {
           deleted: m.deleted ?? false,
           reactions: m.reactions ?? [],
           imageUrl: m.imageUrl ?? null,
+          audioUrl: m.audioUrl ?? null,
+          audioDuration: m.audioDuration ?? 0,
+          replyTo: m.replyTo ?? null,
           gift: m.gift ?? undefined,
           storyReply: m.storyReply ?? undefined,
           sharedPost: m.sharedPost ?? undefined,
@@ -111,6 +124,10 @@ export function useChat(otherUid: string) {
         status: m.status ?? "sent",
         deleted: m.deleted ?? false,
         reactions: m.reactions ?? [],
+        imageUrl: m.imageUrl ?? null,
+        audioUrl: m.audioUrl ?? null,
+        audioDuration: m.audioDuration ?? 0,
+        replyTo: m.replyTo ?? null,
         gift: m.gift ?? undefined,
         storyReply: m.storyReply ?? undefined,
         sharedPost: m.sharedPost ?? undefined,
@@ -194,7 +211,39 @@ export function useChat(otherUid: string) {
     };
   }, [chatKey, myUid]);
 
-  const sendText = useCallback((text: string) => {
+  // Typing indicator
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmit = useRef(0);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !chatKey) return;
+    const handleTyping = (data: { from: string }) => {
+      if (data.from === otherUid) {
+        setIsOtherTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 3000);
+      }
+    };
+    socket.on("chat:typing", handleTyping);
+    return () => {
+      socket.off("chat:typing", handleTyping);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [chatKey, otherUid]);
+
+  const emitTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingEmit.current < 2000) return; // 2sn throttle
+    lastTypingEmit.current = now;
+    const socket = getSocket();
+    if (socket?.connected) {
+      socket.emit("chat:typing", { to: otherUid });
+    }
+  }, [otherUid]);
+
+  const sendText = useCallback((text: string, replyTo?: ReplyToData | null) => {
     if (!chatKey || !myUid || !text.trim()) return;
     const trimmed = text.trim();
     const optimistic: ChatMessage = {
@@ -204,13 +253,14 @@ export function useChat(otherUid: string) {
       type: "text",
       createdAt: new Date().toISOString(),
       status: "sent",
+      replyTo: replyTo || null,
     };
     setMessages((prev) => [...prev, optimistic]);
     const socket = getSocket();
     if (socket?.connected) {
-      socket.emit("chat:send", { to: otherUid, text: trimmed, type: "text" });
+      socket.emit("chat:send", { to: otherUid, text: trimmed, type: "text", replyTo: replyTo || null });
     } else {
-      api.post(`/api/chats/${otherUid}/messages`, { text: trimmed, type: "text" }).catch(() => {});
+      api.post(`/api/chats/${otherUid}/messages`, { text: trimmed, type: "text", replyTo: replyTo || null }).catch(() => {});
     }
   }, [chatKey, myUid, otherUid]);
 
@@ -232,11 +282,84 @@ export function useChat(otherUid: string) {
     }
   }, [chatKey, myUid, otherUid]);
 
-  const sendImage = useCallback((label: string) => {
+  const sendImage = useCallback(async (uri: string, mediaType: "image" | "video" = "image") => {
     if (!chatKey || !myUid) return;
-    const socket = getSocket();
-    if (socket?.connected) {
-      socket.emit("chat:send", { to: otherUid, text: label, type: "image" });
+    const label = mediaType === "video" ? "🎥 Video" : "📷 Fotoğraf";
+    // Optimistic mesaj
+    const optimistic: ChatMessage = {
+      id: `pending_${Date.now()}`,
+      senderId: myUid,
+      text: label,
+      type: mediaType,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      imageUrl: uri, // local uri goster yuklenirken
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    try {
+      // Yukle — dogru MIME type icin medya turunu gec
+      const uploaded = await api.upload("chat", uri, mediaType);
+      // Socket ile gonder
+      const socket = getSocket();
+      if (socket?.connected) {
+        socket.emit("chat:send", {
+          to: otherUid,
+          text: label,
+          type: mediaType,
+          imageUrl: uploaded.url,
+        });
+      } else {
+        await api.post(`/api/chats/${otherUid}/messages`, {
+          text: label,
+          type: mediaType,
+          imageUrl: uploaded.url,
+        });
+      }
+    } catch (err) {
+      // Hata durumunda optimistic mesaji kaldir
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      console.error("sendImage error:", err);
+    }
+  }, [chatKey, myUid, otherUid]);
+
+  const sendVoice = useCallback(async (uri: string, durationMillis: number) => {
+    if (!chatKey || !myUid) return;
+    const label = "🎤 Sesli mesaj";
+    const optimistic: ChatMessage = {
+      id: `pending_${Date.now()}`,
+      senderId: myUid,
+      text: label,
+      type: "audio",
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      audioUrl: uri, // local uri — yuklenirken oynatilabilir
+      audioDuration: durationMillis,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    try {
+      const uploaded = await api.upload("chat", uri, "audio");
+      const socket = getSocket();
+      if (socket?.connected) {
+        socket.emit("chat:send", {
+          to: otherUid,
+          text: label,
+          type: "audio",
+          audioUrl: uploaded.url,
+          audioDuration: durationMillis,
+        });
+      } else {
+        await api.post(`/api/chats/${otherUid}/messages`, {
+          text: label,
+          type: "audio",
+          audioUrl: uploaded.url,
+          audioDuration: durationMillis,
+        });
+      }
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      console.error("sendVoice error:", err);
     }
   }, [chatKey, myUid, otherUid]);
 
@@ -277,8 +400,11 @@ export function useChat(otherUid: string) {
     sendText,
     sendGift,
     sendImage,
+    sendVoice,
     sendSharedPost,
     reactToMessage,
+    emitTyping,
+    isOtherTyping,
     myUid,
     chatId: chatKey,
     formatTime,

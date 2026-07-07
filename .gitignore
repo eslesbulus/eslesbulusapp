@@ -44,3 +44,7 @@ yarn-error.*
 .claude/
 .agents/
 skills-lock.json
+
+# Firebase FCM service account (SECRET)
+google-service-account.json
+eslesbulusapp-firebase-adminsdk-*.json

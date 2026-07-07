@@ -5,7 +5,10 @@ export type NotifType =
   | "story_view"
   | "story_reply"
   | "profile_view"
-  | "hi";
+  | "hi"
+  | "admin"
+  | "announcement"
+  | "system";
 
 export type Notif = {
   id: string;
@@ -36,6 +39,12 @@ export function notifLabel(t: NotifType): { text: string; icon: string } {
       return { text: "profiline baktı", icon: "person" };
     case "hi":
       return { text: "sana Hi gönderdi", icon: "hand-right" };
+    case "admin":
+    case "announcement":
+    case "system":
+      return { text: "📢 Duyuru", icon: "megaphone" };
+    default:
+      return { text: "", icon: "notifications" };
   }
 }
 

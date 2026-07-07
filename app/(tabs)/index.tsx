@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Platform,
   Pressable,
   Alert,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, Layout } from "react-native-reanimated";
@@ -61,7 +63,14 @@ export default function DiscoverScreen() {
   const filterCount = activeFilterCount(filters);
   const { unreadCount: unreadNotifs } = useNotifications();
 
-  const { users } = useUsers(filters);
+  const { users, loading, error, refetch } = useUsers(filters);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const rows = useMemo(() => {
     if (viewMode !== "album") return [];
@@ -132,6 +141,9 @@ export default function DiscoverScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
+        }
       >
         <StoriesBar
           onPressUser={(u) => router.push(`/story/${u.uid}`)}
@@ -158,7 +170,30 @@ export default function DiscoverScreen() {
           <ViewToggle mode={viewMode} onChange={setViewMode} />
         </View>
 
-        {users.length === 0 ? (
+        {loading && users.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <ActivityIndicator size="large" color={c.primary} />
+            <Text style={[styles.emptyHint, { color: c.textMuted, marginTop: 12 }]}>
+              Yükleniyor...
+            </Text>
+          </View>
+        ) : error && users.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <Ionicons name="cloud-offline-outline" size={32} color={c.textMuted} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>Bağlantı hatası</Text>
+            <Text style={[styles.emptyHint, { color: c.textMuted }]}>
+              İnternet bağlantını kontrol et
+            </Text>
+            <Pressable
+              onPress={onRefresh}
+              style={[styles.emptyBtn, { backgroundColor: c.primary }]}
+            >
+              <Text style={styles.emptyBtnText}>Tekrar dene</Text>
+            </Pressable>
+          </View>
+        ) : users.length === 0 ? (
           <View style={styles.emptyWrap}>
             <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Ionicons name="search" size={32} color={c.textMuted} />

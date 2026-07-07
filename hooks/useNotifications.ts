@@ -10,7 +10,10 @@ export type NotifType =
   | "story_view"
   | "story_reply"
   | "profile_view"
-  | "hi";
+  | "hi"
+  | "admin"
+  | "announcement"
+  | "system";
 
 export type NotificationData = {
   id: string;
@@ -19,6 +22,7 @@ export type NotificationData = {
   fromName: string;
   fromPhoto: string;
   text: string;
+  title?: string;
   read: boolean;
   createdAt: string;
   // Optional metadata
@@ -31,7 +35,9 @@ export function useNotifications() {
   const uid = user?.uid ?? "";
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+
+  // unreadCount her zaman listeden türetilir — tek kaynak
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // API'den bildirimleri çek
   const fetchNotifications = useCallback(async () => {
@@ -39,7 +45,6 @@ export function useNotifications() {
     try {
       const list = await api.get<NotificationData[]>("/api/notifications");
       setNotifications(list);
-      setUnreadCount(list.filter((n) => !n.read).length);
     } catch {
       // ignore
     } finally {
@@ -51,36 +56,59 @@ export function useNotifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Socket üzerinden gerçek zamanlı bildirim dinle
+  // Socket üzerinden gerçek zamanlı bildirim dinle.
+  // ÖNEMLİ: socket auth sonrası bağlandığı için ilk render'da null olabilir;
+  // bağlanınca / yeniden bağlanınca dinleyiciyi tekrar ekle.
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket || !uid) return;
+    if (!uid) return;
 
     const handleNotification = (data: NotificationData) => {
-      setNotifications((prev) => [data, ...prev]);
-      setUnreadCount((prev) => prev + 1);
+      setNotifications((prev) => (prev.some((n) => n.id === data.id) ? prev : [data, ...prev]));
     };
 
-    socket.on("notification", handleNotification);
+    let attached: any = null;
+    const attach = () => {
+      const s = getSocket();
+      if (s && s !== attached) {
+        if (attached) attached.off("notification", handleNotification);
+        s.off("notification", handleNotification);
+        s.on("notification", handleNotification);
+        attached = s;
+      }
+    };
+
+    attach();
+    // Socket henüz hazır değilse veya yeni instance oluşursa yakala
+    const interval = setInterval(attach, 2000);
+
     return () => {
-      socket.off("notification", handleNotification);
+      clearInterval(interval);
+      if (attached) attached.off("notification", handleNotification);
     };
   }, [uid]);
 
   // Tüm bildirimleri okundu işaretle
   const markAllRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
     await api.post("/api/notifications/read-all").catch(() => {});
   }, []);
 
   // Tek bildirimi okundu işaretle
   const markRead = useCallback(async (notifId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
+    setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
     await api.post(`/api/notifications/${notifId}/read`).catch(() => {});
+  }, []);
+
+  // Tek bildirimi sil
+  const deleteNotification = useCallback(async (notifId: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    await api.delete(`/api/notifications/${notifId}`).catch(() => {});
+  }, []);
+
+  // Tüm bildirimleri sil
+  const clearAll = useCallback(async () => {
+    setNotifications([]);
+    await api.delete("/api/notifications").catch(() => {});
   }, []);
 
   return {
@@ -89,6 +117,8 @@ export function useNotifications() {
     unreadCount,
     markAllRead,
     markRead,
+    deleteNotification,
+    clearAll,
     refresh: fetchNotifications,
   };
 }

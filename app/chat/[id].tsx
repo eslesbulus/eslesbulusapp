@@ -16,6 +16,7 @@ import {
   Share,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,6 +35,7 @@ import Animated, {
   withSpring,
   Easing,
   SharedValue,
+  runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
@@ -43,7 +45,7 @@ import { usePremium } from "@/context/PremiumContext";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@/hooks/useUser";
 import { api } from "@/config/api";
-import { useChat, type ChatMessage } from "@/hooks/useChat";
+import { useChat, type ChatMessage, type ReplyToData } from "@/hooks/useChat";
 import { useChats, setActiveChat } from "@/hooks/useChats";
 import type { UserProfile } from "@/context/AuthContext";
 import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
@@ -51,8 +53,11 @@ import { Gift } from "@/constants/gifts";
 import { GiftSheet } from "@/components/chat/GiftSheet";
 import { GiftAnimation } from "@/components/chat/GiftAnimation";
 import { EmojiPicker } from "@/components/chat/EmojiPicker";
+import { VoiceRecorder } from "@/components/chat/VoiceRecorder";
+import { VoiceMessageBubble } from "@/components/chat/VoiceMessageBubble";
 import { VipName } from "@/components/common/VipName";
 import * as Clipboard from "expo-clipboard";
+import { setAudioModeAsync } from "expo-audio";
 
 function formatLastSeen(lastActive?: number | string | null): string {
   if (!lastActive) return "çevrimdışı";
@@ -71,6 +76,32 @@ function formatLastSeen(lastActive?: number | string | null): string {
   return `son görülme ${d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}`;
 }
 
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function sameDay(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  return startOfDay(new Date(a)) === startOfDay(new Date(b));
+}
+
+// WhatsApp tarzı gün etiketi: Bugün / Dün / Perşembe / 12 Mayıs / 12 Mayıs 2025
+function dateSeparatorLabel(d: Date): string {
+  const now = new Date();
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+  if (diffDays <= 0) return "Bugün";
+  if (diffDays === 1) return "Dün";
+  if (diffDays < 7) {
+    const wd = d.toLocaleDateString("tr-TR", { weekday: "long" });
+    return wd.charAt(0).toLocaleUpperCase("tr-TR") + wd.slice(1);
+  }
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(
+    "tr-TR",
+    sameYear ? { day: "numeric", month: "long" } : { day: "numeric", month: "long", year: "numeric" }
+  );
+}
+
 function hexToRgba(hex: string, alpha: number) {
   const m = hex.replace("#", "");
   const safe = m.length === 6 ? m : "888888";
@@ -83,11 +114,12 @@ function hexToRgba(hex: string, alpha: number) {
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { user, loading: userLoading } = useUser(id);
-  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendSharedPost, reactToMessage, myUid, formatTime } = useChat(id);
+  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendVoice, sendSharedPost, reactToMessage, emitTyping, isOtherTyping, myUid, formatTime } = useChat(id);
   const { markRead } = useChats();
   const router = useRouter();
   const userPhoto = user?.photoURL || user?.photos?.[0] || null;
   const { theme, mode } = useTheme();
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const { balance: tokenBalance, spend: spendTokens } = useCoins();
   const { isPremium } = usePremium();
   const { profile } = useAuth();
@@ -102,7 +134,8 @@ export default function ChatDetailScreen() {
   const setTextSync = useCallback((val: string) => {
     textRef.current = val;
     setText(val);
-  }, []);
+    if (val.length > 0) emitTyping();
+  }, [emitTyping]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | "vip" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
@@ -122,8 +155,33 @@ export default function ChatDetailScreen() {
 
   // Filtrelenmis mesajlar — silinen mesajlari gizle veya "silindi" olarak goster
   const displayMessages = messages.filter((m) => !localDeletedIds.has(m.id));
-  // inverted FlatList icin ters sira
-  const invertedMessages = [...displayMessages].reverse();
+
+  // Satirlari olustur: gun ayraclari + gruplama bilgisi (inverted liste icin ters)
+  type Row =
+    | { type: "sep"; id: string; label: string }
+    | { type: "msg"; id: string; msg: ChatMessage; isFirstOfGroup: boolean; isLastOfGroup: boolean };
+  const rows: Row[] = [];
+  let lastDayKey = "";
+  for (let i = 0; i < displayMessages.length; i++) {
+    const m = displayMessages[i];
+    const d = m.createdAt ? new Date(m.createdAt) : new Date();
+    const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (dayKey !== lastDayKey) {
+      rows.push({ type: "sep", id: `sep_${dayKey}`, label: dateSeparatorLabel(d) });
+      lastDayKey = dayKey;
+    }
+    const prev = displayMessages[i - 1];
+    const next = displayMessages[i + 1];
+    const fromMe = m.senderId === myUid;
+    const prevSameDay = prev ? sameDay(prev.createdAt, m.createdAt) : false;
+    const nextSameDay = next ? sameDay(next.createdAt, m.createdAt) : false;
+    const prevFromMe = prev ? prev.senderId === myUid : !fromMe;
+    const nextFromMe = next ? next.senderId === myUid : !fromMe;
+    const isFirstOfGroup = !prevSameDay || prevFromMe !== fromMe;
+    const isLastOfGroup = !nextSameDay || nextFromMe !== fromMe;
+    rows.push({ type: "msg", id: m.id, msg: m, isFirstOfGroup, isLastOfGroup });
+  }
+  const invertedRows = [...rows].reverse();
 
   const toggleMsgSelect = useCallback((msgId: string) => {
     setSelectedMsgIds((prev) => {
@@ -155,6 +213,12 @@ export default function ChatDetailScreen() {
   const handleReact = useCallback((msgId: string, emoji: string) => {
     reactToMessage(msgId, emoji);
   }, [reactToMessage]);
+
+  // Swipe-to-reply handler
+  const handleSwipeReply = useCallback((msg: ChatMessage) => {
+    setReplyingTo(msg);
+    inputRef.current?.focus();
+  }, []);
 
   // Back handler
   useEffect(() => {
@@ -273,6 +337,11 @@ export default function ChatDetailScreen() {
     return () => { setActiveChat(null); };
   }, [id]);
 
+  // Sesli mesajlar sessiz modda da çalsın
+  useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+  }, []);
+
   // inverted FlatList kullaniyoruz — en altta basliyor, scroll yok
   // Yeni mesaj gelince zaten en uste (inverted = en alta) ekleniyor
 
@@ -331,8 +400,15 @@ export default function ChatDetailScreen() {
     }
 
     // Hemen mesaji gonder, token harcamayi arka planda yap
+    const reply = replyingTo ? {
+      messageId: replyingTo.id,
+      senderId: replyingTo.senderId,
+      text: replyingTo.text || (replyingTo.type === "image" ? "📷 Fotoğraf" : replyingTo.type === "video" ? "🎥 Video" : ""),
+      type: replyingTo.type,
+    } as ReplyToData : null;
     setTextSync("");
-    sendText(currentText);
+    setReplyingTo(null);
+    sendText(currentText, reply);
     spendTokens(TOKENS_PER_MESSAGE).catch(() => {});
 
     // 150ms debounce — hizli ama cift tiklamayi onler
@@ -430,7 +506,7 @@ export default function ChatDetailScreen() {
         {/* Messages */}
         <FlatList
           ref={listRef}
-          data={invertedMessages}
+          data={invertedRows}
           keyExtractor={(it) => it.id}
           inverted
           contentContainerStyle={styles.list}
@@ -458,44 +534,69 @@ export default function ChatDetailScreen() {
               </View>
             ) : null
           }
-          renderItem={({ item, index }) => {
-            // inverted listede index 0 = en son mesaj
-            // prev/next hesaplamasi icin orijinal sirayi kullan
-            const origIdx = displayMessages.length - 1 - index;
-            const prev = origIdx > 0 ? displayMessages[origIdx - 1] : undefined;
-            const next = origIdx < displayMessages.length - 1 ? displayMessages[origIdx + 1] : undefined;
-            const fromMe = item.senderId === myUid;
-            const prevFromMe = prev ? prev.senderId === myUid : !fromMe;
-            const nextFromMe = next ? next.senderId === myUid : !fromMe;
-            const isFirstOfGroup = prevFromMe !== fromMe;
-            const isLastOfGroup = nextFromMe !== fromMe;
-            const isDeleted = item.deleted || deletedForAllIds.has(item.id);
+          renderItem={({ item }) => {
+            if (item.type === "sep") {
+              return <DateSeparator label={item.label} colors={c} />;
+            }
+            const msg = item.msg;
+            const fromMe = msg.senderId === myUid;
+            const isDeleted = msg.deleted || deletedForAllIds.has(msg.id);
             const displayMsg = isDeleted
-              ? { ...item, text: "Bu mesaj silindi", type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
-              : item;
+              ? { ...msg, text: "Bu mesaj silindi", type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
+              : msg;
             return (
               <BubbleWrapper
                 item={displayMsg}
                 fromMe={fromMe}
-                isFirstOfGroup={isFirstOfGroup}
-                isLastOfGroup={isLastOfGroup}
+                isFirstOfGroup={item.isFirstOfGroup}
+                isLastOfGroup={item.isLastOfGroup}
                 avatar={fromMe ? null : userPhoto}
                 colors={c}
-                timeStr={formatTime(item.createdAt)}
+                timeStr={formatTime(msg.createdAt)}
                 senderVip={fromMe ? myVip : otherVip}
-                selected={selectedMsgIds.has(item.id)}
+                selected={selectedMsgIds.has(msg.id)}
                 isSelecting={isMsgSelecting}
                 isDeleted={isDeleted}
                 onMsgPress={handleMsgPress}
                 onMsgLongPress={handleMsgLongPress}
                 onReact={handleReact}
                 myUid={myUid}
-                showReactionBar={activeReactionMsgId === item.id}
+                showReactionBar={activeReactionMsgId === msg.id}
                 onToggleReaction={handleToggleReaction}
+                onSwipeReply={handleSwipeReply}
               />
             );
           }}
         />
+
+        {/* Typing indicator */}
+        {isOtherTyping && (
+          <Animated.View entering={FadeIn.duration(200)} style={[styles.typingWrap, { backgroundColor: c.card, borderTopColor: c.border }]}>
+            <View style={styles.typingDots}>
+              <TypingDot delay={0} color={c.primary} />
+              <TypingDot delay={200} color={c.primary} />
+              <TypingDot delay={400} color={c.primary} />
+            </View>
+            <Text style={[styles.typingText, { color: c.textMuted }]}>{user?.name ?? ""} yazıyor</Text>
+          </Animated.View>
+        )}
+
+        {/* Reply banner */}
+        {replyingTo && (
+          <View style={[styles.replyBanner, { backgroundColor: c.surface, borderTopColor: c.border, borderLeftColor: c.primary }]}>
+            <View style={styles.replyBannerBody}>
+              <Text style={[styles.replyBannerName, { color: c.primary }]}>
+                {replyingTo.senderId === myUid ? "Kendin" : user?.name ?? ""}
+              </Text>
+              <Text style={[styles.replyBannerText, { color: c.textMuted }]} numberOfLines={1}>
+                {replyingTo.type === "image" ? "📷 Fotoğraf" : replyingTo.type === "video" ? "🎥 Video" : replyingTo.text}
+              </Text>
+            </View>
+            <Pressable onPress={() => setReplyingTo(null)} hitSlop={8} style={{ padding: 4 }}>
+              <Ionicons name="close" size={18} color={c.textMuted} />
+            </Pressable>
+          </View>
+        )}
 
         {/* Input */}
         <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom - 6, 8) }]}>
@@ -526,9 +627,7 @@ export default function ChatDetailScreen() {
               <Ionicons name="send" size={17} color="#fff" />
             </Pressable>
           ) : (
-            <Pressable hitSlop={6} style={styles.iconBtn}>
-              <Ionicons name="mic" size={26} color={c.primary} />
-            </Pressable>
+            <VoiceRecorder colors={c} onSend={sendVoice} />
           )}
         </View>
 
@@ -619,9 +718,6 @@ export default function ChatDetailScreen() {
                 { icon: "camera", label: "Kamera", color: "#7C3AED" },
                 { icon: "images", label: "Galeri", color: "#2563EB" },
                 { icon: "videocam", label: "Video", color: "#DC2626" },
-                { icon: "document-text", label: "Dosya", color: "#D97706" },
-                { icon: "location", label: "Konum", color: "#16A34A" },
-                { icon: "musical-notes", label: "Müzik", color: "#DB2777" },
               ].map((item) => (
                 <Pressable
                   key={item.label}
@@ -631,20 +727,24 @@ export default function ChatDetailScreen() {
                     if (item.icon === "camera") {
                       const { status } = await ImagePicker.requestCameraPermissionsAsync();
                       if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
-                      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.9 });
-                      if (!res.canceled) {
-                        await sendImage("📷 Fotoğraf gönderildi");
+                      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
+                      if (!res.canceled && res.assets[0]) {
+                        await sendImage(res.assets[0].uri, "image");
                       }
-                    } else if (item.icon === "images" || item.icon === "videocam") {
+                    } else if (item.icon === "images") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                       if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
-                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: item.icon === "videocam" ? ["videos"] : ["images"], quality: 0.9 });
-                      if (!res.canceled) {
-                        const label = item.icon === "videocam" ? "🎥 Video gönderildi" : "🖼 Fotoğraf gönderildi";
-                        await sendImage(label);
+                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+                      if (!res.canceled && res.assets[0]) {
+                        await sendImage(res.assets[0].uri, "image");
                       }
-                    } else {
-                      Alert.alert(item.label, "Bu özellik yakında eklenecek.");
+                    } else if (item.icon === "videocam") {
+                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], quality: 0.8 });
+                      if (!res.canceled && res.assets[0]) {
+                        await sendImage(res.assets[0].uri, "video");
+                      }
                     }
                   }}
                 >
@@ -689,6 +789,7 @@ const BubbleWrapper = memo(function BubbleWrapper({
   myUid,
   showReactionBar,
   onToggleReaction,
+  onSwipeReply,
 }: {
   item: ChatMessage;
   fromMe: boolean;
@@ -707,32 +808,72 @@ const BubbleWrapper = memo(function BubbleWrapper({
   myUid: string;
   showReactionBar: boolean;
   onToggleReaction: (id: string) => void;
+  onSwipeReply: (msg: ChatMessage) => void;
 }) {
   const handlePress = useCallback(() => onMsgPress(item.id), [item.id, onMsgPress]);
   const handleLongPress = useCallback(() => onMsgLongPress(item.id), [item.id, onMsgLongPress]);
   const handleReact = useCallback((emoji: string) => onReact(item.id, emoji), [item.id, onReact]);
   const handleToggle = useCallback(() => onToggleReaction(item.id), [item.id, onToggleReaction]);
 
+  // Swipe-to-reply gesture
+  const translateX = useSharedValue(0);
+  const swipeTriggered = useRef(false);
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-999, 30]) // sadece saga kaydirma
+    .failOffsetY([-10, 10])
+    .onUpdate((e) => {
+      if (isDeleted) return;
+      const clamp = Math.min(e.translationX, 80);
+      translateX.value = Math.max(0, clamp);
+      if (clamp >= 60 && !swipeTriggered.current) {
+        swipeTriggered.current = true;
+        runOnJS(onSwipeReply)(item);
+      }
+    })
+    .onEnd(() => {
+      translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
+      swipeTriggered.current = false;
+    });
+
+  const swipeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const replyIconStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(translateX.value / 40, 1),
+    transform: [{ scale: Math.min(translateX.value / 60, 1) }],
+  }));
+
   return (
-    <Bubble
-      msg={item}
-      fromMe={fromMe}
-      isFirstOfGroup={isFirstOfGroup}
-      isLastOfGroup={isLastOfGroup}
-      avatar={avatar}
-      colors={colors}
-      timeStr={timeStr}
-      senderVip={senderVip}
-      selected={selected}
-      isSelecting={isSelecting}
-      isDeleted={isDeleted}
-      onPress={handlePress}
-      onLongPress={handleLongPress}
-      onReact={handleReact}
-      myUid={myUid}
-      showReactionBar={showReactionBar}
-      onToggleReactionBar={handleToggle}
-    />
+    <View style={{ position: "relative" }}>
+      {/* Swipe reply icon */}
+      <Animated.View style={[styles.swipeReplyIcon, replyIconStyle]} pointerEvents="none">
+        <Ionicons name="arrow-undo" size={20} color={colors.primary} />
+      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={swipeStyle}>
+          <Bubble
+            msg={item}
+            fromMe={fromMe}
+            isFirstOfGroup={isFirstOfGroup}
+            isLastOfGroup={isLastOfGroup}
+            avatar={avatar}
+            colors={colors}
+            timeStr={timeStr}
+            senderVip={senderVip}
+            selected={selected}
+            isSelecting={isSelecting}
+            isDeleted={isDeleted}
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+            onReact={handleReact}
+            myUid={myUid}
+            showReactionBar={showReactionBar}
+            onToggleReactionBar={handleToggle}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 });
 
@@ -799,7 +940,7 @@ const Bubble = memo(function Bubble({
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
-      delayLongPress={150}
+      delayLongPress={400}
       style={{ backgroundColor: selected ? `${c.primary}15` : "transparent", borderRadius: 4 }}
     >
     {/* Emoji reaction bar — mesajin ustunde */}
@@ -940,6 +1081,47 @@ const Bubble = memo(function Bubble({
             )}
           </View>
         </Pressable>
+      ) : (msg.type === "image" || msg.type === "video") && msg.imageUrl ? (
+        <View style={[styles.imageBubble, bubbleRadius, fromMe ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" }]}>
+          <Image
+            source={{ uri: msg.imageUrl }}
+            style={styles.imageBubbleImg}
+            resizeMode="cover"
+          />
+          {msg.type === "video" && (
+            <View style={styles.videoPlayOverlay}>
+              <Ionicons name="play-circle" size={44} color="rgba(255,255,255,0.85)" />
+            </View>
+          )}
+          <View style={[styles.imageBubbleMeta, fromMe ? { right: 8 } : { left: 8 }]}>
+            <Text style={styles.imageBubbleTime}>{timeStr}</Text>
+            {fromMe && msg.status && (
+              <Ionicons
+                name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                size={13}
+                color={msg.status === "read" ? "#7DD3FC" : "rgba(255,255,255,0.85)"}
+              />
+            )}
+          </View>
+        </View>
+      ) : msg.type === "audio" && msg.audioUrl ? (
+        <VoiceMessageBubble
+          id={msg.id}
+          url={msg.audioUrl}
+          durationMillis={msg.audioDuration || 0}
+          fromMe={fromMe}
+          colors={c}
+          timeStr={timeStr}
+          statusIcon={
+            fromMe && msg.status ? (
+              <Ionicons
+                name={msg.status === "read" ? "checkmark-done" : "checkmark"}
+                size={13}
+                color={msg.status === "read" ? "#7DD3FC" : "rgba(255,255,255,0.7)"}
+              />
+            ) : null
+          }
+        />
       ) : msg.gift ? (
         <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
@@ -1011,6 +1193,16 @@ const Bubble = memo(function Bubble({
             bubbleRadius,
           ]}
         >
+          {msg.replyTo && !isDeleted && (
+            <View style={[styles.replyQuote, { backgroundColor: fromMe ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.06)", borderLeftColor: c.primary }]}>
+              <Text style={[styles.replyQuoteName, { color: fromMe ? "rgba(255,255,255,0.9)" : c.primary }]} numberOfLines={1}>
+                {msg.replyTo.senderId === myUid ? "Sen" : ""}
+              </Text>
+              <Text style={[styles.replyQuoteText, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]} numberOfLines={1}>
+                {msg.replyTo.text || "📷 Medya"}
+              </Text>
+            </View>
+          )}
           <Text style={[
             styles.bubbleText,
             { color: fromMe ? "#fff" : c.text },
@@ -1071,6 +1263,51 @@ const Bubble = memo(function Bubble({
     </Pressable>
   );
 });
+
+function DateSeparator({ label, colors: c }: { label: string; colors: any }) {
+  return (
+    <View style={styles.dateSepWrap}>
+      <View style={[styles.dateSepPill, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Text style={[styles.dateSepText, { color: c.textMuted }]}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TypingDot({ delay, color }: { delay: number; color: string }) {
+  const scale = useSharedValue(0.4);
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    scale.value = withDelay(delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.4, { duration: 400, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1, true
+      )
+    );
+    opacity.value = withDelay(delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 400 }),
+          withTiming(0.3, { duration: 400 })
+        ),
+        -1, true
+      )
+    );
+  }, []);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }, dotStyle]} />
+  );
+}
 
 function PanelToggleIcon({
   panelOpen,
@@ -1195,6 +1432,15 @@ const styles = StyleSheet.create({
   tokenPillText: { fontSize: 12, fontWeight: "700", color: "#F59E0B" },
 
   list: { paddingHorizontal: 10, paddingVertical: 12 },
+
+  dateSepWrap: { alignItems: "center", marginVertical: 10 },
+  dateSepPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  dateSepText: { fontSize: 11.5, fontWeight: "600" },
 
   matchedCard: {
     alignItems: "center",
@@ -1433,6 +1679,99 @@ const styles = StyleSheet.create({
   },
   giftBubblePriceText: { fontSize: 12, fontWeight: "600" },
   giftBubbleTag: { fontSize: 11.5, fontWeight: "700", marginTop: 4 },
+
+  // Typing indicator
+  typingWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  typingDots: {
+    flexDirection: "row",
+    gap: 4,
+    alignItems: "center",
+  },
+  typingText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  // Reply banner (input üstünde)
+  replyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: 3,
+    marginHorizontal: 8,
+    borderRadius: 4,
+  },
+  replyBannerBody: { flex: 1, gap: 2 },
+  replyBannerName: { fontSize: 12, fontWeight: "700" },
+  replyBannerText: { fontSize: 12 },
+
+  // Reply quote (bubble icinde)
+  replyQuote: {
+    borderLeftWidth: 2.5,
+    borderRadius: 4,
+    paddingLeft: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
+    marginBottom: 4,
+  },
+  replyQuoteName: { fontSize: 11, fontWeight: "700" },
+  replyQuoteText: { fontSize: 11.5 },
+
+  // Swipe reply icon
+  swipeReplyIcon: {
+    position: "absolute",
+    left: 4,
+    top: "50%",
+    marginTop: -12,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Image/Video bubble
+  imageBubble: {
+    maxWidth: "70%",
+    marginHorizontal: 4,
+    overflow: "hidden",
+    position: "relative",
+  },
+  imageBubbleImg: {
+    width: 220,
+    height: 220,
+    borderRadius: 16,
+  },
+  videoPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.15)",
+    borderRadius: 16,
+  },
+  imageBubbleMeta: {
+    position: "absolute",
+    bottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  imageBubbleTime: {
+    fontSize: 10,
+    color: "#fff",
+  },
 
   // Emoji trigger icon
   emojiTrigger: {

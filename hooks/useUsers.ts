@@ -9,6 +9,7 @@ export function useUsers(filters?: Filters, opts?: { includeIncomplete?: boolean
   users: UserProfile[];
   loading: boolean;
   error: Error | null;
+  refetch: () => Promise<void>;
 } {
   const { user } = useAuth();
   const includeIncomplete = opts?.includeIncomplete ?? false;
@@ -19,11 +20,13 @@ export function useUsers(filters?: Filters, opts?: { includeIncomplete?: boolean
   const fetchUsers = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     try {
+      setError(null);
       const params = includeIncomplete ? "?includeIncomplete=true" : "";
       const list = await api.get<UserProfile[]>(`/api/users${params}`);
       setUsers(list);
       setLoading(false);
     } catch (e: any) {
+      console.error("[useUsers] fetch error:", e?.message || e);
       setError(e);
       setLoading(false);
     }
@@ -55,5 +58,5 @@ export function useUsers(filters?: Filters, opts?: { includeIncomplete?: boolean
   }, []);
 
   const filtered = filters ? applyFilters(users, filters) : users;
-  return { users: filtered, loading, error };
+  return { users: filtered, loading, error, refetch: fetchUsers };
 }
