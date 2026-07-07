@@ -31,6 +31,7 @@ import { VerificationSheet } from "@/components/profile/VerificationSheet";
 import { MyPostsSection } from "@/components/profile/MyPostsSection";
 import { usePosts } from "@/hooks/usePosts";
 import { api } from "@/config/api";
+import { useMyTickets } from "@/hooks/useSupportTickets";
 
 const SCREEN_W = Dimensions.get("window").width;
 const PHOTO_GAP = 6;
@@ -48,6 +49,7 @@ export default function ProfileScreen() {
   const c = theme.colors;
 
   const { posts: myPosts, deletePost, archivePost, editPost } = usePosts(user?.uid);
+  const { totalUnread: unreadTickets, tickets, refresh: refreshTickets } = useMyTickets();
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportText, setReportText] = useState("");
   const [reportPhoto, setReportPhoto] = useState<string | null>(null);
@@ -101,7 +103,11 @@ export default function ProfileScreen() {
       setReportModalOpen(false);
       setReportText("");
       setReportPhoto(null);
-      Alert.alert("Teşekkürler", "Sorun bildiriminiz alındı, en kısa sürede inceleyeceğiz.");
+      refreshTickets();
+      Alert.alert(
+        "Teşekkürler",
+        "Sorun bildiriminiz alındı. Destek ekibimiz cevap yazınca 'Taleplerim' ekranında görebilirsin."
+      );
     } catch (e: any) {
       Alert.alert("Hata", e?.message ?? "Bildirim gönderilemedi. Tekrar dene.");
     }
@@ -401,6 +407,15 @@ export default function ProfileScreen() {
               icon="flag-outline"
               label="Sorun Bildir"
               onPress={() => setReportModalOpen(true)}
+              c={c}
+            />
+            <Divider c={c} />
+            <NavRow
+              icon="mail-outline"
+              label="Taleplerim"
+              value={tickets.length > 0 ? `${tickets.length} talep` : "Henüz yok"}
+              badge={unreadTickets > 0 ? String(unreadTickets) : undefined}
+              onPress={() => router.push("/profile/support-tickets")}
               c={c}
             />
             <Divider c={c} />
