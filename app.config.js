@@ -53,6 +53,13 @@ module.exports = {
           microphonePermission: "Sesli mesaj kaydetmek için mikrofon erişimi gerekiyor.",
         },
       ],
+      [
+        "expo-camera",
+        {
+          cameraPermission: "Hesabını doğrulamak için selfie çekmen gerekiyor.",
+          recordAudioAndroid: false,
+        },
+      ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       [

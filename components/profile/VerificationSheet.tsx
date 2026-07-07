@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TouchableWithoutFeedback,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
@@ -30,23 +29,36 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
   const [photo, setPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
 
   async function handleTakePhoto() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Selfie çekebilmek için kamera iznine ihtiyacımız var.");
-      return;
+    // İzin yoksa iste; reddedildiyse uyar
+    if (!permission?.granted) {
+      const r = await requestPermission();
+      if (!r.granted) {
+        Alert.alert("İzin Gerekli", "Selfie çekebilmek için kamera iznine ihtiyacımız var.");
+        return;
+      }
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.85,
-      cameraType: ImagePicker.CameraType.front,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPhoto(result.assets[0].uri);
+    setCameraOpen(true);
+  }
+
+  async function handleCapture() {
+    if (!cameraRef.current || capturing) return;
+    setCapturing(true);
+    try {
+      const pic = await cameraRef.current.takePictureAsync({ quality: 0.85 });
+      if (pic?.uri) {
+        setPhoto(pic.uri);
+        setCameraOpen(false);
+      }
+    } catch (e: any) {
+      Alert.alert("Hata", e?.message ?? "Fotoğraf çekilemedi.");
     }
+    setCapturing(false);
   }
 
   async function handleSend() {
@@ -212,6 +224,43 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
           )}
         </ScrollView>
       </View>
+
+      {/* Ön kamera — flip butonu yok, kullanıcı arka kameraya geçemez */}
+      <Modal
+        visible={cameraOpen}
+        animationType="slide"
+        onRequestClose={() => setCameraOpen(false)}
+      >
+        <View style={styles.cameraContainer}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.cameraView}
+            facing="front"
+          />
+          {/* Üst bar — kapat */}
+          <View style={styles.cameraTopBar}>
+            <Pressable onPress={() => setCameraOpen(false)} hitSlop={12} style={styles.cameraTopBtn}>
+              <Ionicons name="close" size={26} color="#fff" />
+            </Pressable>
+            <View style={styles.cameraHintPill}>
+              <Ionicons name="camera-reverse-outline" size={13} color="#fff" />
+              <Text style={styles.cameraHintText}>Ön Kamera</Text>
+            </View>
+            <View style={{ width: 40 }} />
+          </View>
+          {/* Alt bar — çekim düğmesi */}
+          <View style={styles.cameraBottomBar}>
+            <Text style={styles.cameraHelp}>Yüzünü ve elindeki kağıdı net göster</Text>
+            <Pressable
+              onPress={handleCapture}
+              disabled={capturing}
+              style={[styles.captureBtn, capturing && { opacity: 0.6 }]}
+            >
+              <View style={styles.captureInner} />
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -320,4 +369,67 @@ const styles = StyleSheet.create({
   cameraBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
   privacy: { fontSize: 12, textAlign: "center", lineHeight: 18 },
+
+  // Ön kamera modalı
+  cameraContainer: { flex: 1, backgroundColor: "#000" },
+  cameraView: { flex: 1 },
+  cameraTopBar: {
+    position: "absolute",
+    top: 40,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cameraTopBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraHintPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  cameraHintText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  cameraBottomBar: {
+    position: "absolute",
+    bottom: 46,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    gap: 16,
+  },
+  cameraHelp: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 13,
+    fontWeight: "500",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  captureBtn: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 4,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  captureInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#fff",
+  },
 });
