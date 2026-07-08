@@ -1,11 +1,21 @@
 import { useState } from "react";
-import { View, Text, Image, Pressable, StyleSheet } from "react-native";
+import { View, Text, Image, Pressable, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
+import { VipName } from "@/components/common/VipName";
 import { ReportSheet } from "@/components/common/ReportSheet";
+import { usePremium, DAILY_LIKE_LIMIT } from "@/context/PremiumContext";
 
 type Props = {
   user: UserProfile;
@@ -15,11 +25,41 @@ type Props = {
 
 export function ProfileCardList({ user, onPressHi, onPress }: Props) {
   const { theme } = useTheme();
-  const { hasSent } = useInteractions();
+  const { hasSent, isLiked, toggleLike } = useInteractions();
+  const { canLike, useLike } = usePremium();
+  const router = useRouter();
   const c = theme.colors;
   const sent = hasSent(user.uid);
+  const liked = isLiked(user.uid);
   const [reportOpen, setReportOpen] = useState(false);
   const photo = user.photoURL || user.photos?.[0];
+
+  const heartScale = useSharedValue(1);
+  const heartAnim = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
+
+  async function handleLike() {
+    if (!canLike && !liked) {
+      Alert.alert(
+        "Günlük Limit Doldu",
+        `Bugün ${DAILY_LIKE_LIMIT} beğeni hakkını kullandın. Premium üyelikle sınırsız beğen!`,
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Premium Al", onPress: () => router.push("/premium") },
+        ]
+      );
+      return;
+    }
+    heartScale.value = withSequence(
+      withTiming(0.8, { duration: 80 }),
+      withSpring(1.3, { damping: 5, stiffness: 300 }),
+      withSpring(1, { damping: 10 })
+    );
+    if (!liked) {
+      const allowed = await useLike();
+      if (!allowed) return;
+    }
+    await toggleLike(user);
+  }
 
   return (
     <Pressable
@@ -52,18 +92,18 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
 
       <View style={styles.middle}>
         <View style={styles.nameRow}>
-          <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-            {user.name}, {user.age}
-          </Text>
-          {user.verified && <VerifiedBadge size={14} />}
+          <View style={styles.nameWrap}>
+            <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: c.text }} fontSize={15} numberOfLines={1} />
+            {user.verified && <VerifiedBadge size={14} />}
+          </View>
         </View>
         <View style={styles.metaRow}>
           <Ionicons name="location-outline" size={12} color={c.textMuted} />
-          <Text style={[styles.meta, { color: c.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.meta, { color: c.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
             {user.city}
           </Text>
-          <View style={[styles.sep, { backgroundColor: c.textMuted }]} />
-          <Text style={[styles.meta, { color: user.online ? c.online : c.textMuted }]}>
+          <View style={[styles.onlineDot, { backgroundColor: user.online ? c.online : c.textMuted }]} />
+          <Text style={[styles.meta, { color: user.online ? c.online : c.textMuted }]} numberOfLines={1}>
             {user.online ? "Çevrimiçi" : "Çevrimdışı"}
           </Text>
         </View>
@@ -75,29 +115,40 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
       </View>
 
       <View style={styles.rightActions}>
-        <Pressable
-          onPress={() => {
-            if (sent) return;
-            onPressHi(user);
-          }}
-          disabled={sent}
-          style={({ pressed }) => [
-            styles.hiBtn,
-            sent
-              ? { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }
-              : { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
-          ]}
-          hitSlop={8}
-        >
-          {sent ? (
-            <>
-              <Ionicons name="checkmark-circle" size={14} color={c.online} />
-              <Text style={[styles.hiText, { color: c.text }]}>Gönderildi</Text>
-            </>
-          ) : (
-            <Text style={styles.hiText}>Hi 👋</Text>
-          )}
-        </Pressable>
+        <View style={styles.rightBtnsRow}>
+          <Pressable onPress={handleLike} hitSlop={8} style={[styles.heartBtn, { borderColor: liked ? "#FF4D6D" : c.border }]}>
+            <Animated.View style={heartAnim}>
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={18}
+                color={liked ? "#FF4D6D" : c.textMuted}
+              />
+            </Animated.View>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              if (sent) return;
+              onPressHi(user);
+            }}
+            disabled={sent}
+            style={({ pressed }) => [
+              styles.hiBtn,
+              sent
+                ? { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }
+                : { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
+            ]}
+            hitSlop={8}
+          >
+            {sent ? (
+              <>
+                <Ionicons name="checkmark-circle" size={14} color={c.online} />
+                <Text style={[styles.hiText, { color: c.text }]}>Gönderildi</Text>
+              </>
+            ) : (
+              <Text style={styles.hiText}>Hi 👋</Text>
+            )}
+          </Pressable>
+        </View>
         <Pressable onPress={() => setReportOpen(true)} hitSlop={8} style={styles.moreBtn}>
           <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
         </Pressable>
@@ -147,16 +198,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  middle: { flex: 1 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  name: { fontSize: 15, fontWeight: "700" },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  meta: { fontSize: 12, fontWeight: "500" },
-  sep: { width: 3, height: 3, borderRadius: 2, opacity: 0.5 },
+  middle: { flex: 1, marginRight: 4 },
+  nameRow: { flexDirection: "row", alignItems: "center" },
+  nameWrap: { flexDirection: "row", alignItems: "center", gap: 4, flex: 1 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3, flexShrink: 1 },
+  meta: { fontSize: 12, fontWeight: "500", flexShrink: 1 },
+  onlineDot: { width: 6, height: 6, borderRadius: 3 },
   bio: { fontSize: 12, marginTop: 4 },
   rightActions: {
     alignItems: "flex-end",
     gap: 6,
+  },
+  rightBtnsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  heartBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   hiBtn: {
     paddingHorizontal: 14,

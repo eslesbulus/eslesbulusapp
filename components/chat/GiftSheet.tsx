@@ -52,10 +52,11 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
   const { balance, spend } = useCoins();
   const [selected, setSelected] = useState<Gift | null>(null);
 
-  function handleSend() {
+  async function handleSend() {
     if (!selected) return;
-    if (!spend(selected.price)) {
-      Alert.alert("Yetersiz Jeton 🪙", `Bu hediye için ${selected.price} jeton gerekli. Bakiyen: ${balance}`);
+    const ok = await spend(selected.price);
+    if (!ok) {
+      Alert.alert("Yetersiz Jeton", `Bu hediye için ${selected.price} jeton gerekli.\nBakiyen: ${balance}`);
       return;
     }
     onSend(selected);

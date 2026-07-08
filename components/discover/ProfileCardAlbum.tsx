@@ -117,8 +117,10 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
 
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: "#fff" }} fontSize={20} />
-          {user.verified && <VerifiedBadge size={13} />}
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: "#fff" }} fontSize={17} numberOfLines={1} />
+            {user.verified && <VerifiedBadge size={13} />}
+          </View>
           <Pressable onPress={handleLike} hitSlop={8} style={styles.heartBtn}>
             <Animated.View style={heartAnim}>
               <Ionicons

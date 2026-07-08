@@ -84,7 +84,9 @@ export function usePosts(userId?: string) {
     if (!user) return;
     let imageUrl: string | undefined;
     if (imageUri) {
-      const uploaded = await api.upload("posts", imageUri);
+      const ext = (imageUri.split(".").pop() || "").toLowerCase();
+      const isVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(ext);
+      const uploaded = await api.upload("posts", imageUri, isVideo ? "video" : "image");
       imageUrl = uploaded.url;
     }
     await api.post("/api/posts", { text, imageUrl: imageUrl ?? null });

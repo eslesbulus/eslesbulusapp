@@ -5,10 +5,13 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Alert,
   TextInput,
   ActivityIndicator,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +21,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { useStories } from "@/hooks/useStories";
+import { showAlert } from "@/components/common/CustomAlert";
 
 const { height: H } = Dimensions.get("window");
 
@@ -35,7 +39,7 @@ export default function StoryCreateScreen() {
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -52,7 +56,7 @@ export default function StoryCreateScreen() {
   async function openCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Kamera erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Kamera erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -67,19 +71,19 @@ export default function StoryCreateScreen() {
 
   async function handlePost() {
     if (!photo) {
-      Alert.alert("Fotoğraf Ekle", "Hikaye için önce bir fotoğraf seç.");
+      showAlert("Fotoğraf Ekle", "Hikaye için önce bir fotoğraf seç.");
       return;
     }
     setPosting(true);
     try {
       await createStory(photo, caption.trim() || undefined);
       setPosting(false);
-      Alert.alert("Hikaye Paylaşıldı!", "Hikayen 24 saat boyunca görünecek.", [
+      showAlert("Hikaye Paylaşıldı!", "Hikayen 24 saat boyunca görünecek.", [
         { text: "Tamam", onPress: () => router.back() },
       ]);
     } catch (e: any) {
       setPosting(false);
-      Alert.alert("Hata", e.message ?? "Hikaye paylaşılamadı.");
+      showAlert("Hata", e.message ?? "Hikaye paylaşılamadı.");
     }
   }
 
@@ -119,39 +123,47 @@ export default function StoryCreateScreen() {
       {/* Content */}
       {photo ? (
         /* ── Preview mode ── */
-        <Animated.View entering={FadeIn.duration(300)} style={styles.previewWrap}>
-          <Image source={{ uri: photo }} style={styles.previewImg} resizeMode="cover" />
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.7)"]}
-            style={styles.previewGrad}
-          />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <Animated.View entering={FadeIn.duration(300)} style={styles.previewWrap}>
+              <Image source={{ uri: photo }} style={styles.previewImg} resizeMode="cover" />
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.7)"]}
+                style={styles.previewGrad}
+              />
 
-          {/* Caption */}
-          <TextInput
-            style={styles.captionInput}
-            placeholder="Bir şeyler yaz..."
-            placeholderTextColor="rgba(255,255,255,0.55)"
-            value={caption}
-            onChangeText={setCaption}
-            multiline
-            maxLength={150}
-          />
+              {/* Caption */}
+              <TextInput
+                style={styles.captionInput}
+                placeholder="Bir şeyler yaz..."
+                placeholderTextColor="rgba(255,255,255,0.55)"
+                value={caption}
+                onChangeText={setCaption}
+                multiline
+                maxLength={150}
+              />
 
-          {/* Remove */}
-          <Pressable
-            onPress={() => setPhoto(null)}
-            style={styles.removeBtn}
-            hitSlop={8}
-          >
-            <Ionicons name="close-circle" size={30} color="rgba(255,255,255,0.85)" />
-          </Pressable>
+              {/* Remove */}
+              <Pressable
+                onPress={() => setPhoto(null)}
+                style={styles.removeBtn}
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={30} color="rgba(255,255,255,0.85)" />
+              </Pressable>
 
-          {/* Story tip */}
-          <View style={styles.storyTipWrap}>
-            <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.storyTip}>24 saat sonra otomatik silinir</Text>
-          </View>
-        </Animated.View>
+              {/* Story tip */}
+              <View style={styles.storyTipWrap}>
+                <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.storyTip}>24 saat sonra otomatik silinir</Text>
+              </View>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       ) : (
         /* ── Pick mode ── */
         <Animated.View entering={FadeInDown.duration(320)} style={styles.pickArea}>

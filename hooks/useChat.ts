@@ -66,38 +66,44 @@ export function useChat(otherUid: string) {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const loadingMoreRef = useRef(false);
+  const PAGE_SIZE = 50;
 
-  // Fetch messages from API
+  function mapMsg(m: any): ChatMessage {
+    return {
+      id: m._id || m.id || String(Math.random()),
+      senderId: m.senderId,
+      text: m.text ?? "",
+      type: m.type ?? "text",
+      createdAt: m.createdAt ?? null,
+      status: m.status ?? "sent",
+      deleted: m.deleted ?? false,
+      reactions: m.reactions ?? [],
+      imageUrl: m.imageUrl ?? null,
+      audioUrl: m.audioUrl ?? null,
+      audioDuration: m.audioDuration ?? 0,
+      replyTo: m.replyTo ?? null,
+      gift: m.gift ?? undefined,
+      storyReply: m.storyReply ?? undefined,
+      sharedPost: m.sharedPost ?? undefined,
+    };
+  }
+
   useEffect(() => {
     if (!chatKey || !otherUid) { setLoading(false); return; }
     let cancelled = false;
 
-    api.get<any[]>(`/api/chats/${otherUid}/messages`)
+    api.get<any[]>(`/api/chats/${otherUid}/messages?limit=${PAGE_SIZE}`)
       .then((msgs) => {
         if (cancelled) return;
-        const mapped: ChatMessage[] = msgs.map((m: any) => ({
-          id: m._id || m.id || String(Math.random()),
-          senderId: m.senderId,
-          text: m.text ?? "",
-          type: m.type ?? "text",
-          createdAt: m.createdAt ?? null,
-          status: m.status ?? "sent",
-          deleted: m.deleted ?? false,
-          reactions: m.reactions ?? [],
-          imageUrl: m.imageUrl ?? null,
-          audioUrl: m.audioUrl ?? null,
-          audioDuration: m.audioDuration ?? 0,
-          replyTo: m.replyTo ?? null,
-          gift: m.gift ?? undefined,
-          storyReply: m.storyReply ?? undefined,
-          sharedPost: m.sharedPost ?? undefined,
-        }));
+        const mapped = msgs.map(mapMsg);
         setMessages(mapped);
+        setHasMore(msgs.length >= PAGE_SIZE);
         setLoading(false);
       })
       .catch(() => setLoading(false));
 
-    // Sohbet acildiginda karsi tarafin mesajlarini "read" olarak isaretle
     const socket = getSocket();
     if (socket?.connected) {
       socket.emit("chat:read", { chatKey, readerUid: myUid });
@@ -105,6 +111,26 @@ export function useChat(otherUid: string) {
 
     return () => { cancelled = true; };
   }, [chatKey, otherUid]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMoreRef.current || !otherUid || messages.length === 0) return;
+    loadingMoreRef.current = true;
+    try {
+      const oldest = messages[0];
+      const before = oldest?.createdAt ?? "";
+      const older = await api.get<any[]>(`/api/chats/${otherUid}/messages?limit=${PAGE_SIZE}&before=${encodeURIComponent(before)}`);
+      if (older.length > 0) {
+        const mapped = older.map(mapMsg);
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newMsgs = mapped.filter((m) => !existingIds.has(m.id));
+          return [...newMsgs, ...prev];
+        });
+      }
+      setHasMore(older.length >= PAGE_SIZE);
+    } catch {}
+    loadingMoreRef.current = false;
+  }, [hasMore, otherUid, messages]);
 
   // Listen for real-time messages via Socket.IO
   useEffect(() => {

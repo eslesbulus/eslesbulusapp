@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -101,6 +101,27 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
     inputRef.current?.focus();
   }, []);
 
+  const sortedComments = useMemo(() => {
+    const roots: PostComment[] = [];
+    const repliesMap = new Map<string, PostComment[]>();
+    for (const c of comments) {
+      if (c.replyTo) {
+        const list = repliesMap.get(c.replyTo) || [];
+        list.push(c);
+        repliesMap.set(c.replyTo, list);
+      } else {
+        roots.push(c);
+      }
+    }
+    const result: PostComment[] = [];
+    for (const root of roots) {
+      result.push(root);
+      const replies = repliesMap.get(root.id);
+      if (replies) result.push(...replies);
+    }
+    return result;
+  }, [comments]);
+
   function handleClose() {
     Keyboard.dismiss();
     setReplyingTo(null);
@@ -147,7 +168,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
 
           <FlatList
             ref={listRef}
-            data={comments}
+            data={sortedComments}
             keyExtractor={(item) => item.id}
             style={styles.list}
             contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14 }}

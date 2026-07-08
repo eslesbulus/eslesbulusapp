@@ -6,7 +6,6 @@ import {
   ScrollView,
   Image,
   Pressable,
-  Alert,
   Switch,
   Dimensions,
   Platform,
@@ -15,6 +14,7 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,6 +32,7 @@ import { MyPostsSection } from "@/components/profile/MyPostsSection";
 import { usePosts } from "@/hooks/usePosts";
 import { api } from "@/config/api";
 import { useMyTickets } from "@/hooks/useSupportTickets";
+import { showAlert } from "@/components/common/CustomAlert";
 
 const SCREEN_W = Dimensions.get("window").width;
 const PHOTO_GAP = 6;
@@ -51,6 +52,8 @@ export default function ProfileScreen() {
   const { posts: myPosts, deletePost, archivePost, editPost } = usePosts(user?.uid);
   const { totalUnread: unreadTickets, tickets } = useMyTickets();
   const [verificationOpen, setVerificationOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   function calcAge(birthDate?: string): string {
     if (!birthDate) return "";
@@ -62,7 +65,7 @@ export default function ProfileScreen() {
   }
 
   function handleLogout() {
-    Alert.alert("Çıkış Yap", "Hesabından çıkış yapmak istediğine emin misin?", [
+    showAlert("Çıkış Yap", "Hesabından çıkış yapmak istediğine emin misin?", [
       { text: "İptal", style: "cancel" },
       { text: "Çıkış Yap", style: "destructive", onPress: () => signOut() },
     ]);
@@ -294,22 +297,14 @@ export default function ProfileScreen() {
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
               icon="shield-checkmark-outline"
-              label={
-                profile?.verified
-                  ? "Hesabın Doğrulandı ✓"
-                  : profile?.verificationStatus === "pending"
-                  ? "Doğrulama İnceleniyor…"
-                  : profile?.verificationStatus === "rejected"
-                  ? "Doğrulama Reddedildi"
-                  : "Hesabı Doğrula"
-              }
+              label="Hesabı Doğrula"
               value={
                 profile?.verified
-                  ? "Profilinde onay rozeti gösteriliyor"
+                  ? "Doğrulandı ✓"
                   : profile?.verificationStatus === "pending"
-                  ? "En geç 24 saat içinde sonuçlanır"
+                  ? "İnceleniyor…"
                   : profile?.verificationStatus === "rejected"
-                  ? "Tekrar denemek için dokun"
+                  ? "Reddedildi · Tekrar dene"
                   : "Onaylı rozet kazan"
               }
               onPress={() => setVerificationOpen(true)}
@@ -344,9 +339,17 @@ export default function ProfileScreen() {
           <SectionHeader title="Destek" c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
+              icon="alert-circle-outline"
+              label="Sorun Bildir"
+              value="Bize ulaşın"
+              onPress={() => setReportOpen(true)}
+              c={c}
+            />
+            <Divider c={c} />
+            <NavRow
               icon="help-circle-outline"
               label="Yardım Merkezi"
-              onPress={() => Alert.alert("Yardım", "destek@eslesbulus.com")}
+              onPress={() => showAlert("Yardım", "destek@eslesbulus.com")}
               c={c}
             />
             <Divider c={c} />
@@ -363,11 +366,25 @@ export default function ProfileScreen() {
               icon="information-circle-outline"
               label="Uygulama Hakkında"
               value="v1.0.0"
-              onPress={() => {}}
+              onPress={() => setAboutOpen(true)}
               c={c}
             />
           </View>
         </Animated.View>
+
+        {/* ── Sorun Bildir Modal ── */}
+        <ReportIssueModal
+          visible={reportOpen}
+          onClose={() => setReportOpen(false)}
+          colors={c}
+        />
+
+        {/* ── Uygulama Hakkında Modal ── */}
+        <AboutModal
+          visible={aboutOpen}
+          onClose={() => setAboutOpen(false)}
+          colors={c}
+        />
 
         {/* ── Doğrulama Sheet ── */}
         <VerificationSheet
@@ -467,6 +484,162 @@ function NavRow({
       ) : null}
       <Ionicons name="chevron-forward" size={16} color={c.textMuted} style={{ marginLeft: 4 }} />
     </Pressable>
+  );
+}
+
+function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; onClose: () => void; colors: any }) {
+  const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  async function handlePickPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setPhoto(result.assets[0].uri);
+    }
+  }
+
+  async function handleSend() {
+    if (!text.trim()) {
+      showAlert("Hata", "Lütfen sorununuzu yazın.");
+      return;
+    }
+    setSending(true);
+    try {
+      let photoUrl = "";
+      if (photo) {
+        const uploaded = await api.upload("reports", photo, "image");
+        photoUrl = uploaded.url;
+      }
+      await api.post("/api/reports", {
+        type: "support",
+        reason: "Sorun Bildir",
+        details: text.trim(),
+        photo: photoUrl || undefined,
+      });
+      setText("");
+      setPhoto(null);
+      onClose();
+      showAlert("Gönderildi", "Sorun bildiriminiz alındı. Destek Talepleri'nden takip edebilirsiniz.");
+    } catch (e: any) {
+      showAlert("Hata", e?.message ?? "Gönderilemedi, tekrar deneyin.");
+    }
+    setSending(false);
+  }
+
+  function handleClose() {
+    setText("");
+    setPhoto(null);
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, justifyContent: "flex-end" }}
+        >
+        <Pressable onPress={handleClose} style={styles.reportOverlay}>
+          <Pressable onPress={(e) => e.stopPropagation()} style={[styles.reportSheet, { backgroundColor: c.card }]}>
+            <View style={[styles.reportHandle, { backgroundColor: c.border }]} />
+            <Text style={[styles.reportTitle, { color: c.text }]}>Sorun Bildir</Text>
+            <Text style={[styles.reportSubtitle, { color: c.textMuted }]}>
+              Yaşadığınız sorunu detaylıca açıklayın, isterseniz ekran görüntüsü ekleyin.
+            </Text>
+            <TextInput
+              style={[styles.reportInput, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
+              placeholder="Sorununuzu buraya yazın..."
+              placeholderTextColor={c.textMuted}
+              multiline
+              value={text}
+              onChangeText={setText}
+              maxLength={1000}
+            />
+            {/* Ekran görüntüsü */}
+            {photo ? (
+              <View style={styles.reportPhotoWrap}>
+                <Image source={{ uri: photo }} style={styles.reportPhotoPreview} />
+                <Pressable onPress={() => setPhoto(null)} style={[styles.reportPhotoRemove, { backgroundColor: c.primary }]}>
+                  <Ionicons name="close" size={14} color="#fff" />
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable onPress={handlePickPhoto} style={[styles.reportPhotoBtn, { borderColor: c.border }]}>
+                <Ionicons name="image-outline" size={20} color={c.primary} />
+                <Text style={{ color: c.primary, fontWeight: "600", fontSize: 14 }}>Ekran Görüntüsü Ekle</Text>
+              </Pressable>
+            )}
+            <View style={styles.reportActions}>
+              <Pressable onPress={handleClose} style={[styles.reportCancelBtn, { borderColor: c.border }]}>
+                <Text style={{ color: c.textMuted, fontWeight: "600" }}>İptal</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSend}
+                disabled={sending}
+                style={[styles.reportSendBtn, { backgroundColor: c.primary, opacity: sending ? 0.6 : 1 }]}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Gönder</Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+        </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+}
+
+function AboutModal({ visible, onClose, colors: c }: { visible: boolean; onClose: () => void; colors: any }) {
+  const infoRows = [
+    { icon: "code-slash-outline" as const, label: "Sürüm", value: "1.0.0" },
+    { icon: "business-outline" as const, label: "Geliştirici", value: "EşleşBuluş" },
+    { icon: "mail-outline" as const, label: "İletişim", value: "destek@eslesbulus.com" },
+    { icon: "shield-checkmark-outline" as const, label: "Gizlilik", value: "KVKK Uyumlu" },
+  ];
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={styles.reportOverlay}>
+        <Pressable onPress={(e) => e.stopPropagation()} style={[styles.reportSheet, { backgroundColor: c.card }]}>
+          <View style={[styles.reportHandle, { backgroundColor: c.border }]} />
+          <View style={{ alignItems: "center", paddingVertical: 20, gap: 8 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: `${c.primary}15`, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="heart-circle" size={40} color={c.primary} />
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: "800", color: c.text }}>EşleşBuluş</Text>
+            <Text style={{ fontSize: 13, color: c.textMuted }}>Kalbini dinle, eşini bul</Text>
+          </View>
+          <View style={{ paddingHorizontal: 16, gap: 1 }}>
+            {infoRows.map((row, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: i < infoRows.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border }}>
+                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: `${c.primary}12`, alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Ionicons name={row.icon} size={17} color={c.primary} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: c.text }}>{row.label}</Text>
+                <Text style={{ fontSize: 14, color: c.textMuted }}>{row.value}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={{ alignItems: "center", paddingVertical: 20, gap: 4 }}>
+            <Text style={{ fontSize: 11, color: c.textMuted }}>Tüm hakları saklıdır.</Text>
+            <Text style={{ fontSize: 11, color: c.textMuted }}>2024-2025 EşleşBuluş</Text>
+          </View>
+          <Pressable onPress={onClose} style={{ alignSelf: "center", paddingVertical: 12, paddingHorizontal: 32, backgroundColor: c.primary, borderRadius: 14, marginBottom: 16 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Kapat</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -682,4 +855,19 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   logoutText: { fontSize: 15, fontWeight: "700" },
+
+  // Sorun Bildir Modal
+  reportOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  reportSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingBottom: 32 },
+  reportHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginVertical: 10 },
+  reportTitle: { fontSize: 17, fontWeight: "800", textAlign: "center", marginBottom: 4 },
+  reportSubtitle: { fontSize: 13, textAlign: "center", paddingHorizontal: 24, marginBottom: 12 },
+  reportInput: { marginHorizontal: 16, borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 100, textAlignVertical: "top", marginBottom: 12 },
+  reportPhotoBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 12, paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderStyle: "dashed" },
+  reportPhotoWrap: { marginHorizontal: 16, marginBottom: 12, position: "relative", alignSelf: "flex-start" },
+  reportPhotoPreview: { width: 120, height: 120, borderRadius: 12 },
+  reportPhotoRemove: { position: "absolute", top: -6, right: -6, width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  reportActions: { flexDirection: "row", gap: 10, paddingHorizontal: 16 },
+  reportCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1, alignItems: "center" },
+  reportSendBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
 });

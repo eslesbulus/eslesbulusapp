@@ -11,6 +11,7 @@ import { InteractionsProvider } from "@/context/InteractionsContext";
 import { BlockedUsersProvider } from "@/context/BlockedUsersContext";
 import { CoinsProvider } from "@/context/CoinsContext";
 import { PremiumProvider } from "@/context/PremiumContext";
+import { CustomAlertProvider } from "@/components/common/CustomAlert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { BASE_URL } from "@/config/api";
 import MaintenanceScreen from "@/components/MaintenanceScreen";
@@ -175,7 +176,9 @@ function MaintenanceGate() {
         <InteractionsProvider>
           <BlockedUsersProvider>
             <CoinsProvider>
-              <RootNavigator />
+              <CustomAlertProvider>
+                <RootNavigator />
+              </CustomAlertProvider>
             </CoinsProvider>
           </BlockedUsersProvider>
         </InteractionsProvider>

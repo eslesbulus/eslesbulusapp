@@ -417,15 +417,11 @@ export default function ChatDetailScreen() {
     setTimeout(() => { sendingRef.current = false; }, 150);
   }
 
-  if (userLoading || !user) {
+  if (!user && !userLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
         <View style={styles.notFound}>
-          {userLoading ? (
-            <Text style={[styles.notFoundText, { color: c.textMuted }]}>Yükleniyor…</Text>
-          ) : (
-            <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
-          )}
+          <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
         </View>
       </SafeAreaView>
     );
@@ -535,9 +531,7 @@ export default function ChatDetailScreen() {
           }
           ListEmptyComponent={
             chatLoading ? (
-              <View style={styles.loadingWrap}>
-                <Text style={[styles.loadingText, { color: c.textMuted }]}>Mesajlar yükleniyor…</Text>
-              </View>
+              <ChatSkeleton colors={c} />
             ) : null
           }
           renderItem={({ item }) => {
@@ -1269,6 +1263,43 @@ const Bubble = memo(function Bubble({
     </Pressable>
   );
 });
+
+function ChatSkeleton({ colors: c }: { colors: any }) {
+  const shimmer = useSharedValue(0.3);
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1, true
+    );
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ opacity: shimmer.value }));
+  const lines = [
+    { w: "55%", align: "flex-end" as const },
+    { w: "70%", align: "flex-start" as const },
+    { w: "45%", align: "flex-end" as const },
+    { w: "60%", align: "flex-start" as const },
+    { w: "50%", align: "flex-end" as const },
+  ];
+  return (
+    <View style={{ paddingHorizontal: 14, paddingVertical: 16, gap: 12, transform: [{ scaleY: -1 }] }}>
+      {lines.map((l, i) => (
+        <Animated.View
+          key={i}
+          style={[animStyle, {
+            alignSelf: l.align,
+            width: l.w as any,
+            height: 38,
+            borderRadius: 16,
+            backgroundColor: c.surface,
+          }]}
+        />
+      ))}
+    </View>
+  );
+}
 
 function DateSeparator({ label, colors: c }: { label: string; colors: any }) {
   return (

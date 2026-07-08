@@ -7,9 +7,9 @@ import {
   Pressable,
   FlatList,
   Image,
-  Alert,
   TouchableWithoutFeedback,
 } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUsers } from "@/hooks/useUsers";
@@ -31,6 +31,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
   const chatUsers = users.slice(0, 6);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [sentNames, setSentNames] = useState<string | null>(null);
 
   function toggleUser(id: string) {
     setSelected((prev) => {
@@ -65,8 +66,12 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
 
     onSent();
     setSelected(new Set());
-    onClose();
-    Alert.alert("Gönderildi", `Gönderi ${recipients.map((u) => u.name).join(", ")} kişisine paylaşıldı.`);
+    const names = recipients.map((u) => u.name).join(", ");
+    setSentNames(names);
+    setTimeout(() => {
+      setSentNames(null);
+      onClose();
+    }, 1800);
   }
 
   function handleClose() {
@@ -128,6 +133,21 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                 {post.text || "Fotoğraf"}
               </Text>
             </View>
+          )}
+
+          {/* Gönderildi overlay */}
+          {sentNames && (
+            <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(250)} style={styles.sentOverlay}>
+              <View style={[styles.sentCard, { backgroundColor: c.card }]}>
+                <View style={[styles.sentIcon, { backgroundColor: `${c.primary}18` }]}>
+                  <Ionicons name="checkmark-circle" size={44} color={c.primary} />
+                </View>
+                <Text style={[styles.sentTitle, { color: c.text }]}>Gönderildi!</Text>
+                <Text style={[styles.sentDesc, { color: c.textMuted }]}>
+                  {sentNames} kişisine paylaşıldı
+                </Text>
+              </View>
+            </Animated.View>
           )}
 
           {/* Kullanıcı Listesi */}
@@ -206,6 +226,31 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   emptyUsersText: { fontSize: 14 },
+  sentOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  sentCard: {
+    alignItems: "center",
+    padding: 32,
+    borderRadius: 20,
+    gap: 10,
+    width: "80%",
+  },
+  sentIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sentTitle: { fontSize: 20, fontWeight: "800" },
+  sentDesc: { fontSize: 14, textAlign: "center" },
   handleWrap: { alignItems: "center", paddingTop: 10, paddingBottom: 4 },
   handle: { width: 36, height: 4, borderRadius: 2 },
 
