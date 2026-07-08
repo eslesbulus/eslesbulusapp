@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Image, Pressable, Alert } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,7 +14,7 @@ export default function BlockedUsersScreen() {
   const router = useRouter();
 
   function handleUnblock(id: string, name: string) {
-    Alert.alert(
+    showAlert(
       "Engeli Kaldır",
       `${name} adlı kullanıcının engelini kaldırmak istediğinden emin misin?`,
       [

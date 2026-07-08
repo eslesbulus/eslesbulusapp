@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import type { Post } from "@/hooks/usePosts";
@@ -52,7 +53,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
   }
 
   function confirmDelete(id: string) {
-    Alert.alert("Gönderiyi Sil", "Bu gönderi kalıcı olarak silinecek. Emin misin?", [
+    showAlert("Gönderiyi Sil", "Bu gönderi kalıcı olarak silinecek. Emin misin?", [
       { text: "İptal", style: "cancel" },
       { text: "Sil", style: "destructive", onPress: () => onDelete(id) },
     ]);

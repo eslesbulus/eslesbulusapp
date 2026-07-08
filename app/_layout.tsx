@@ -187,12 +187,19 @@ function MaintenanceGate() {
   );
 }
 
+function ThemedRoot() {
+  const { theme } = useTheme();
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <MaintenanceGate />
+    </GestureHandlerRootView>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <MaintenanceGate />
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <ThemeProvider>
+      <ThemedRoot />
+    </ThemeProvider>
   );
 }

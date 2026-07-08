@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -261,7 +262,7 @@ export default function StoryScreen() {
     if (kind === "emoji") {
       // Emoji = story like (5/day limit, premium unlimited)
       if (!canLikeStory) {
-        Alert.alert(
+        showAlert(
           "Günlük Limit Doldu",
           `Bugün ${DAILY_STORY_LIKE_LIMIT} hikaye beğeni hakkını kullandın. Premium ile sınırsız beğen!`,
           [
@@ -278,7 +279,7 @@ export default function StoryScreen() {
     } else {
       // Text = story reply (costs tokens like message)
       if (tokenBalance < TOKENS_PER_MESSAGE) {
-        Alert.alert(
+        showAlert(
           "Jeton Yetersiz 🪙",
           `Yanıt göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor.`,
           [

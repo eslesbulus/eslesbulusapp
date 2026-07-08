@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -152,7 +153,7 @@ export default function CoinsScreen() {
   const selectedPkg = packages.find((p) => p.id === selected) ?? packages[0];
 
   async function handlePurchase() {
-    Alert.alert(
+    showAlert(
       "Jeton Satın Al 🪙",
       `${selectedPkg.tokens} jeton ${selectedPkg.price} karşılığında satın almak istiyor musun?`,
       [
@@ -163,13 +164,13 @@ export default function CoinsScreen() {
             setLoading(true);
             try {
               await add(selectedPkg.tokens);
-              Alert.alert(
+              showAlert(
                 "🎉 Jeton Eklendi!",
                 `${selectedPkg.tokens} jeton hesabına eklendi. Şimdi sohbet başlatabilirsin!`,
                 [{ text: "Harika!", onPress: () => router.back() }]
               );
             } catch {
-              Alert.alert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
+              showAlert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
             } finally {
               setLoading(false);
             }

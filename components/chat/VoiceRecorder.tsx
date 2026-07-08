@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Alert } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -78,7 +79,7 @@ export function VoiceRecorder({
   async function ensurePermission(): Promise<boolean> {
     const { granted } = await requestRecordingPermissionsAsync();
     if (!granted) {
-      Alert.alert("Mikrofon İzni", "Sesli mesaj göndermek için mikrofon iznine ihtiyaç var.");
+      showAlert("Mikrofon İzni", "Sesli mesaj göndermek için mikrofon iznine ihtiyaç var.");
     }
     return granted;
   }

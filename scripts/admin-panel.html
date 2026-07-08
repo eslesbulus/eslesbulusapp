@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EşleşBuluş Admin Panel</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', sans-serif; }
+body { background: #0f172a; color: #e2e8f0; }
+.sidebar { background: #1e293b; min-height: 100vh; width: 260px; position: fixed; left: 0; top: 0; z-index: 40; transition: transform 0.3s; }
+.main-content { margin-left: 260px; min-height: 100vh; }
+.card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; }
+.card-hover:hover { border-color: #6366f1; box-shadow: 0 0 20px rgba(99,102,241,0.1); }
+.stat-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+.btn-primary { background: #6366f1; color: white; padding: 8px 20px; border-radius: 8px; font-weight: 500; transition: all 0.2s; }
+.btn-primary:hover { background: #4f46e5; transform: translateY(-1px); }
+.btn-danger { background: #ef4444; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 500; }
+.btn-danger:hover { background: #dc2626; }
+.btn-success { background: #22c55e; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 500; }
+.btn-success:hover { background: #16a34a; }
+.btn-warning { background: #f59e0b; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 500; }
+.btn-warning:hover { background: #d97706; }
+.input { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px 14px; color: #e2e8f0; width: 100%; outline: none; }
+.input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+.nav-item { padding: 10px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; border-radius: 8px; margin: 2px 12px; transition: all 0.2s; color: #94a3b8; }
+.nav-item:hover { background: #334155; color: #e2e8f0; }
+.nav-item.active { background: #6366f1; color: white; }
+.badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge-green { background: #065f46; color: #6ee7b7; }
+.badge-red { background: #7f1d1d; color: #fca5a5; }
+.badge-yellow { background: #78350f; color: #fcd34d; }
+.badge-blue { background: #1e3a5f; color: #93c5fd; }
+.badge-purple { background: #3b0764; color: #c4b5fd; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px 16px; color: #94a3b8; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+td { padding: 12px 16px; border-bottom: 1px solid #1e293b; }
+tr:hover td { background: #1e293b44; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal { background: #1e293b; border-radius: 16px; padding: 24px; min-width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto; border: 1px solid #334155; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #334155; }
+.avatar-sm { width: 32px; height: 32px; }
+.avatar-lg { width: 80px; height: 80px; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.login-bg { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); }
+.photo-grid img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer; }
+.photo-grid img:hover { opacity: 0.8; transform: scale(1.05); transition: 0.2s; }
+.toggle { width: 44px; height: 24px; border-radius: 12px; background: #475569; cursor: pointer; position: relative; transition: 0.3s; }
+.toggle.on { background: #6366f1; }
+.toggle::after { content: ''; width: 20px; height: 20px; border-radius: 50%; background: white; position: absolute; top: 2px; left: 2px; transition: 0.3s; }
+.toggle.on::after { left: 22px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-bg min-h-screen flex items-center justify-center">
+  <div class="card p-8 w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="text-4xl mb-2">💕</div>
+      <h1 class="text-2xl font-bold text-white">EşleşBuluş</h1>
+      <p class="text-slate-400 mt-1">Admin Panel</p>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">Kullanıcı Adı</label>
+        <input id="loginUser" class="input" placeholder="admin" autocomplete="username">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">Şifre</label>
+        <input id="loginPass" type="password" class="input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="loginError" class="text-red-400 text-sm hidden"></div>
+      <button onclick="doLogin()" class="btn-primary w-full py-3 text-center">Giriş Yap</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" class="hidden">
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="p-5 border-b border-slate-700">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">💕</span>
+        <div>
+          <h2 class="text-lg font-bold text-white">EşleşBuluş</h2>
+          <p class="text-xs text-slate-400">Admin Panel</p>
+        </div>
+      </div>
+    </div>
+    <nav class="py-4">
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <span>📊</span><span>Dashboard</span>
+      </div>
+      <div class="nav-item" onclick="navigate('users')">
+        <span>👥</span><span>Kullanıcılar</span>
+      </div>
+      <div class="nav-item" onclick="navigate('posts')">
+        <span>📝</span><span>Gönderiler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('chats')">
+        <span>💬</span><span>Mesajlar</span>
+      </div>
+      <div class="nav-item" onclick="navigate('stories')">
+        <span>📸</span><span>Hikayeler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('reports')">
+        <span>🚨</span><span>Şikayetler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('notifications')">
+        <span>🔔</span><span>Bildirimler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('gifts')">
+        <span>🎁</span><span>Hediyeler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('analytics')">
+        <span>📈</span><span>Analizler</span>
+      </div>
+      <div class="nav-item" onclick="navigate('system')">
+        <span>🛠️</span><span>Sistem Durumu</span>
+      </div>
+      <div class="nav-item" onclick="navigate('fakeusers')">
+        <span>🤖</span><span>Fake Kullanıcılar</span>
+      </div>
+      <div class="nav-item" onclick="navigate('botsettings')">
+        <span>🧠</span><span>Bot AI Ayarları</span>
+      </div>
+      <div class="nav-item" onclick="navigate('settings')">
+        <span>⚙️</span><span>Ayarlar</span>
+      </div>
+    </nav>
+    <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
+      <button onclick="doLogout()" class="text-slate-400 hover:text-white text-sm flex items-center gap-2 w-full">
+        <span>🚪</span> Çıkış Yap
+      </button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-content p-6">
+    <div id="pageContent"></div>
+  </div>
+</div>
+
+<!-- Modal container -->
+<div id="modalContainer"></div>
+
+<script>
+const API = '/admin/api';
+let TOKEN = localStorage.getItem('admin_token') || '';
+let currentPage = 'dashboard';
+
+// ── Auth ──
+async function doLogin() {
+  const user = document.getElementById('loginUser').value;
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  try {
+    const res = await fetch(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Hata');
+    TOKEN = data.token;
+    localStorage.setItem('admin_token', TOKEN);
+    showApp();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+function doLogout() {
+  TOKEN = '';
+  localStorage.removeItem('admin_token');
+  document.getElementById('appContainer').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+}
+
+function showApp() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('appContainer').classList.remove('hidden');
+  navigate('dashboard');
+}
+
+// Check token on load
+if (TOKEN) {
+  apiFetch('/dashboard').then(() => showApp()).catch(() => doLogout());
+}
+
+// ── API Helper ──
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN, ...opts.headers },
+  });
+  if (res.status === 401) { doLogout(); throw new Error('Oturum suresi doldu'); }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Hata');
+  return data;
+}
+
+// ── Navigation ──
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const navItems = document.querySelectorAll('.nav-item');
+  const pageNames = ['dashboard','users','posts','chats','stories','reports','notifications','gifts','analytics','system','fakeusers','botsettings','settings'];
+  const idx = pageNames.indexOf(page);
+  if (idx >= 0 && navItems[idx]) navItems[idx].classList.add('active');
+  renderPage(page);
+}
+
+function renderPage(page) {
+  const c = document.getElementById('pageContent');
+  c.innerHTML = '<div class="text-center py-20"><div class="pulse text-4xl">⏳</div><p class="text-slate-400 mt-4">Yükleniyor...</p></div>';
+  switch(page) {
+    case 'dashboard': renderDashboard(); break;
+    case 'users': renderUsers(); break;
+    case 'posts': renderPosts(); break;
+    case 'chats': renderChats(); break;
+    case 'stories': renderStories(); break;
+    case 'reports': renderReports(); break;
+    case 'notifications': renderNotifications(); break;
+    case 'gifts': renderGifts(); break;
+    case 'fakeusers': renderFakeUsers(); break;
+    case 'botsettings': renderBotSettings(); break;
+    case 'analytics': renderAnalytics(); break;
+    case 'system': renderSystem(); break;
+    case 'settings': renderSettings(); break;
+  }
+}
+
+// ════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════
+async function renderDashboard() {
+  const d = await apiFetch('/dashboard');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Dashboard</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      ${statCard('👥', 'Toplam Kullanıcı', d.totalUsers, 'blue')}
+      ${statCard('🟢', 'Çevrimiçi', d.onlineUsers, 'green')}
+      ${statCard('📝', 'Toplam Gönderi', d.totalPosts, 'purple')}
+      ${statCard('💬', 'Toplam Mesaj', d.totalMessages, 'yellow')}
+      ${statCard('📅', 'Bugün Kayıt', d.todayUsers, 'blue')}
+      ${statCard('📅', 'Bu Hafta Kayıt', d.weekUsers, 'blue')}
+      ${statCard('⭐', 'Premium', d.premiumUsers, 'purple')}
+      ${statCard('🪙', 'Dolaşımdaki Jeton', d.totalTokensInCirculation, 'yellow')}
+      ${statCard('💬', 'Toplam Sohbet', d.totalChats, 'green')}
+      ${statCard('📸', 'Aktif Hikaye', d.totalStories, 'purple')}
+      ${statCard('🔌', 'Socket Bağlantı', d.connectedSockets, 'green')}
+      ${statCard('📝', 'Bugün Gönderi', d.todayPosts, 'blue')}
+    </div>
+  `;
+}
+
+function statCard(icon, label, value, color) {
+  const colors = {
+    blue: 'from-blue-900/50 to-blue-950/30 border-blue-800/50',
+    green: 'from-emerald-900/50 to-emerald-950/30 border-emerald-800/50',
+    purple: 'from-purple-900/50 to-purple-950/30 border-purple-800/50',
+    yellow: 'from-amber-900/50 to-amber-950/30 border-amber-800/50',
+  };
+  return `<div class="rounded-xl border p-5 bg-gradient-to-br ${colors[color] || colors.blue}">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-slate-400 text-sm">${label}</p>
+        <p class="text-3xl font-bold text-white mt-1">${typeof value === 'number' ? value.toLocaleString('tr-TR') : value}</p>
+      </div>
+      <div class="text-3xl">${icon}</div>
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════════════
+//  USERS
+// ════════════════════════════════════════
+let usersPage = 1;
+async function renderUsers(page = 1) {
+  usersPage = page;
+  const search = document.getElementById('userSearch')?.value || '';
+  const d = await apiFetch(`/users?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Kullanıcılar <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+      <div class="flex gap-2">
+        <input id="userSearch" class="input w-64" placeholder="İsim, email veya UID ara..." value="${search}" onkeyup="if(event.key==='Enter')renderUsers(1)">
+        <button onclick="renderUsers(1)" class="btn-primary">Ara</button>
+      </div>
+    </div>
+    <div class="card overflow-hidden">
+      <table>
+        <thead><tr>
+          <th>Kullanıcı</th><th>Email</th><th>Şehir</th><th>Yaş</th><th>Jeton</th><th>Durum</th><th>Kayıt</th><th>İşlem</th>
+        </tr></thead>
+        <tbody>
+          ${d.users.map(u => `<tr>
+            <td>
+              <div class="flex items-center gap-3">
+                <img class="avatar" src="${u.photoURL || u.photos?.[0] || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23334155%22 width=%2240%22 height=%2240%22/><text x=%2220%22 y=%2225%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2216%22>?</text></svg>'">
+                <div>
+                  <p class="font-medium text-white">${esc(u.name || 'İsimsiz')}</p>
+                  <p class="text-xs text-slate-500">${u.uid?.substring(0,12)}...</p>
+                </div>
+              </div>
+            </td>
+            <td class="text-sm text-slate-400">${esc(u.email || '-')}</td>
+            <td class="text-sm">${esc(u.city || '-')}</td>
+            <td class="text-sm">${u.age || '-'}</td>
+            <td class="text-sm font-medium text-amber-400">🪙 ${u.tokens || 0}</td>
+            <td>
+              ${u.online ? '<span class="badge badge-green">Çevrimiçi</span>' : '<span class="badge" style="background:#334155;color:#64748b">Çevrimdışı</span>'}
+              ${u.isPremium ? ' <span class="badge badge-purple">Premium</span>' : ''}
+              ${u.banned ? ' <span class="badge badge-red">Banlı</span>' : ''}
+              ${u.verified ? ' <span class="badge badge-blue">✓</span>' : ''}
+            </td>
+            <td class="text-sm text-slate-400">${formatDate(u.createdAt)}</td>
+            <td>
+              <button onclick="showUserDetail('${u.uid}')" class="text-indigo-400 hover:text-indigo-300 text-sm font-medium">Detay</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${pagination(d.page, d.pages, 'renderUsers')}
+  `;
+}
+
+async function showUserDetail(uid) {
+  const u = await apiFetch(`/users/${uid}`);
+  const baseUrl = location.origin;
+  showModal(`
+    <div class="flex items-center gap-4 mb-6">
+      <img class="avatar-lg" src="${u.photoURL || u.photos?.[0] || ''}" onerror="this.style.display='none'">
+      <div>
+        <h2 class="text-xl font-bold text-white">${esc(u.name || 'İsimsiz')}</h2>
+        <p class="text-slate-400">${esc(u.email)}</p>
+        <p class="text-xs text-slate-500 mt-1">UID: ${u.uid}</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="card p-3"><span class="text-slate-400 text-sm">Cinsiyet:</span> <span class="text-white">${u.gender || '-'}</span></div>
+      <div class="card p-3"><span class="text-slate-400 text-sm">Yaş:</span> <span class="text-white">${u.age || '-'}</span></div>
+      <div class="card p-3"><span class="text-slate-400 text-sm">Şehir:</span> <span class="text-white">${u.city || '-'}</span></div>
+      <div class="card p-3"><span class="text-slate-400 text-sm">Boy:</span> <span class="text-white">${u.height ? u.height + ' cm' : '-'}</span></div>
+      <div class="card p-3"><span class="text-slate-400 text-sm">Meslek:</span> <span class="text-white">${u.job || '-'}</span></div>
+      <div class="card p-3"><span class="text-slate-400 text-sm">Doğum:</span> <span class="text-white">${u.birthDate || '-'}</span></div>
+    </div>
+    ${u.bio ? `<div class="card p-3 mb-4"><span class="text-slate-400 text-sm">Bio:</span><p class="text-white mt-1">${esc(u.bio)}</p></div>` : ''}
+    ${u.interests?.length ? `<div class="card p-3 mb-4"><span class="text-slate-400 text-sm">İlgi Alanları:</span><div class="flex flex-wrap gap-2 mt-2">${u.interests.map(i => `<span class="badge badge-blue">${esc(i)}</span>`).join('')}</div></div>` : ''}
+    ${u.photos?.length ? `<div class="card p-3 mb-4"><span class="text-slate-400 text-sm">Fotoğraflar:</span><div class="photo-grid flex flex-wrap gap-2 mt-2">${u.photos.map(p => `<img src="${p}" onerror="this.style.display='none'">`).join('')}</div></div>` : ''}
+    <div class="card p-4 mb-4">
+      <h3 class="font-semibold text-white mb-3">Yönetim</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-slate-400">Jeton</label>
+          <input id="editTokens" type="number" class="input mt-1" value="${u.tokens || 0}">
+        </div>
+        <div>
+          <label class="text-sm text-slate-400">Premium Bitiş</label>
+          <input id="editPremiumExpiry" type="date" class="input mt-1" value="${u.premiumExpiry ? new Date(u.premiumExpiry).toISOString().split('T')[0] : ''}">
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3 mt-4">
+        <button onclick="toggleUserField('${u.uid}','isPremium',${!u.isPremium})" class="${u.isPremium ? 'btn-warning' : 'btn-success'}">${u.isPremium ? 'Premium Kaldır' : 'Premium Yap'}</button>
+        <button onclick="toggleUserField('${u.uid}','verified',${!u.verified})" class="${u.verified ? 'btn-warning' : 'btn-success'}">${u.verified ? 'Doğrulama Kaldır' : 'Doğrula'}</button>
+        <button onclick="toggleUserField('${u.uid}','vip',${!u.vip})" class="${u.vip ? 'btn-warning' : 'btn-success'}">${u.vip ? 'VIP Kaldır' : 'VIP Yap'}</button>
+        <button onclick="toggleUserField('${u.uid}','banned',${!u.banned})" class="${u.banned ? 'btn-success' : 'btn-danger'}">${u.banned ? 'Ban Kaldır' : 'Banla'}</button>
+        <button onclick="toggleUserField('${u.uid}','suspended',${!u.suspended})" class="${u.suspended ? 'btn-success' : 'btn-warning'}">${u.suspended ? 'Askıyı Kaldır' : 'Askıya Al'}</button>
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button onclick="updateUserTokens('${u.uid}')" class="btn-primary">Jeton Güncelle</button>
+        <button onclick="updateUserPremium('${u.uid}')" class="btn-primary">Premium Süre Güncelle</button>
+      </div>
+    </div>
+    <div class="card p-3">
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div><span class="text-slate-400">Kayıt:</span> <span class="text-white">${formatDateTime(u.createdAt)}</span></div>
+        <div><span class="text-slate-400">Son Aktif:</span> <span class="text-white">${formatDateTime(u.lastActive)}</span></div>
+        <div><span class="text-slate-400">Beğeni:</span> <span class="text-white">${u.likedUsers?.length || 0}</span></div>
+        <div><span class="text-slate-400">Engellenen:</span> <span class="text-white">${u.blockedUsers?.length || 0}</span></div>
+      </div>
+    </div>
+  `);
+}
+
+async function toggleUserField(uid, field, value) {
+  await apiFetch(`/users/${uid}`, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
+  showUserDetail(uid);
+}
+
+async function updateUserTokens(uid) {
+  const tokens = parseInt(document.getElementById('editTokens').value);
+  await apiFetch(`/users/${uid}`, { method: 'PATCH', body: JSON.stringify({ tokens }) });
+  showUserDetail(uid);
+}
+
+async function updateUserPremium(uid) {
+  const expiry = document.getElementById('editPremiumExpiry').value;
+  await apiFetch(`/users/${uid}`, { method: 'PATCH', body: JSON.stringify({ isPremium: true, premiumExpiry: expiry ? new Date(expiry) : null }) });
+  showUserDetail(uid);
+}
+
+// ════════════════════════════════════════
+//  POSTS
+// ════════════════════════════════════════
+async function renderPosts(page = 1) {
+  const d = await apiFetch(`/posts?page=${page}&limit=20`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Gönderiler <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+    <div class="grid gap-4">
+      ${d.posts.map(p => `
+        <div class="card p-4 card-hover">
+          <div class="flex items-start gap-3">
+            <img class="avatar" src="${p.user?.photoURL || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%23334155%22 width=%2240%22 height=%2240%22/></svg>'">
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="font-medium text-white">${esc(p.user?.name || 'Bilinmeyen')}</span>
+                  <span class="text-slate-500 text-sm ml-2">${formatDateTime(p.createdAt)}</span>
+                </div>
+                <button onclick="deletePost('${p._id}')" class="btn-danger text-xs">Sil</button>
+              </div>
+              <p class="text-slate-300 mt-2">${esc(p.text || '')}</p>
+              ${p.imageUrl ? `<img src="${p.imageUrl}" class="mt-2 rounded-lg max-h-64 object-cover" onerror="this.style.display='none'">` : ''}
+              <div class="flex gap-4 mt-3 text-sm text-slate-400">
+                <span>❤️ ${p.likesCount || 0}</span>
+                <span>💬 ${p.commentsCount || p.comments?.length || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${pagination(d.page, d.pages, 'renderPosts')}
+  `;
+}
+
+async function deletePost(id) {
+  if (!confirm('Bu gönderiyi silmek istediğinize emin misiniz?')) return;
+  await apiFetch(`/posts/${id}`, { method: 'DELETE' });
+  renderPosts();
+}
+
+// ════════════════════════════════════════
+//  CHATS
+// ════════════════════════════════════════
+async function renderChats(page = 1) {
+  const search = document.getElementById('chatSearch')?.value || '';
+  const d = await apiFetch(`/chats?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Mesajlar <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+      <div class="flex gap-2">
+        <input id="chatSearch" class="input w-64" placeholder="Kullanıcı UID ile ara..." value="${search}" onkeyup="if(event.key==='Enter')renderChats(1)">
+        <button onclick="renderChats(1)" class="btn-primary">Ara</button>
+      </div>
+    </div>
+    <div class="card overflow-hidden">
+      <table>
+        <thead><tr><th>Katılımcılar</th><th>Son Mesaj</th><th>Tarih</th><th>İşlem</th></tr></thead>
+        <tbody>
+          ${d.chats.map(ch => `<tr>
+            <td>
+              <div class="flex items-center gap-2">
+                ${ch.participantDetails.map(p => `<div class="flex items-center gap-1"><img class="avatar-sm" src="${p.photoURL || ''}" onerror="this.style.display='none'"><span class="text-sm">${esc(p.name || p.uid?.substring(0,8))}</span></div>`).join('<span class="text-slate-600">↔</span>')}
+              </div>
+            </td>
+            <td class="text-sm text-slate-400 max-w-xs truncate">${esc(ch.lastMessage || '-')}</td>
+            <td class="text-sm text-slate-500">${formatDateTime(ch.lastMessageAt)}</td>
+            <td><button onclick="showChatMessages('${ch.chatKey}')" class="text-indigo-400 hover:text-indigo-300 text-sm font-medium">Mesajları Gör</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${pagination(d.page, d.pages, 'renderChats')}
+  `;
+}
+
+async function showChatMessages(chatKey) {
+  const d = await apiFetch(`/chats/${chatKey}/messages`);
+  const msgs = d.messages.slice(-100); // son 100 mesaj
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">Sohbet: ${chatKey}</h2>
+    <div class="max-h-96 overflow-y-auto space-y-2">
+      ${msgs.map(m => `
+        <div class="flex items-start gap-2 ${m.deleted ? 'opacity-50' : ''}">
+          <img class="avatar-sm mt-1" src="${m.senderPhoto || ''}" onerror="this.style.display='none'">
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-white">${esc(m.senderName)}</span>
+              <span class="text-xs text-slate-500">${formatDateTime(m.createdAt)}</span>
+              ${m.type !== 'text' ? `<span class="badge badge-blue">${m.type}</span>` : ''}
+            </div>
+            <p class="text-sm text-slate-300">${m.deleted ? '<em>Silindi</em>' : esc(m.text || '')}</p>
+            ${m.imageUrl ? `<img src="${m.imageUrl}" class="mt-1 rounded max-h-32" onerror="this.style.display='none'">` : ''}
+          </div>
+          <button onclick="deleteMessage('${chatKey}','${m._id}')" class="text-red-400 hover:text-red-300 text-xs">🗑</button>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+
+async function deleteMessage(chatKey, msgId) {
+  if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) return;
+  await apiFetch(`/chats/${chatKey}/messages/${msgId}`, { method: 'DELETE' });
+  showChatMessages(chatKey);
+}
+
+// ════════════════════════════════════════
+//  STORIES
+// ════════════════════════════════════════
+async function renderStories(page = 1) {
+  const d = await apiFetch(`/stories?page=${page}&limit=20`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Hikayeler <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      ${d.stories.map(s => `
+        <div class="card overflow-hidden card-hover">
+          <div class="relative">
+            <img src="${s.imageUrl}" class="w-full h-48 object-cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23334155%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22105%22 text-anchor=%22middle%22 fill=%22%2364748b%22 font-size=%2224%22>📸</text></svg>'">
+            <div class="absolute top-2 right-2">
+              <button onclick="deleteStory('${s._id}')" class="bg-red-500 text-white rounded-full w-7 h-7 text-sm hover:bg-red-600">✕</button>
+            </div>
+          </div>
+          <div class="p-3">
+            <div class="flex items-center gap-2 mb-1">
+              <img class="avatar-sm" src="${s.user?.photoURL || ''}" onerror="this.style.display='none'">
+              <span class="text-sm font-medium text-white">${esc(s.user?.name || 'Bilinmeyen')}</span>
+            </div>
+            ${s.caption ? `<p class="text-xs text-slate-400 mt-1">${esc(s.caption)}</p>` : ''}
+            <div class="flex gap-3 mt-2 text-xs text-slate-500">
+              <span>❤️ ${s.likesCount}</span>
+              <span>💬 ${s.repliesCount}</span>
+              <span>⏰ ${formatDateTime(s.expiresAt)}</span>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${pagination(d.page, d.pages, 'renderStories')}
+  `;
+}
+
+async function deleteStory(id) {
+  if (!confirm('Bu hikayeyi silmek istediğinize emin misiniz?')) return;
+  await apiFetch(`/stories/${id}`, { method: 'DELETE' });
+  renderStories();
+}
+
+// ════════════════════════════════════════
+//  REPORTS
+// ════════════════════════════════════════
+async function renderReports(page = 1) {
+  const status = document.getElementById('reportFilter')?.value || '';
+  const d = await apiFetch(`/reports?page=${page}&limit=20${status ? '&status=' + status : ''}`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Şikayetler <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+      <select id="reportFilter" class="input w-48" onchange="renderReports(1)">
+        <option value="">Tümü</option>
+        <option value="pending" ${status==='pending'?'selected':''}>Bekleyen</option>
+        <option value="reviewed" ${status==='reviewed'?'selected':''}>İncelenen</option>
+        <option value="resolved" ${status==='resolved'?'selected':''}>Çözülen</option>
+        <option value="dismissed" ${status==='dismissed'?'selected':''}>Reddedilen</option>
+      </select>
+    </div>
+    <div class="card overflow-hidden">
+      <table>
+        <thead><tr><th>Şikayet Eden</th><th>Şikayet Edilen</th><th>Tür</th><th>Sebep</th><th>Durum</th><th>Tarih</th><th>İşlem</th></tr></thead>
+        <tbody>
+          ${d.reports.length ? d.reports.map(r => `<tr>
+            <td><span class="text-sm">${esc(r.reporter?.name || r.reporterUid)}</span></td>
+            <td><span class="text-sm">${esc(r.reported?.name || r.reportedUid || '-')}</span></td>
+            <td><span class="badge badge-blue">${r.type}</span></td>
+            <td class="text-sm text-slate-400 max-w-xs truncate">${esc(r.reason)}</td>
+            <td>${statusBadge(r.status)}</td>
+            <td class="text-sm text-slate-500">${formatDate(r.createdAt)}</td>
+            <td><button onclick="showReportDetail('${r._id}')" class="text-indigo-400 hover:text-indigo-300 text-sm">Detay</button></td>
+          </tr>`).join('') : '<tr><td colspan="7" class="text-center text-slate-500 py-8">Henüz şikayet yok</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    ${pagination(d.page, d.pages, 'renderReports')}
+  `;
+}
+
+async function showReportDetail(id) {
+  const reports = (await apiFetch('/reports')).reports;
+  const r = reports.find(x => x._id === id);
+  if (!r) return;
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">Şikayet Detayı</h2>
+    <div class="space-y-3">
+      <div class="card p-3"><span class="text-slate-400">Şikayet Eden:</span> <span class="text-white">${esc(r.reporter?.name)} (${r.reporterUid})</span></div>
+      <div class="card p-3"><span class="text-slate-400">Şikayet Edilen:</span> <span class="text-white">${esc(r.reported?.name)} (${r.reportedUid})</span></div>
+      <div class="card p-3"><span class="text-slate-400">Tür:</span> <span class="badge badge-blue">${r.type}</span></div>
+      <div class="card p-3"><span class="text-slate-400">Sebep:</span> <span class="text-white">${esc(r.reason)}</span></div>
+      ${r.details ? `<div class="card p-3"><span class="text-slate-400">Detay:</span><p class="text-white mt-1">${esc(r.details)}</p></div>` : ''}
+      <div class="card p-3"><span class="text-slate-400">Durum:</span> ${statusBadge(r.status)}</div>
+      <div>
+        <label class="text-sm text-slate-400">Admin Notu</label>
+        <textarea id="reportNote" class="input mt-1" rows="2">${esc(r.adminNote || '')}</textarea>
+      </div>
+      <div>
+        <label class="text-sm text-slate-400">Aksiyon</label>
+        <select id="reportAction" class="input mt-1">
+          <option value="">Seçin</option>
+          <option value="warning">Uyarı verildi</option>
+          <option value="post_removed">Gönderi kaldırıldı</option>
+          <option value="user_banned">Kullanıcı banlandı</option>
+          <option value="no_action">İşlem yapılmadı</option>
+        </select>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="updateReport('${r._id}','reviewed')" class="btn-warning">İnceleniyor</button>
+        <button onclick="updateReport('${r._id}','resolved')" class="btn-success">Çözüldü</button>
+        <button onclick="updateReport('${r._id}','dismissed')" class="btn-danger">Reddet</button>
+      </div>
+    </div>
+  `);
+}
+
+async function updateReport(id, status) {
+  const adminNote = document.getElementById('reportNote')?.value || '';
+  const actionTaken = document.getElementById('reportAction')?.value || '';
+  await apiFetch(`/reports/${id}`, { method: 'PATCH', body: JSON.stringify({ status, adminNote, actionTaken }) });
+  closeModal();
+  renderReports();
+}
+
+// ════════════════════════════════════════
+//  NOTIFICATIONS
+// ════════════════════════════════════════
+function renderNotifications() {
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Toplu Bildirim Gönder</h1>
+    <div class="card p-6 max-w-2xl">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Başlık</label>
+          <input id="notifTitle" class="input" placeholder="Bildirim başlığı...">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Mesaj</label>
+          <textarea id="notifBody" class="input" rows="3" placeholder="Bildirim içeriği..."></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-400 mb-1">Hedef Kitle</label>
+          <select id="notifTarget" class="input">
+            <option value="all">Tüm Kullanıcılar</option>
+            <option value="premium">Sadece Premium</option>
+          </select>
+        </div>
+        <div id="notifResult" class="hidden"></div>
+        <button onclick="sendNotification()" class="btn-primary">🔔 Gönder</button>
+      </div>
+    </div>
+  `;
+}
+
+async function sendNotification() {
+  const title = document.getElementById('notifTitle').value;
+  const body = document.getElementById('notifBody').value;
+  const target = document.getElementById('notifTarget').value;
+  const resultEl = document.getElementById('notifResult');
+
+  if (!title && !body) { alert('Başlık veya mesaj gerekli'); return; }
+  if (!confirm(`"${target === 'all' ? 'Tüm kullanıcılara' : 'Premium kullanıcılara'}" bildirim gönderilecek. Onaylıyor musunuz?`)) return;
+
+  try {
+    const d = await apiFetch('/notifications/send', { method: 'POST', body: JSON.stringify({ title, body, target }) });
+    resultEl.innerHTML = `<div class="p-3 rounded-lg bg-emerald-900/50 border border-emerald-700 text-emerald-300">✅ ${d.sent} / ${d.total} kullanıcıya gönderildi</div>`;
+    resultEl.classList.remove('hidden');
+  } catch (e) {
+    resultEl.innerHTML = `<div class="p-3 rounded-lg bg-red-900/50 border border-red-700 text-red-300">❌ Hata: ${e.message}</div>`;
+    resultEl.classList.remove('hidden');
+  }
+}
+
+// ════════════════════════════════════════
+//  GIFTS
+// ════════════════════════════════════════
+async function renderGifts() {
+  const d = await apiFetch('/gifts');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Hediyeler</h1>
+      <button onclick="showGiftForm()" class="btn-primary">+ Yeni Hediye</button>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <h2 class="text-lg font-semibold text-white mb-3">Hediye Listesi</h2>
+        <div class="space-y-2">
+          ${d.gifts.map(g => `
+            <div class="card p-4 card-hover flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-3xl">${g.emoji}</span>
+                <div>
+                  <p class="font-medium text-white">${esc(g.name)}</p>
+                  <p class="text-sm text-amber-400">🪙 ${g.price} jeton</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="badge ${g.active !== false ? 'badge-green' : 'badge-red'}">${g.active !== false ? 'Aktif' : 'Pasif'}</span>
+                <button onclick="showGiftForm('${g._id}','${esc(g.name)}','${g.emoji}',${g.price},'${g.color || ''}',${g.active !== false},${g.order || 0})" class="text-indigo-400 hover:text-indigo-300 text-sm">Düzenle</button>
+                <button onclick="deleteGift('${g._id}')" class="text-red-400 hover:text-red-300 text-sm">Sil</button>
+              </div>
+            </div>
+          `).join('')}
+          ${!d.gifts.length ? '<p class="text-slate-500 text-center py-8">Henüz hediye yok</p>' : ''}
+        </div>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-white mb-3">En Çok Gönderilen</h2>
+        <div class="card p-4">
+          ${d.stats.length ? d.stats.map((s, i) => `
+            <div class="flex items-center justify-between py-2 ${i > 0 ? 'border-t border-slate-700' : ''}">
+              <span class="text-white">${i + 1}. ${esc(s._id || 'Bilinmeyen')}</span>
+              <span class="text-amber-400 font-semibold">${s.count} kez</span>
+            </div>
+          `).join('') : '<p class="text-slate-500 text-center py-4">Veri yok</p>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showGiftForm(id, name, emoji, price, color, active, order) {
+  const isEdit = !!id;
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">${isEdit ? 'Hediye Düzenle' : 'Yeni Hediye'}</h2>
+    <div class="space-y-3">
+      <div><label class="text-sm text-slate-400">İsim</label><input id="giftName" class="input mt-1" value="${name || ''}"></div>
+      <div><label class="text-sm text-slate-400">Emoji</label><input id="giftEmoji" class="input mt-1" value="${emoji || ''}"></div>
+      <div><label class="text-sm text-slate-400">Fiyat (jeton)</label><input id="giftPrice" type="number" class="input mt-1" value="${price || 10}"></div>
+      <div><label class="text-sm text-slate-400">Renk</label><input id="giftColor" type="color" class="input mt-1 h-10" value="${color || '#FF6B6B'}"></div>
+      <div><label class="text-sm text-slate-400">Sıra</label><input id="giftOrder" type="number" class="input mt-1" value="${order || 0}"></div>
+      <div class="flex items-center gap-2">
+        <div id="giftActiveToggle" class="toggle ${active !== false ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>
+        <span class="text-sm text-slate-400">Aktif</span>
+      </div>
+      <button onclick="saveGift('${id || ''}')" class="btn-primary w-full">${isEdit ? 'Güncelle' : 'Ekle'}</button>
+    </div>
+  `);
+}
+
+async function saveGift(id) {
+  const data = {
+    name: document.getElementById('giftName').value,
+    emoji: document.getElementById('giftEmoji').value,
+    price: parseInt(document.getElementById('giftPrice').value),
+    color: document.getElementById('giftColor').value,
+    order: parseInt(document.getElementById('giftOrder').value),
+    active: document.getElementById('giftActiveToggle').classList.contains('on'),
+  };
+  if (id) {
+    await apiFetch(`/gifts/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  } else {
+    await apiFetch('/gifts', { method: 'POST', body: JSON.stringify(data) });
+  }
+  closeModal();
+  renderGifts();
+}
+
+async function deleteGift(id) {
+  if (!confirm('Bu hediyeyi silmek istediğinize emin misiniz?')) return;
+  await apiFetch(`/gifts/${id}`, { method: 'DELETE' });
+  renderGifts();
+}
+
+// ════════════════════════════════════════
+//  ANALYTICS
+// ════════════════════════════════════════
+async function renderAnalytics() {
+  const d = await apiFetch('/analytics?days=30');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Analizler <span class="text-slate-400 text-lg">(Son 30 gün)</span></h1>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-4"><canvas id="regChart"></canvas></div>
+      <div class="card p-4"><canvas id="msgChart"></canvas></div>
+      <div class="card p-4"><canvas id="genderChart"></canvas></div>
+      <div class="card p-4"><canvas id="cityChart"></canvas></div>
+    </div>
+  `;
+
+  // Kayit trendi
+  setTimeout(() => {
+    new Chart(document.getElementById('regChart'), {
+      type: 'line',
+      data: {
+        labels: d.registrationTrend.map(x => x._id.substring(5)),
+        datasets: [{ label: 'Yeni Kayıt', data: d.registrationTrend.map(x => x.count), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, tension: 0.4 }]
+      },
+      options: { plugins: { title: { display: true, text: 'Günlük Kayıt Trendi', color: '#e2e8f0' } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' }, beginAtZero: true } } }
+    });
+
+    new Chart(document.getElementById('msgChart'), {
+      type: 'bar',
+      data: {
+        labels: d.messageTrend.map(x => x._id.substring(5)),
+        datasets: [{ label: 'Mesaj', data: d.messageTrend.map(x => x.count), backgroundColor: '#22c55e88', borderColor: '#22c55e', borderWidth: 1 }]
+      },
+      options: { plugins: { title: { display: true, text: 'Günlük Mesaj Trafiği', color: '#e2e8f0' } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' }, beginAtZero: true } } }
+    });
+
+    new Chart(document.getElementById('genderChart'), {
+      type: 'doughnut',
+      data: {
+        labels: d.genderDist.map(x => x._id || 'Belirtilmemiş'),
+        datasets: [{ data: d.genderDist.map(x => x.count), backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#64748b'] }]
+      },
+      options: { plugins: { title: { display: true, text: 'Cinsiyet Dağılımı', color: '#e2e8f0' } } }
+    });
+
+    new Chart(document.getElementById('cityChart'), {
+      type: 'bar',
+      data: {
+        labels: d.cityDist.map(x => x._id),
+        datasets: [{ label: 'Kullanıcı', data: d.cityDist.map(x => x.count), backgroundColor: '#f59e0b88', borderColor: '#f59e0b', borderWidth: 1 }]
+      },
+      options: { indexAxis: 'y', plugins: { title: { display: true, text: 'Şehir Dağılımı (İlk 10)', color: '#e2e8f0' } }, scales: { x: { ticks: { color: '#94a3b8' }, beginAtZero: true }, y: { ticks: { color: '#94a3b8' } } } }
+    });
+  }, 100);
+}
+
+// ════════════════════════════════════════
+//  SYSTEM
+// ════════════════════════════════════════
+async function renderSystem() {
+  const d = await apiFetch('/system');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Sistem Durumu</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">🖥️ Sunucu</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Platform</span><span class="text-white">${d.server.platform} (${d.server.arch})</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Hostname</span><span class="text-white">${d.server.hostname}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Uptime</span><span class="text-white">${formatUptime(d.server.uptime)}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Node.js</span><span class="text-white">${d.server.nodeVersion}</span></div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">⚡ CPU</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Çekirdek</span><span class="text-white">${d.cpu.cores}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Model</span><span class="text-white text-xs">${d.cpu.model}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Load (1/5/15m)</span><span class="text-white">${d.cpu.loadAvg['1m']} / ${d.cpu.loadAvg['5m']} / ${d.cpu.loadAvg['15m']}</span></div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">💾 Bellek</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Toplam</span><span class="text-white">${d.memory.total}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Kullanılan</span><span class="text-white">${d.memory.used}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Boş</span><span class="text-white">${d.memory.free}</span></div>
+          <div class="w-full bg-slate-700 rounded-full h-3 mt-2"><div class="h-3 rounded-full ${parseFloat(d.memory.usagePercent) > 80 ? 'bg-red-500' : 'bg-indigo-500'}" style="width:${d.memory.usagePercent}%"></div></div>
+          <div class="text-center text-slate-400">${d.memory.usagePercent}%</div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">🍃 MongoDB</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Durum</span><span class="badge ${d.mongodb.status==='connected'?'badge-green':'badge-red'}">${d.mongodb.status}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Boyut</span><span class="text-white">${d.mongodb.dbSize}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Koleksiyon</span><span class="text-white">${d.mongodb.collections}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Doküman</span><span class="text-white">${d.mongodb.documents?.toLocaleString()}</span></div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">🔴 Redis</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Durum</span><span class="badge ${d.redis.status==='connected'?'badge-green':'badge-red'}">${d.redis.status}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Bellek</span><span class="text-white">${d.redis.memory}</span></div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-3 flex items-center gap-2">🔌 Socket.IO</h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-slate-400">Bağlı</span><span class="text-white text-xl font-bold">${d.sockets.connected}</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Çevrimiçi</span><span class="text-white text-xl font-bold">${d.sockets.onlineUsers}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4 text-right">
+      <button onclick="renderSystem()" class="btn-primary">🔄 Yenile</button>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════════════
+async function renderSettings() {
+  const s = await apiFetch('/settings');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">Uygulama Ayarları</h1>
+    <div class="max-w-3xl space-y-6">
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Genel</h2>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div><p class="text-white font-medium">Bakım Modu</p><p class="text-slate-400 text-sm">Uygulamada bakım ekranı gösterir, hiçbir şey kullanılamaz</p></div>
+            <div id="toggleMaintenance" class="toggle ${s.maintenanceMode ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div id="maintenanceFields" class="ml-4 pl-4 border-l-2 border-indigo-500/30 space-y-3 mt-2 mb-4">
+            <div>
+              <label class="text-sm text-slate-400">Bakım Mesajı (kullanıcılar görecek)</label>
+              <textarea id="setMaintenanceMsg" class="input mt-1" rows="2" placeholder="Örn: Sistemi güncelliyoruz, kısa süre içinde döneceğiz!">${esc(s.maintenanceMessage || '')}</textarea>
+            </div>
+            <div>
+              <label class="text-sm text-slate-400">Tahmini Bitiş Tarihi/Saati</label>
+              <input id="setMaintenanceEnd" type="datetime-local" class="input mt-1" value="${s.maintenanceEndDate ? new Date(s.maintenanceEndDate).toISOString().slice(0,16) : ''}">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Limitler</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm text-slate-400">Min Yaş</label><input id="setMinAge" type="number" class="input mt-1" value="${s.minAge || 18}"></div>
+          <div><label class="text-sm text-slate-400">Max Mesafe (km)</label><input id="setMaxDistance" type="number" class="input mt-1" value="${s.maxDistance || 100}"></div>
+          <div><label class="text-sm text-slate-400">Günlük Beğeni Limiti</label><input id="setDailyLike" type="number" class="input mt-1" value="${s.dailyLikeLimit || 10}"></div>
+          <div><label class="text-sm text-slate-400">Günlük Hi Limiti</label><input id="setDailyHi" type="number" class="input mt-1" value="${s.dailyHiLimit || 5}"></div>
+          <div><label class="text-sm text-slate-400">Günlük Story Beğeni</label><input id="setDailyStoryLike" type="number" class="input mt-1" value="${s.dailyStoryLikeLimit || 20}"></div>
+          <div><label class="text-sm text-slate-400">Varsayılan Jeton</label><input id="setDefaultTokens" type="number" class="input mt-1" value="${s.defaultTokens || 100}"></div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Ekonomi</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm text-slate-400">Mesaj Başı Jeton Ücreti</label><input id="setMsgCost" type="number" class="input mt-1" value="${s.messageTokenCost || 0}"></div>
+          <div><label class="text-sm text-slate-400">Aylık Premium (₺)</label><input id="setPremiumMonthly" type="number" step="0.01" class="input mt-1" value="${s.premiumMonthlyPrice || 99.99}"></div>
+          <div><label class="text-sm text-slate-400">Yıllık Premium (₺)</label><input id="setPremiumYearly" type="number" step="0.01" class="input mt-1" value="${s.premiumYearlyPrice || 599.99}"></div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Duyuru</h2>
+        <textarea id="setAnnouncement" class="input" rows="3" placeholder="Uygulama içi duyuru metni...">${esc(s.announcementText || '')}</textarea>
+      </div>
+
+      <button onclick="saveSettings()" class="btn-primary text-lg py-3 px-8">💾 Ayarları Kaydet</button>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════
+//  FAKE USERS
+// ════════════════════════════════════════
+async function renderFakeUsers(page = 1) {
+  const d = await apiFetch(`/fake-users?page=${page}&limit=20`);
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Fake Kullanıcılar <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+      <div class="flex gap-2">
+        <button onclick="showGenerateModal()" class="btn-primary">+ Toplu Oluştur</button>
+      </div>
+    </div>
+    <div class="grid gap-3">
+      ${d.users.map(u => `
+        <div class="card p-4 card-hover">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <img class="avatar-lg rounded-xl" src="${u.photoURL || u.photos?.[0] || ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><rect fill=%22%23334155%22 width=%2280%22 height=%2280%22 rx=%2212%22/><text x=%2240%22 y=%2248%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-size=%2228%22>👤</text></svg>'">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-white text-lg">${esc(u.name)}</span>
+                  <span class="badge ${u.role === 'fake-bot' ? 'badge-purple' : 'badge-yellow'}">${u.role === 'fake-bot' ? '🤖 Bot' : '👤 Manuel'}</span>
+                  ${u.online ? '<span class="badge badge-green">Online</span>' : ''}
+                </div>
+                <p class="text-sm text-slate-400 mt-1">${u.age || '?'} yaş • ${esc(u.city || '?')} • ${esc(u.job || '?')}</p>
+                <p class="text-xs text-slate-500 mt-1">${esc(u.bio || '')}</p>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2 items-end">
+              <div class="flex gap-2">
+                <span class="text-xs text-slate-500">${u.photos?.length || 0} foto</span>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="showFakeUserPhotos('${u.uid}')" class="text-indigo-400 hover:text-indigo-300 text-sm">📸 Fotoğraflar</button>
+                <button onclick="showFakeUserEdit('${u.uid}')" class="text-indigo-400 hover:text-indigo-300 text-sm">✏️ Düzenle</button>
+                <button onclick="deleteFakeUser('${u.uid}')" class="text-red-400 hover:text-red-300 text-sm">🗑 Sil</button>
+              </div>
+            </div>
+          </div>
+          ${u.photos?.length ? `<div class="photo-grid flex flex-wrap gap-2 mt-3">${u.photos.slice(0,6).map(p => `<img src="${p}" onerror="this.style.display='none'">`).join('')}</div>` : ''}
+        </div>
+      `).join('')}
+      ${!d.users.length ? '<div class="text-center py-12 text-slate-500">Henüz fake kullanıcı yok. "Toplu Oluştur" ile başlayın.</div>' : ''}
+    </div>
+    ${pagination(d.page, d.pages, 'renderFakeUsers')}
+  `;
+}
+
+function showGenerateModal() {
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">Toplu Fake Kullanıcı Oluştur</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm text-slate-400">Kaç adet? (max 50)</label>
+        <input id="genCount" type="number" class="input mt-1" value="10" min="1" max="50">
+      </div>
+      <div>
+        <label class="text-sm text-slate-400">Tür</label>
+        <select id="genRole" class="input mt-1">
+          <option value="fake-bot">🤖 Bot (AI otomatik yanıt)</option>
+          <option value="fake-manual">👤 Manuel (insan kontrol)</option>
+        </select>
+      </div>
+      <p class="text-xs text-slate-500">Profil bilgileri (isim, şehir, yaş, bio, ilgi alanları) otomatik doldurulur. Fotoğrafları sonra eklersiniz.</p>
+      <div id="genResult" class="hidden"></div>
+      <button onclick="doGenerate()" class="btn-primary w-full">Oluştur</button>
+    </div>
+  `);
+}
+
+async function doGenerate() {
+  const count = parseInt(document.getElementById('genCount').value) || 5;
+  const role = document.getElementById('genRole').value;
+  const resultEl = document.getElementById('genResult');
+  try {
+    const d = await apiFetch('/fake-users/generate', { method: 'POST', body: JSON.stringify({ count, role }) });
+    resultEl.innerHTML = `<div class="p-3 rounded-lg bg-emerald-900/50 border border-emerald-700 text-emerald-300">✅ ${d.count} kullanıcı oluşturuldu</div>`;
+    resultEl.classList.remove('hidden');
+    setTimeout(() => { closeModal(); renderFakeUsers(); }, 1500);
+  } catch (e) {
+    resultEl.innerHTML = `<div class="p-3 rounded-lg bg-red-900/50 border border-red-700 text-red-300">❌ ${e.message}</div>`;
+    resultEl.classList.remove('hidden');
+  }
+}
+
+async function showFakeUserPhotos(uid) {
+  const u = await apiFetch(`/users/${uid}`);
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">📸 ${esc(u.name)} - Fotoğraflar</h2>
+    <div class="photo-grid flex flex-wrap gap-3 mb-4">
+      ${(u.photos || []).map((p, i) => `
+        <div class="relative group">
+          <img src="${p}" class="w-24 h-24 object-cover rounded-lg" onerror="this.style.display='none'">
+          <button onclick="removeFakePhoto('${uid}',${i})" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hidden group-hover:block">✕</button>
+        </div>
+      `).join('')}
+      ${!(u.photos?.length) ? '<p class="text-slate-500">Henüz fotoğraf yok</p>' : ''}
+    </div>
+    <div class="card p-4">
+      <label class="text-sm text-slate-400 block mb-2">Fotoğraf URL ekle (her satıra bir URL)</label>
+      <textarea id="photoUrls" class="input" rows="4" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"></textarea>
+      <div class="mt-2 text-xs text-slate-500">
+        Fotoğrafları sunucuya yüklemek için: <code>/api/upload/photos</code> endpoint'ini kullanın veya direkt URL girin.
+      </div>
+      <button onclick="addFakePhotos('${uid}')" class="btn-primary mt-3">Fotoğrafları Ekle</button>
+    </div>
+  `);
+}
+
+async function addFakePhotos(uid) {
+  const urls = document.getElementById('photoUrls').value.split('\\n').map(u => u.trim()).filter(Boolean);
+  if (!urls.length) { alert('En az bir URL girin'); return; }
+  await apiFetch(`/fake-users/${uid}/photos`, { method: 'POST', body: JSON.stringify({ photos: urls }) });
+  showFakeUserPhotos(uid);
+}
+
+async function removeFakePhoto(uid, index) {
+  const u = await apiFetch(`/users/${uid}`);
+  const photos = [...(u.photos || [])];
+  photos.splice(index, 1);
+  await apiFetch(`/fake-users/${uid}`, { method: 'PATCH', body: JSON.stringify({ photos, photoURL: photos[0] || '' }) });
+  showFakeUserPhotos(uid);
+}
+
+async function showFakeUserEdit(uid) {
+  const u = await apiFetch(`/users/${uid}`);
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">✏️ ${esc(u.name)} Düzenle</h2>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="text-sm text-slate-400">İsim</label><input id="feName" class="input mt-1" value="${esc(u.name)}"></div>
+      <div><label class="text-sm text-slate-400">Yaş</label><input id="feAge" type="number" class="input mt-1" value="${u.age || ''}"></div>
+      <div><label class="text-sm text-slate-400">Şehir</label><input id="feCity" class="input mt-1" value="${esc(u.city)}"></div>
+      <div><label class="text-sm text-slate-400">Meslek</label><input id="feJob" class="input mt-1" value="${esc(u.job)}"></div>
+      <div><label class="text-sm text-slate-400">Boy</label><input id="feHeight" type="number" class="input mt-1" value="${u.height || ''}"></div>
+      <div>
+        <label class="text-sm text-slate-400">Tür</label>
+        <select id="feRole" class="input mt-1">
+          <option value="fake-bot" ${u.role === 'fake-bot' ? 'selected' : ''}>🤖 Bot</option>
+          <option value="fake-manual" ${u.role === 'fake-manual' ? 'selected' : ''}>👤 Manuel</option>
+        </select>
+      </div>
+      <div class="col-span-2"><label class="text-sm text-slate-400">Bio</label><textarea id="feBio" class="input mt-1" rows="2">${esc(u.bio)}</textarea></div>
+      <div class="col-span-2"><label class="text-sm text-slate-400">İlgi Alanları (virgülle)</label><input id="feInterests" class="input mt-1" value="${(u.interests || []).join(', ')}"></div>
+    </div>
+    <button onclick="saveFakeUser('${uid}')" class="btn-primary w-full mt-4">Kaydet</button>
+  `);
+}
+
+async function saveFakeUser(uid) {
+  const data = {
+    name: document.getElementById('feName').value,
+    age: parseInt(document.getElementById('feAge').value) || null,
+    city: document.getElementById('feCity').value,
+    job: document.getElementById('feJob').value,
+    height: parseInt(document.getElementById('feHeight').value) || null,
+    role: document.getElementById('feRole').value,
+    bio: document.getElementById('feBio').value,
+    interests: document.getElementById('feInterests').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  await apiFetch(`/fake-users/${uid}`, { method: 'PATCH', body: JSON.stringify(data) });
+  closeModal();
+  renderFakeUsers();
+}
+
+async function deleteFakeUser(uid) {
+  if (!confirm('Bu fake kullanıcıyı silmek istediğinize emin misiniz?')) return;
+  await apiFetch(`/fake-users/${uid}`, { method: 'DELETE' });
+  renderFakeUsers();
+}
+
+// ════════════════════════════════════════
+//  BOT AI SETTINGS
+// ════════════════════════════════════════
+async function renderBotSettings() {
+  const s = await apiFetch('/settings');
+  const c = document.getElementById('pageContent');
+  c.innerHTML = `
+    <h1 class="text-2xl font-bold text-white mb-6">🧠 Bot AI Ayarları</h1>
+    <div class="max-w-2xl space-y-6">
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-white">Bot Sistemi</h2>
+            <p class="text-slate-400 text-sm">Fake-bot kullanıcılara mesaj gelince AI otomatik yanıt verir</p>
+          </div>
+          <div id="toggleBot" class="toggle ${s.botEnabled ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="p-3 rounded-lg ${s.botEnabled ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-red-900/30 border border-red-800'}">
+          <p class="text-sm ${s.botEnabled ? 'text-emerald-300' : 'text-red-300'}">
+            ${s.botEnabled ? '✅ Bot sistemi aktif — fake-bot kullanıcılara gelen mesajlar AI tarafından yanıtlanıyor' : '❌ Bot sistemi kapalı — fake-bot kullanıcılara gelen mesajlar yanıtsız kalacak'}
+          </p>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">API Ayarları</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="text-sm text-slate-400">API URL</label>
+            <input id="botUrl" class="input mt-1" value="${esc(s.botApiUrl || 'https://dp.apis.net.tr/v3beta')}">
+          </div>
+          <div>
+            <label class="text-sm text-slate-400">API Key</label>
+            <input id="botKey" class="input mt-1" value="${esc(s.botApiKey || '')}">
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Yanıt Gecikme (ms)</h2>
+        <p class="text-slate-400 text-sm mb-3">Bot yanıtı gelmeden önce "yazıyor..." efekti için bekleme süresi</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="text-sm text-slate-400">Min (ms)</label><input id="botDelayMin" type="number" class="input mt-1" value="${s.botResponseDelayMin || 1000}"></div>
+          <div><label class="text-sm text-slate-400">Max (ms)</label><input id="botDelayMax" type="number" class="input mt-1" value="${s.botResponseDelayMax || 3000}"></div>
+        </div>
+      </div>
+
+      <button onclick="saveBotSettings()" class="btn-primary text-lg py-3 px-8">💾 Bot Ayarlarını Kaydet</button>
+    </div>
+  `;
+}
+
+async function saveBotSettings() {
+  const data = {
+    botEnabled: document.getElementById('toggleBot').classList.contains('on'),
+    botApiUrl: document.getElementById('botUrl').value,
+    botApiKey: document.getElementById('botKey').value,
+    botResponseDelayMin: parseInt(document.getElementById('botDelayMin').value) || 1000,
+    botResponseDelayMax: parseInt(document.getElementById('botDelayMax').value) || 3000,
+  };
+  await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(data) });
+  alert('Bot ayarları kaydedildi!');
+  renderBotSettings();
+}
+
+async function saveSettings() {
+  const data = {
+    maintenanceMode: document.getElementById('toggleMaintenance').classList.contains('on'),
+    maintenanceMessage: document.getElementById('setMaintenanceMsg').value,
+    maintenanceEndDate: document.getElementById('setMaintenanceEnd').value ? new Date(document.getElementById('setMaintenanceEnd').value).toISOString() : null,
+    minAge: parseInt(document.getElementById('setMinAge').value),
+    maxDistance: parseInt(document.getElementById('setMaxDistance').value),
+    dailyLikeLimit: parseInt(document.getElementById('setDailyLike').value),
+    dailyHiLimit: parseInt(document.getElementById('setDailyHi').value),
+    dailyStoryLikeLimit: parseInt(document.getElementById('setDailyStoryLike').value),
+    defaultTokens: parseInt(document.getElementById('setDefaultTokens').value),
+    messageTokenCost: parseInt(document.getElementById('setMsgCost').value),
+    premiumMonthlyPrice: parseFloat(document.getElementById('setPremiumMonthly').value),
+    premiumYearlyPrice: parseFloat(document.getElementById('setPremiumYearly').value),
+    announcementText: document.getElementById('setAnnouncement').value,
+  };
+  await apiFetch('/settings', { method: 'PATCH', body: JSON.stringify(data) });
+  alert('Ayarlar kaydedildi!');
+}
+
+// ════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('tr-TR'); }
+
+function formatDateTime(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); }
+
+function formatUptime(s) {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${d}g ${h}s ${m}dk`;
+}
+
+function statusBadge(s) {
+  const map = { pending: ['Bekliyor', 'badge-yellow'], reviewed: ['İnceleniyor', 'badge-blue'], resolved: ['Çözüldü', 'badge-green'], dismissed: ['Reddedildi', 'badge-red'] };
+  const [label, cls] = map[s] || [s, ''];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function pagination(current, total, fn) {
+  if (total <= 1) return '';
+  let html = '<div class="flex items-center justify-center gap-2 mt-6">';
+  if (current > 1) html += `<button onclick="${fn}(${current - 1})" class="btn-primary text-sm">← Önceki</button>`;
+  html += `<span class="text-slate-400 text-sm px-4">${current} / ${total}</span>`;
+  if (current < total) html += `<button onclick="${fn}(${current + 1})" class="btn-primary text-sm">Sonraki →</button>`;
+  html += '</div>';
+  return html;
+}
+
+function showModal(content) {
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">${content}<button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl">✕</button></div>
+    </div>
+  `;
+}
+
+function closeModal() { document.getElementById('modalContainer').innerHTML = ''; }
+
+// Enter ile login
+document.getElementById('loginPass')?.addEventListener('keyup', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('loginUser')?.addEventListener('keyup', e => { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
+</script>
+</body>
+</html>

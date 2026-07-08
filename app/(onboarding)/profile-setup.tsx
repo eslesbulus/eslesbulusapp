@@ -15,6 +15,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { BlurView } from "expo-blur";
@@ -81,7 +82,7 @@ export default function ProfileSetupScreen() {
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Galeri izni verilmedi.");
+      showAlert("İzin Gerekli", "Galeri izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -99,7 +100,7 @@ export default function ProfileSetupScreen() {
     setInterests((prev) => {
       if (prev.includes(item)) return prev.filter((i) => i !== item);
       if (prev.length >= INTERESTS_MAX) {
-        Alert.alert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
+        showAlert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
         return prev;
       }
       return [...prev, item];
@@ -116,14 +117,14 @@ export default function ProfileSetupScreen() {
   function goNext() {
     if (step === "photo") {
       if (!photoUri) {
-        Alert.alert("Fotoğraf Gerekli", "Devam etmek için profil fotoğrafı eklemelisin.");
+        showAlert("Fotoğraf Gerekli", "Devam etmek için profil fotoğrafı eklemelisin.");
         return;
       }
       setStep("info");
     }
     else if (step === "info") {
-      if (!gender) return Alert.alert("Hata", "Cinsiyet seç.");
-      if (!city) return Alert.alert("Hata", "Şehir seç.");
+      if (!gender) return showAlert("Hata", "Cinsiyet seç.");
+      if (!city) return showAlert("Hata", "Şehir seç.");
       setStep("about");
     }
   }
@@ -131,7 +132,7 @@ export default function ProfileSetupScreen() {
   async function handleSave() {
     if (saving) return;
     if (interests.length === 0) {
-      Alert.alert("Hata", "En az bir ilgi alanı seç.");
+      showAlert("Hata", "En az bir ilgi alanı seç.");
       return;
     }
     setSaving(true);
@@ -162,7 +163,7 @@ export default function ProfileSetupScreen() {
       await api.put("/api/users/me", updates);
       await refreshProfile();
     } catch (e: any) {
-      Alert.alert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
+      showAlert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
     } finally {
       setSaving(false);
     }

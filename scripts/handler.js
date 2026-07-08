@@ -3,6 +3,8 @@ const { getRedis } = require("../utils/redis");
 const Chat = require("../models/Chat");
 const User = require("../models/User");
 const { sendPushNotification } = require("../utils/pushNotify");
+const { getBotResponse } = require("../utils/botAI");
+const { getSettings } = require("../middleware/maintenance");
 
 function setupSocket(io) {
   global._io = io;
@@ -38,6 +40,7 @@ function setupSocket(io) {
           type: data.type || "text",
           status: "delivered",
           imageUrl: data.imageUrl || null,
+          replyTo: data.replyTo || null,
           gift: data.gift || null,
           sharedPost: data.sharedPost || null,
           storyReply: data.storyReply || null,
@@ -89,7 +92,7 @@ function setupSocket(io) {
         });
 
         // Push notification
-        const sender = await User.findOne({ uid }).select("name photoURL photos").lean();
+        const sender = await User.findOne({ uid }).select("name photoURL photos role").lean();
         sendPushNotification({
           toUid: data.to,
           type: data.type === "storyReply" ? "story_reply" : "message",
@@ -100,6 +103,14 @@ function setupSocket(io) {
           storyId: data.storyReply?.storyId,
           storyImageUrl: data.storyReply?.storyImageUrl,
         }).catch(err => console.error("Push error:", err));
+
+        // ── Bot yanit sistemi ──
+        // Gonderen bot degilse ve alici bot ise → AI yanit
+        if (sender?.role !== "fake-bot" && sender?.role !== "fake-manual") {
+          handleBotReply(uid, data.to, chatKey, data.text || "", socket).catch(err =>
+            console.error("[Bot] reply error:", err.message)
+          );
+        }
       } catch (err) {
         console.error("chat:send error:", err);
       }
@@ -212,6 +223,91 @@ function setupSocket(io) {
       socket.broadcast.emit("user:offline", { uid, lastActive: new Date() });
     });
   });
+}
+
+// ── Bot yanit fonksiyonu ──
+async function handleBotReply(senderUid, receiverUid, chatKey, messageText, socket) {
+  if (!messageText || !messageText.trim()) return;
+
+  // Bot ayarlari kontrol
+  const settings = await getSettings();
+  if (!settings || !settings.botEnabled) return;
+
+  // Alici bot mu?
+  const receiver = await User.findOne({ uid: receiverUid }).select("role name age city").lean();
+  if (!receiver || receiver.role !== "fake-bot") return;
+
+  // Gonderenin adini al
+  const sender = await User.findOne({ uid: senderUid }).select("name").lean();
+
+  // Yazip yaziyor efekti — rastgele 1-3 sn bekle
+  const typingDelay = 1000 + Math.floor(Math.random() * 2000);
+
+  // Typing event gonder
+  socket.emit("chat:typing", { from: receiverUid });
+
+  // AI'dan yanit al (paralel)
+  const responsePromise = getBotResponse({
+    senderId: senderUid,
+    receiverId: receiverUid,
+    message: messageText,
+    dialog: chatKey,
+    botDetails: {
+      bot_isim: receiver.name || "Bot",
+      bot_yas: String(receiver.age || 24),
+      bot_sehir: receiver.city || "İstanbul",
+    },
+    userName: sender?.name || "Kullanıcı",
+    apiUrl: settings.botApiUrl || undefined,
+    apiKey: settings.botApiKey || undefined,
+  });
+
+  // Delay + yanit
+  const [botResponse] = await Promise.all([
+    responsePromise,
+    new Promise(r => setTimeout(r, typingDelay)),
+  ]);
+
+  if (!botResponse) return;
+
+  // Bot mesajini DB'ye kaydet
+  const botMessage = {
+    senderId: receiverUid,
+    text: botResponse,
+    type: "text",
+    status: "delivered",
+    reactions: [],
+    createdAt: new Date(),
+  };
+
+  const updatedChat = await Chat.findOneAndUpdate(
+    { chatKey },
+    {
+      $set: {
+        lastMessage: botResponse,
+        lastMessageAt: new Date(),
+        lastSenderId: receiverUid,
+      },
+      $push: { messages: botMessage },
+      $inc: { [`unreadCounts.${senderUid}`]: 1 },
+    },
+    { returnDocument: "after" }
+  );
+
+  const savedBotMsg = updatedChat.messages[updatedChat.messages.length - 1];
+
+  const senderUnread = updatedChat.unreadCounts instanceof Map
+    ? (updatedChat.unreadCounts.get(senderUid) || 0)
+    : (updatedChat.unreadCounts?.[senderUid] || 0);
+
+  // Gonderene bot yanitini ilet
+  if (global._io) {
+    global._io.to(senderUid).emit("chat:message", {
+      chatKey,
+      message: savedBotMsg,
+      unreadCount: senderUnread,
+    });
+  }
 }
 
 module.exports = { setupSocket };

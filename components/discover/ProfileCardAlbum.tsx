@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Dimensions, Alert } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -56,7 +57,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
 
   async function handleLike() {
     if (!canLike && !liked) {
-      Alert.alert(
+      showAlert(
         "Günlük Limit Doldu",
         `Bugün ${DAILY_LIKE_LIMIT} beğeni hakkını kullandın. Premium üyelikle sınırsız beğen!`,
         [
@@ -118,7 +119,7 @@ export function ProfileCardAlbum({ user, onPressHi, onPress }: Props) {
       <View style={styles.info}>
         <View style={styles.nameRow}>
           <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: "#fff" }} fontSize={17} numberOfLines={1} />
+            <VipName name={`${user.name.split(" ")[0]}, ${user.age}`} vip={user.vip} style={{ color: "#fff" }} fontSize={17} numberOfLines={1} />
             {user.verified && <VerifiedBadge size={13} />}
           </View>
           <Pressable onPress={handleLike} hitSlop={8} style={styles.heartBtn}>

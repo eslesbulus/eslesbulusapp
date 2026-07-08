@@ -9,6 +9,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
@@ -56,7 +57,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
     if (!selected) return;
     const ok = await spend(selected.price);
     if (!ok) {
-      Alert.alert("Yetersiz Jeton", `Bu hediye için ${selected.price} jeton gerekli.\nBakiyen: ${balance}`);
+      showAlert("Yetersiz Jeton", `Bu hediye için ${selected.price} jeton gerekli.\nBakiyen: ${balance}`);
       return;
     }
     onSend(selected);

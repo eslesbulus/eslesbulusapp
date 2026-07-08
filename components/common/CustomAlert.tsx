@@ -93,7 +93,7 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
       <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={() => handleButton()}>
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => { if (!hasCancel) handleButton(); }} />
-          <Animated.View entering={ZoomIn.duration(250).springify().damping(18)} exiting={ZoomOut.duration(150)} style={[styles.card, { backgroundColor: c.card }]}>
+          <Animated.View entering={ZoomIn.duration(250).springify().damping(28).stiffness(200)} exiting={ZoomOut.duration(150)} style={[styles.card, { backgroundColor: c.card }]}>
             <View style={[styles.iconWrap, { backgroundColor: `${iconColor}15` }]}>
               <Ionicons name={iconName as any} size={36} color={iconColor} />
             </View>

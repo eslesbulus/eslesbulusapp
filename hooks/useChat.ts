@@ -423,6 +423,8 @@ export function useChat(otherUid: string) {
   return {
     messages,
     loading,
+    loadMore,
+    hasMore,
     sendText,
     sendGift,
     sendImage,

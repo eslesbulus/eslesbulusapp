@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   BackHandler,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight, FadeIn, FadeOut, SlideInUp, SlideOutUp } from "react-native-reanimated";
@@ -72,12 +73,16 @@ export default function ChatScreen() {
     });
   }, []);
 
+  const navigatingRef = useRef(false);
   const handlePress = useCallback((otherUid: string) => {
     if (isSelecting) {
       toggleSelect(otherUid);
     } else {
+      if (navigatingRef.current) return;
+      navigatingRef.current = true;
       markRead(otherUid);
       router.push(`/chat/${otherUid}`);
+      setTimeout(() => { navigatingRef.current = false; }, 1000);
     }
   }, [isSelecting, toggleSelect, markRead, router]);
 
@@ -103,7 +108,7 @@ export default function ChatScreen() {
 
   function handleBulkDelete() {
     const count = selectedIds.size;
-    Alert.alert(
+    showAlert(
       "Sohbetleri Sil",
       `${count} sohbeti silmek istediğine emin misin? Bu işlem geri alınamaz.`,
       [

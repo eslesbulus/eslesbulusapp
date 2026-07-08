@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { api } from "@/config/api";
@@ -177,9 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verificationNote: data.note ?? prev.verificationNote,
       } : prev);
       if (data.status === "approved") {
-        Alert.alert("Hesabın Doğrulandı ✓", "Tebrikler! Profilinde onay rozeti gösteriliyor.");
+        showAlert("Hesabın Doğrulandı ✓", "Tebrikler! Profilinde onay rozeti gösteriliyor.");
       } else if (data.status === "rejected") {
-        Alert.alert(
+        showAlert(
           "Doğrulama Reddedildi",
           data.note ? `Sebep: ${data.note}` : "Kurallara uygun yeni bir selfie ile tekrar deneyebilirsin."
         );

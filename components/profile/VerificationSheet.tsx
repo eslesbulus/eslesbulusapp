@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/config/api";
@@ -39,7 +40,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
     if (!permission?.granted) {
       const r = await requestPermission();
       if (!r.granted) {
-        Alert.alert("İzin Gerekli", "Selfie çekebilmek için kamera iznine ihtiyacımız var.");
+        showAlert("İzin Gerekli", "Selfie çekebilmek için kamera iznine ihtiyacımız var.");
         return;
       }
     }
@@ -56,7 +57,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
         setCameraOpen(false);
       }
     } catch (e: any) {
-      Alert.alert("Hata", e?.message ?? "Fotoğraf çekilemedi.");
+      showAlert("Hata", e?.message ?? "Fotoğraf çekilemedi.");
     }
     setCapturing(false);
   }
@@ -72,7 +73,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
       // Profil ekranındaki alt-satır (İnceleniyor…) hemen güncellensin
       refreshProfile().catch(() => {});
     } catch (e: any) {
-      Alert.alert("Hata", e?.message ?? "Doğrulama gönderilemedi. Lütfen tekrar dene.");
+      showAlert("Hata", e?.message ?? "Doğrulama gönderilemedi. Lütfen tekrar dene.");
     }
     setSending(false);
   }

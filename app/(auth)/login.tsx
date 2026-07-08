@@ -14,6 +14,7 @@ import {
   Pressable,
   Modal,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,7 +43,7 @@ export default function LoginScreen() {
 
   async function handleEmailLogin() {
     if (!email.trim() || !password) {
-      Alert.alert("Hata", "E-posta ve şifre boş bırakılamaz.");
+      showAlert("Hata", "E-posta ve şifre boş bırakılamaz.");
       return;
     }
     setLoading(true);
@@ -58,7 +59,7 @@ export default function LoginScreen() {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       // Routing handled by AuthContext + RootNavigator
     } catch (e: any) {
-      Alert.alert("Giriş başarısız", firebaseAuthErrorMessage(e.code));
+      showAlert("Giriş başarısız", firebaseAuthErrorMessage(e.code));
     } finally {
       setLoading(false);
     }
@@ -66,17 +67,17 @@ export default function LoginScreen() {
 
   async function handleForgotPassword() {
     if (!email.trim()) {
-      Alert.alert("E-posta gerekli", "Şifreni sıfırlamak için önce e-postanı yaz.");
+      showAlert("E-posta gerekli", "Şifreni sıfırlamak için önce e-postanı yaz.");
       return;
     }
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      Alert.alert(
+      showAlert(
         "Sıfırlama bağlantısı gönderildi",
         `${email.trim()} adresine şifre sıfırlama linki gönderdik.`
       );
     } catch (e: any) {
-      Alert.alert("Hata", firebaseAuthErrorMessage(e.code));
+      showAlert("Hata", firebaseAuthErrorMessage(e.code));
     }
   }
 

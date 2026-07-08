@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -114,7 +115,7 @@ export function PostCard({
           hitSlop={8}
           onPress={() => {
             if (post.userId === currentUserId && onDelete) {
-              Alert.alert(
+              showAlert(
                 "Gönderi Seçenekleri",
                 undefined,
                 [
@@ -122,7 +123,7 @@ export function PostCard({
                     text: "Gönderiyi Sil",
                     style: "destructive",
                     onPress: () =>
-                      Alert.alert(
+                      showAlert(
                         "Gönderiyi Sil",
                         "Bu gönderiyi silmek istediğinden emin misin?",
                         [

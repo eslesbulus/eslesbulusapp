@@ -14,7 +14,9 @@ import {
   Alert,
   BackHandler,
   Share,
+  ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import * as ImagePicker from "expo-image-picker";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -115,7 +117,7 @@ function hexToRgba(hex: string, alpha: number) {
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { user, loading: userLoading } = useUser(id);
-  const { messages, loading: chatLoading, sendText, sendGift, sendImage, sendVoice, sendSharedPost, reactToMessage, emitTyping, isOtherTyping, myUid, formatTime } = useChat(id);
+  const { messages, loading: chatLoading, loadMore, hasMore, sendText, sendGift, sendImage, sendVoice, sendSharedPost, reactToMessage, emitTyping, isOtherTyping, myUid, formatTime } = useChat(id);
   const { markRead } = useChats();
   const router = useRouter();
   const userPhoto = user?.photoURL || user?.photos?.[0] || null;
@@ -252,7 +254,7 @@ export default function ChatDetailScreen() {
 
   function handleDeleteSelected() {
     const ids = [...selectedMsgIds];
-    Alert.alert(
+    showAlert(
       "Mesajları Sil",
       `${ids.length} mesajı nasıl silmek istiyorsun?`,
       [
@@ -390,7 +392,7 @@ export default function ChatDetailScreen() {
 
     if (tokenBalance < TOKENS_PER_MESSAGE) {
       sendingRef.current = false;
-      Alert.alert(
+      showAlert(
         "Jeton Yetersiz 🪙",
         `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
         [
@@ -417,12 +419,44 @@ export default function ChatDetailScreen() {
     setTimeout(() => { sendingRef.current = false; }, 150);
   }
 
-  if (!user && !userLoading) {
+  // Kullanıcı henüz yüklenmediyse: iskelet başlık + hayalet mesajlar göster.
+  // userLoading bittikten sonra hâlâ user yoksa "bulunamadı" göster — ama en az 1.5sn bekle
+  // (hızlı ağda skeleton flaş yapmasın diye)
+  const [showNotFound, setShowNotFound] = useState(false);
+  useEffect(() => {
+    if (!userLoading && !user) {
+      const t = setTimeout(() => setShowNotFound(true), 1500);
+      return () => clearTimeout(t);
+    }
+    setShowNotFound(false);
+  }, [userLoading, user]);
+
+  if (!user) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
-        <View style={styles.notFound}>
-          <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        {!showNotFound ? (
+          <>
+            <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.card }]}>
+              <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={26} color={c.text} />
+              </Pressable>
+              <View style={[styles.headerAvatar, { backgroundColor: c.surface }]} />
+              <View style={{ flex: 1, gap: 6, marginLeft: 10 }}>
+                <View style={{ width: 120, height: 12, borderRadius: 6, backgroundColor: c.surface }} />
+                <View style={{ width: 70, height: 9, borderRadius: 5, backgroundColor: c.surface }} />
+              </View>
+            </View>
+            <ChatSkeleton colors={c} />
+          </>
+        ) : (
+          <View style={styles.notFound}>
+            <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
+            <Pressable onPress={() => router.back()} style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, backgroundColor: c.primary }}>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Geri Dön</Text>
+            </Pressable>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -513,21 +547,30 @@ export default function ChatDetailScreen() {
           inverted
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={0.4}
           ListFooterComponent={
-            <View style={styles.matchedCard}>
-              {userPhoto ? (
-                <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
-              ) : (
-                <View style={[styles.matchedAvatar, { backgroundColor: c.surface }]} />
-              )}
-              <Text style={[styles.matchedText, { color: c.text }]}>
-                <Text style={{ fontWeight: "700" }}>{user.name} </Text>
-                ile eşleştiniz
-              </Text>
-              <Text style={[styles.matchedSub, { color: c.textMuted }]}>
-                Selam de, sohbet başlasın
-              </Text>
-            </View>
+            hasMore ? (
+              // Inverted listede footer en ustte (en eski) render olur — eski mesajlar yuklenirken spinner
+              <View style={styles.loadOlderWrap}>
+                <ActivityIndicator size="small" color={c.textMuted} />
+              </View>
+            ) : (
+              <View style={styles.matchedCard}>
+                {userPhoto ? (
+                  <Image source={{ uri: userPhoto }} style={styles.matchedAvatar} />
+                ) : (
+                  <View style={[styles.matchedAvatar, { backgroundColor: c.surface }]} />
+                )}
+                <Text style={[styles.matchedText, { color: c.text }]}>
+                  <Text style={{ fontWeight: "700" }}>{user.name} </Text>
+                  ile eşleştiniz
+                </Text>
+                <Text style={[styles.matchedSub, { color: c.textMuted }]}>
+                  Selam de, sohbet başlasın
+                </Text>
+              </View>
+            )
           }
           ListEmptyComponent={
             chatLoading ? (
@@ -726,21 +769,21 @@ export default function ChatDetailScreen() {
                     setAttachOpen(false);
                     if (item.icon === "camera") {
                       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Kamera izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert("İzin Gerekli", "Kamera izni verilmedi."); return; }
                       const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "image");
                       }
                     } else if (item.icon === "images") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert("İzin Gerekli", "Galeri izni verilmedi."); return; }
                       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "image");
                       }
                     } else if (item.icon === "videocam") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { Alert.alert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert("İzin Gerekli", "Galeri izni verilmedi."); return; }
                       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "video");
@@ -1284,7 +1327,7 @@ function ChatSkeleton({ colors: c }: { colors: any }) {
     { w: "50%", align: "flex-end" as const },
   ];
   return (
-    <View style={{ paddingHorizontal: 14, paddingVertical: 16, gap: 12, transform: [{ scaleY: -1 }] }}>
+    <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 16, gap: 12, justifyContent: "flex-end" }}>
       {lines.map((l, i) => (
         <Animated.View
           key={i}
@@ -1483,6 +1526,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 22,
     gap: 8,
+  },
+  loadOlderWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
   },
   matchedAvatar: { width: 88, height: 88, borderRadius: 44, marginBottom: 6 },
   matchedText: { fontSize: 15, textAlign: "center" },

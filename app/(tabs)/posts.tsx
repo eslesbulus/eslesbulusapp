@@ -14,6 +14,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -74,7 +75,7 @@ export default function PostsScreen() {
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -88,7 +89,7 @@ export default function PostsScreen() {
   async function handlePickVideo() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -101,7 +102,7 @@ export default function PostsScreen() {
 
   async function handleAddPost() {
     if (!newText.trim() && !newImage) {
-      Alert.alert("Hata", "Gönderi boş olamaz.");
+      showAlert("Hata", "Gönderi boş olamaz.");
       return;
     }
     setPosting(true);
@@ -111,7 +112,7 @@ export default function PostsScreen() {
       setNewImage(null);
       setNewPostModal(false);
     } catch (e: any) {
-      Alert.alert("Hata", e.message ?? "Gönderi paylaşılamadı.");
+      showAlert("Hata", e.message ?? "Gönderi paylaşılamadı.");
     }
     setPosting(false);
   }

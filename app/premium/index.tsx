@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -147,7 +148,7 @@ export default function PremiumScreen() {
 
   async function handlePurchase() {
     const pkg = packages.find((p) => p.id === selected) ?? packages[0];
-    Alert.alert(
+    showAlert(
       "Premium'a Geç 👑",
       `${pkg.label} paket — ${pkg.price}\n\nSatın almak istiyor musun?`,
       [
@@ -158,13 +159,13 @@ export default function PremiumScreen() {
             setLoading(true);
             try {
               await activatePremium(selected);
-              Alert.alert(
+              showAlert(
                 "🎉 Tebrikler!",
                 "VIP Premium üyeliğin aktifleştirildi. Ayrıcalıkların seni bekliyor!",
                 [{ text: "Harika!", onPress: () => router.back() }]
               );
             } catch {
-              Alert.alert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
+              showAlert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
             } finally {
               setLoading(false);
             }

@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -56,7 +57,7 @@ export default function SupportTicketDetailScreen() {
     try {
       await sendMessage(t);
     } catch (e: any) {
-      Alert.alert("Hata", e?.message ?? "Mesaj gönderilemedi.");
+      showAlert("Hata", e?.message ?? "Mesaj gönderilemedi.");
       setText(t);
     }
     setSending(false);

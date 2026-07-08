@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Alert } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Animated, {
@@ -39,7 +40,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
 
   async function handleLike() {
     if (!canLike && !liked) {
-      Alert.alert(
+      showAlert(
         "Günlük Limit Doldu",
         `Bugün ${DAILY_LIKE_LIMIT} beğeni hakkını kullandın. Premium üyelikle sınırsız beğen!`,
         [
@@ -93,7 +94,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
       <View style={styles.middle}>
         <View style={styles.nameRow}>
           <View style={styles.nameWrap}>
-            <VipName name={`${user.name}, ${user.age}`} vip={user.vip} style={{ color: c.text }} fontSize={15} numberOfLines={1} />
+            <VipName name={`${user.name.split(" ")[0]}, ${user.age}`} vip={user.vip} style={{ color: c.text }} fontSize={15} numberOfLines={1} />
             {user.verified && <VerifiedBadge size={14} />}
           </View>
         </View>
@@ -140,10 +141,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
             hitSlop={8}
           >
             {sent ? (
-              <>
-                <Ionicons name="checkmark-circle" size={14} color={c.online} />
-                <Text style={[styles.hiText, { color: c.text }]}>Gönderildi</Text>
-              </>
+              <Ionicons name="mail" size={16} color={c.online} />
             ) : (
               <Text style={styles.hiText}>Hi 👋</Text>
             )}
@@ -228,6 +226,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 5,
   },
   hiText: { color: "#fff", fontSize: 13, fontWeight: "700" },

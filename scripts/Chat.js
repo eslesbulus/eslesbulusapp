@@ -13,6 +13,7 @@ const messageSchema = new mongoose.Schema({
   deleted:   { type: Boolean, default: false },
   reactions: { type: [reactionSchema], default: [] },
   imageUrl:  { type: String, default: null },
+  replyTo:   { type: mongoose.Schema.Types.Mixed, default: null },
   gift:      { type: mongoose.Schema.Types.Mixed, default: null },
   storyReply: { storyId: String, storyImageUrl: String, storyOwnerId: String, isEmoji: Boolean },
   sharedPost:{ type: mongoose.Schema.Types.Mixed, default: null },

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,7 +43,7 @@ export default function EditProfileScreen() {
   const pickMainPhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -58,12 +59,12 @@ export default function EditProfileScreen() {
 
   const pickExtraPhoto = useCallback(async () => {
     if (photos.length >= MAX_PHOTOS) {
-      Alert.alert("Limit", `En fazla ${MAX_PHOTOS} fotoğraf ekleyebilirsin.`);
+      showAlert("Limit", `En fazla ${MAX_PHOTOS} fotoğraf ekleyebilirsin.`);
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
+      showAlert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -85,7 +86,7 @@ export default function EditProfileScreen() {
     setInterests((prev) => {
       if (prev.includes(item)) return prev.filter((i) => i !== item);
       if (prev.length >= INTERESTS_MAX) {
-        Alert.alert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
+        showAlert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
         return prev;
       }
       return [...prev, item];
@@ -101,7 +102,7 @@ export default function EditProfileScreen() {
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert("Hata", "İsim boş olamaz.");
+      showAlert("Hata", "İsim boş olamaz.");
       return;
     }
     setSaving(true);
@@ -130,7 +131,7 @@ export default function EditProfileScreen() {
       });
       router.back();
     } catch (e: any) {
-      Alert.alert("Hata", e.message ?? "Profil kaydedilemedi. Tekrar dene.");
+      showAlert("Hata", e.message ?? "Profil kaydedilemedi. Tekrar dene.");
     } finally {
       setSaving(false);
     }

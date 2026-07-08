@@ -9,6 +9,7 @@ import {
   Switch,
   Dimensions,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
@@ -95,7 +96,7 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
   function setGender(g: "all" | Gender) {
     // Specific gender filter requires premium
     if (g !== "all" && !isPremium) {
-      Alert.alert(
+      showAlert(
         "Premium Gerekli 👑",
         "Cinsiyete göre filtre kullanmak Premium üyelik gerektirir. \"Tümü\" seçeneğiyle karışık olarak görüntüleyebilirsiniz.",
         [

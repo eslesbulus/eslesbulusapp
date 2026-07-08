@@ -16,6 +16,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -96,27 +97,27 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password) {
-      Alert.alert("Hata", "Tüm alanları doldur.");
+      showAlert("Hata", "Tüm alanları doldur.");
       return;
     }
     if (name.trim().length < 2) {
-      Alert.alert("Hata", "İsim en az 2 karakter olmalı.");
+      showAlert("Hata", "İsim en az 2 karakter olmalı.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Hata", "Şifre en az 6 karakter olmalı.");
+      showAlert("Hata", "Şifre en az 6 karakter olmalı.");
       return;
     }
     if (!birthDate || age == null) {
-      Alert.alert("Doğum Tarihi", "Doğum tarihini seçmelisin.");
+      showAlert("Doğum Tarihi", "Doğum tarihini seçmelisin.");
       return;
     }
     if (age < MIN_AGE) {
-      Alert.alert("Yaş Doğrulama", `Uygulamayı kullanmak için en az ${MIN_AGE} yaşında olmalısın.`);
+      showAlert("Yaş Doğrulama", `Uygulamayı kullanmak için en az ${MIN_AGE} yaşında olmalısın.`);
       return;
     }
     if (!termsAccepted) {
-      Alert.alert("Kullanım Sözleşmesi", "Devam etmek için kullanım sözleşmesini kabul etmelisin.");
+      showAlert("Kullanım Sözleşmesi", "Devam etmek için kullanım sözleşmesini kabul etmelisin.");
       return;
     }
     setLoading(true);
@@ -131,7 +132,7 @@ export default function RegisterScreen() {
       });
       // RootNavigator routes to onboarding automatically
     } catch (e: any) {
-      Alert.alert("Kayıt başarısız", firebaseAuthErrorMessage(e.code));
+      showAlert("Kayıt başarısız", firebaseAuthErrorMessage(e.code));
     } finally {
       setLoading(false);
     }

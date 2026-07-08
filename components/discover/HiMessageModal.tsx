@@ -38,7 +38,7 @@ export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
         </Pressable>
 
         <Animated.View
-          entering={SlideInDown.duration(300).springify().damping(18)}
+          entering={SlideInDown.duration(300).springify().damping(28).stiffness(200)}
           exiting={SlideOutDown.duration(200)}
           style={[styles.sheet, { backgroundColor: c.surface }]}
         >

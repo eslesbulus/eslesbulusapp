@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, Layout } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,7 +84,7 @@ export default function DiscoverScreen() {
 
   async function handlePressHi(user: UserProfile) {
     if (!canSendHi) {
-      Alert.alert(
+      showAlert(
         "Günlük Limit Doldu",
         `Bugün ${DAILY_HI_LIMIT} hi mesajı hakkını kullandın. Premium üyelikle sınırsız gönder!`,
         [

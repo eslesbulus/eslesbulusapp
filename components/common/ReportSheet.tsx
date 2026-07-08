@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
@@ -80,7 +81,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
     handleClose();
     if (targetId && targetName && targetPhoto !== undefined) {
       blockUser({ uid: targetId, name: targetName, photoURL: targetPhoto ?? "" });
-      Alert.alert("Engellendi", `${targetName} engellendi.`);
+      showAlert("Engellendi", `${targetName} engellendi.`);
       onBlock?.();
     }
   }
@@ -98,12 +99,12 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
       });
     } catch (e: any) {
       handleClose();
-      Alert.alert("Hata", e?.message ?? "Şikayet gönderilemedi. Tekrar dene.");
+      showAlert("Hata", e?.message ?? "Şikayet gönderilemedi. Tekrar dene.");
       return;
     }
     setTimeout(() => {
       handleClose();
-      Alert.alert("Şikayet Alındı", "Şikayetin incelemeye alındı. Teşekkürler.");
+      showAlert("Şikayet Alındı", "Şikayetin incelemeye alındı. Teşekkürler.");
     }, 1000);
   }
 

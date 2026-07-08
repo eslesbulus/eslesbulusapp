@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { showAlert } from "@/components/common/CustomAlert";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -104,7 +105,7 @@ export default function UserDetail() {
 
   function openChat(draft?: string) {
     if (tokenBalance < TOKENS_PER_MESSAGE) {
-      Alert.alert(
+      showAlert(
         "Jeton Yetersiz 🪙",
         `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
         [
