@@ -613,9 +613,7 @@ function AboutModal({ visible, onClose, colors: c }: { visible: boolean; onClose
         <Pressable onPress={(e) => e.stopPropagation()} style={[styles.reportSheet, { backgroundColor: c.card }]}>
           <View style={[styles.reportHandle, { backgroundColor: c.border }]} />
           <View style={{ alignItems: "center", paddingVertical: 20, gap: 8 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: `${c.primary}15`, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="heart-circle" size={40} color={c.primary} />
-            </View>
+            <Image source={require("@/assets/icon.png")} style={{ width: 64, height: 64, borderRadius: 20 }} />
             <Text style={{ fontSize: 22, fontWeight: "800", color: c.text }}>EşleşBuluş</Text>
             <Text style={{ fontSize: 13, color: c.textMuted }}>Kalbini dinle, eşini bul</Text>
           </View>
