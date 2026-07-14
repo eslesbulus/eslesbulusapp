@@ -459,193 +459,68 @@ async function deletePost(id) {
 // ════════════════════════════════════════
 //  CHATS
 // ════════════════════════════════════════
-let CHATS = { items: [], page: 1, pages: 1, total: 0, search: '', activeKey: null, loading: false };
-
-async function renderChats() {
+async function renderChats(page = 1) {
+  const search = document.getElementById('chatSearch')?.value || '';
+  const d = await apiFetch(`/chats?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
   const c = document.getElementById('pageContent');
   c.innerHTML = `
-    <div class="flex flex-col h-[calc(100vh-3rem)]">
-      <div class="mb-4">
-        <h1 class="text-2xl font-bold text-white">Sohbetler</h1>
-        <p class="text-slate-400 text-sm">Konuşmaları incele, tüm mesajları görüntüle veya sil</p>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-white">Mesajlar <span class="text-slate-400 text-lg">(${d.total})</span></h1>
+      <div class="flex gap-2">
+        <input id="chatSearch" class="input w-64" placeholder="Kullanıcı UID ile ara..." value="${search}" onkeyup="if(event.key==='Enter')renderChats(1)">
+        <button onclick="renderChats(1)" class="btn-primary">Ara</button>
       </div>
-      <div class="flex gap-4 flex-1 min-h-0">
-        <!-- Sol: sohbet listesi -->
-        <div class="card flex flex-col w-80 shrink-0 overflow-hidden">
-          <div class="p-3 border-b border-slate-700">
-            <div class="flex gap-2">
-              <input id="chatSearch" class="input" placeholder="UID veya isim ara..." onkeyup="if(event.key==='Enter')searchChats()">
-              <button onclick="searchChats()" class="btn-primary shrink-0">Ara</button>
+    </div>
+    <div class="card overflow-hidden">
+      <table>
+        <thead><tr><th>Katılımcılar</th><th>Son Mesaj</th><th>Tarih</th><th>İşlem</th></tr></thead>
+        <tbody>
+          ${d.chats.map(ch => `<tr>
+            <td>
+              <div class="flex items-center gap-2">
+                ${ch.participantDetails.map(p => `<div class="flex items-center gap-1"><img class="avatar-sm" src="${p.photoURL || ''}" onerror="this.style.display='none'"><span class="text-sm">${esc(p.name || p.uid?.substring(0,8))}</span></div>`).join('<span class="text-slate-600">↔</span>')}
+              </div>
+            </td>
+            <td class="text-sm text-slate-400 max-w-xs truncate">${esc(ch.lastMessage || '-')}</td>
+            <td class="text-sm text-slate-500">${formatDateTime(ch.lastMessageAt)}</td>
+            <td><button onclick="showChatMessages('${ch.chatKey}')" class="text-indigo-400 hover:text-indigo-300 text-sm font-medium">Mesajları Gör</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${pagination(d.page, d.pages, 'renderChats')}
+  `;
+}
+
+async function showChatMessages(chatKey) {
+  const d = await apiFetch(`/chats/${chatKey}/messages`);
+  const msgs = d.messages.slice(-100); // son 100 mesaj
+  showModal(`
+    <h2 class="text-lg font-bold text-white mb-4">Sohbet: ${chatKey}</h2>
+    <div class="max-h-96 overflow-y-auto space-y-2">
+      ${msgs.map(m => `
+        <div class="flex items-start gap-2 ${m.deleted ? 'opacity-50' : ''}">
+          <img class="avatar-sm mt-1" src="${m.senderPhoto || ''}" onerror="this.style.display='none'">
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-white">${esc(m.senderName)}</span>
+              <span class="text-xs text-slate-500">${formatDateTime(m.createdAt)}</span>
+              ${m.type !== 'text' ? `<span class="badge badge-blue">${m.type}</span>` : ''}
             </div>
-            <div id="chatCount" class="text-xs text-slate-500 mt-2 px-1"></div>
+            <p class="text-sm text-slate-300">${m.deleted ? '<em>Silindi</em>' : esc(m.text || '')}</p>
+            ${m.imageUrl ? `<img src="${m.imageUrl}" class="mt-1 rounded max-h-32" onerror="this.style.display='none'">` : ''}
           </div>
-          <div id="chatList" class="flex-1 overflow-y-auto"></div>
-          <div id="chatListMore" class="p-2 border-t border-slate-700 hidden">
-            <button onclick="loadMoreChats()" class="w-full text-sm text-indigo-400 hover:text-indigo-300 py-2">Daha fazla yükle</button>
-          </div>
+          <button onclick="deleteMessage('${chatKey}','${m._id}')" class="text-red-400 hover:text-red-300 text-xs">🗑</button>
         </div>
-        <!-- Sağ: sohbet detayı -->
-        <div id="chatDetail" class="card flex-1 flex flex-col overflow-hidden">
-          ${chatEmptyState()}
-        </div>
-      </div>
+      `).join('')}
     </div>
-  `;
-  CHATS = { items: [], page: 1, pages: 1, total: 0, search: '', activeKey: null, loading: false };
-  await fetchChats(1, true);
+  `);
 }
 
-function chatEmptyState() {
-  return `<div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-    <div class="text-5xl mb-3 opacity-40">💬</div>
-    <p class="text-slate-400 font-medium">Bir sohbet seçin</p>
-    <p class="text-slate-600 text-sm mt-1">Soldaki listeden bir konuşmaya tıklayın; tüm mesajlar burada, yukarı kaydırarak görünür.</p>
-  </div>`;
-}
-
-async function fetchChats(page, reset) {
-  if (CHATS.loading) return;
-  CHATS.loading = true;
-  try {
-    const d = await apiFetch(`/chats?page=${page}&limit=20&search=${encodeURIComponent(CHATS.search)}`);
-    CHATS.page = d.page; CHATS.pages = d.pages; CHATS.total = d.total;
-    CHATS.items = reset ? (d.chats || []) : CHATS.items.concat(d.chats || []);
-  } finally { CHATS.loading = false; }
-  renderChatList();
-}
-
-function searchChats() {
-  CHATS.search = document.getElementById('chatSearch')?.value || '';
-  fetchChats(1, true);
-}
-function loadMoreChats() { if (CHATS.page < CHATS.pages) fetchChats(CHATS.page + 1, false); }
-
-// Katılımcılardan gerçek kullanıcı ile bot/fake hesabı ayır
-function chatParticipants(ch) {
-  const ps = ch.participantDetails || [];
-  let botIdx = ps.findIndex(p => /fake|bot/i.test(p.role || '') || p.isFake || p.isBot || p.fake);
-  const detected = botIdx >= 0;
-  if (botIdx < 0) botIdx = ps.length > 1 ? 1 : 0;
-  const bot = ps[botIdx] || {};
-  const user = ps.find((_, i) => i !== botIdx) || ps[0] || {};
-  return { user, bot, detected };
-}
-
-function chatAvatar(p, size) {
-  const s = size || 40;
-  const initial = esc((p.name || p.uid || '?').substring(0, 1).toUpperCase());
-  const inner = p.photoURL
-    ? `<img src="${p.photoURL}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentNode.textContent='${initial}'">`
-    : initial;
-  return `<div class="rounded-full bg-slate-600 border-2 border-slate-800 flex items-center justify-center text-white font-semibold overflow-hidden shrink-0" style="width:${s}px;height:${s}px;font-size:${Math.round(s/2.4)}px">${inner}</div>`;
-}
-
-function chatTimeShort(d) {
-  if (!d) return '';
-  const dt = new Date(d), diff = (Date.now() - dt.getTime()) / 60000;
-  if (diff < 1) return 'şimdi';
-  if (diff < 60) return `${Math.floor(diff)} dk`;
-  if (diff < 1440) return `${Math.floor(diff / 60)} sa`;
-  return `${Math.floor(diff / 1440)} gün`;
-}
-
-function renderChatList() {
-  const el = document.getElementById('chatList');
-  if (!el) return;
-  const countEl = document.getElementById('chatCount');
-  if (countEl) countEl.textContent = `${CHATS.total} sohbet`;
-  const moreWrap = document.getElementById('chatListMore');
-  if (moreWrap) moreWrap.classList.toggle('hidden', CHATS.page >= CHATS.pages);
-  if (!CHATS.items.length) {
-    el.innerHTML = `<div class="text-center text-slate-500 text-sm py-10">Sohbet bulunamadı</div>`;
-    return;
-  }
-  el.innerHTML = CHATS.items.map(ch => {
-    const { user, bot } = chatParticipants(ch);
-    const active = ch.chatKey === CHATS.activeKey;
-    return `<button onclick="openChatPanel('${ch.chatKey}')" class="w-full text-left px-3 py-3 border-b border-slate-800 hover:bg-slate-800/50 transition ${active ? 'bg-slate-800' : ''}" style="${active ? 'box-shadow:inset 3px 0 0 #6366f1' : ''}">
-      <div class="flex items-center gap-3">
-        <div class="flex -space-x-3 shrink-0">${chatAvatar(user, 38)}${chatAvatar(bot, 38)}</div>
-        <div class="min-w-0 flex-1">
-          <div class="text-sm font-semibold text-white truncate">${esc(user.name || user.uid?.substring(0, 8) || '—')} <span class="text-slate-500 font-normal">↔</span> ${esc(bot.name || bot.uid?.substring(0, 8) || '—')}</div>
-          <div class="flex items-center justify-between gap-2 mt-0.5">
-            <span class="text-xs text-slate-400 truncate">${esc(ch.lastMessage || '—')}</span>
-            <span class="text-[10px] text-slate-600 shrink-0">${chatTimeShort(ch.lastMessageAt)}</span>
-          </div>
-        </div>
-      </div>
-    </button>`;
-  }).join('');
-}
-
-const MSG_TYPE_LABEL = { image: '📷 Fotoğraf', photo: '📷 Fotoğraf', voice: '🎤 Sesli mesaj', audio: '🎤 Sesli mesaj', gift: '🎁 Hediye', video_call: '📹 Görüntülü Arama', voice_call: '📞 Sesli Arama', location: '📍 Konum', sticker: '✨ Çıkartma' };
-
-async function openChatPanel(chatKey) {
-  CHATS.activeKey = chatKey;
-  renderChatList();
-  const detail = document.getElementById('chatDetail');
-  if (!detail) return;
-  detail.innerHTML = `<div class="flex-1 flex items-center justify-center"><div class="pulse text-3xl">⏳</div></div>`;
-  const ch = CHATS.items.find(c => c.chatKey === chatKey) || { participantDetails: [] };
-  const { user, bot, detected } = chatParticipants(ch);
-  let d;
-  try { d = await apiFetch(`/chats/${chatKey}/messages`); }
-  catch (e) { detail.innerHTML = `<div class="flex-1 flex items-center justify-center text-red-400 text-sm">${esc(e.message)}</div>`; return; }
-  const msgs = d.messages || [];
-  detail.innerHTML = `
-    <div class="flex items-center gap-3 p-3 border-b border-slate-700 bg-slate-900/40 shrink-0">
-      <div class="flex items-center gap-2 min-w-0">
-        ${chatAvatar(user, 40)}
-        <div class="min-w-0"><div class="text-white font-semibold text-sm truncate">${esc(user.name || user.uid?.substring(0, 10) || '—')}</div><div class="text-slate-500 text-xs truncate">${esc(user.city || 'Kullanıcı')}</div></div>
-      </div>
-      <span class="text-slate-600 text-xs px-1 shrink-0">ile</span>
-      <div class="flex items-center gap-2 min-w-0">
-        ${chatAvatar(bot, 40)}
-        <div class="min-w-0"><div class="text-white font-semibold text-sm truncate flex items-center gap-1">${esc(bot.name || bot.uid?.substring(0, 10) || '—')} ${detected ? '<span class="badge badge-purple" style="font-size:10px">🤖 Bot</span>' : ''}</div><div class="text-slate-500 text-xs truncate">${detected ? 'Bot hesabı' : 'Katılımcı'}</div></div>
-      </div>
-      <div class="ml-auto flex items-center gap-3 shrink-0">
-        <span class="text-xs text-slate-500">${msgs.length} mesaj</span>
-        <button onclick="openChatPanel('${chatKey}')" class="text-slate-400 hover:text-white" title="Yenile">🔄</button>
-      </div>
-    </div>
-    <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-2" style="background:#0f172a">
-      ${msgs.length ? msgs.map(m => chatBubble(m, bot, chatKey)).join('') : '<div class="text-center text-slate-600 text-sm py-10">Bu sohbette mesaj yok</div>'}
-    </div>
-  `;
-  const mc = document.getElementById('chatMessages');
-  if (mc) mc.scrollTop = mc.scrollHeight;
-}
-
-function isBotMessage(m, bot) {
-  const sid = m.senderId || m.senderUid || m.senderUID || m.sender;
-  if (sid && bot.uid) return String(sid) === String(bot.uid);
-  if (m.senderName && bot.name) return m.senderName === bot.name;
-  return false;
-}
-
-function chatBubble(m, bot, chatKey) {
-  const mine = isBotMessage(m, bot); // bot/fake hesabı sağda
-  const body = m.deleted
-    ? '<em class="opacity-70">🗑 Silindi</em>'
-    : (m.type && m.type !== 'text' ? (MSG_TYPE_LABEL[m.type] || esc(m.type)) : esc(m.text || ''));
-  const img = (!m.deleted && m.imageUrl) ? `<img src="${m.imageUrl}" class="mt-2 rounded-lg max-h-48" onerror="this.style.display='none'">` : '';
-  const bubbleCls = mine ? 'bg-indigo-500 text-white rounded-2xl rounded-br-md' : 'bg-slate-700 text-slate-100 rounded-2xl rounded-bl-md';
-  return `<div class="group flex ${mine ? 'justify-end' : 'justify-start'} ${m.deleted ? 'opacity-60' : ''}">
-    <div class="flex items-end gap-1 max-w-[75%] ${mine ? 'flex-row-reverse' : ''}">
-      <div class="px-3 py-2 ${bubbleCls}" style="word-break:break-word">
-        <div class="text-sm leading-snug">${body}</div>
-        ${img}
-        <div class="text-[10px] mt-1 ${mine ? 'text-indigo-200' : 'text-slate-400'} text-right">${formatDateTime(m.createdAt)}</div>
-      </div>
-      <button onclick="deleteChatMessage('${chatKey}','${m._id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition shrink-0" title="Mesajı sil">🗑</button>
-    </div>
-  </div>`;
-}
-
-async function deleteChatMessage(chatKey, msgId) {
+async function deleteMessage(chatKey, msgId) {
   if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) return;
   await apiFetch(`/chats/${chatKey}/messages/${msgId}`, { method: 'DELETE' });
-  openChatPanel(chatKey);
+  showChatMessages(chatKey);
 }
 
 // ════════════════════════════════════════
