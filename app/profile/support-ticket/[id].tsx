@@ -16,22 +16,25 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useTicket, type TicketMessage } from "@/hooks/useSupportTickets";
+import type { TranslationKeys } from "@/i18n/tr";
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+function fmtTime(iso: string, lang: string) {
+  return new Date(iso).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
-function statusInfo(s: string | undefined) {
-  if (s === "resolved") return { text: "Çözüldü", color: "#10b981" };
-  if (s === "reviewed") return { text: "İnceleniyor", color: "#3b82f6" };
-  if (s === "dismissed") return { text: "İptal", color: "#94a3b8" };
-  return { text: "Yeni", color: "#f59e0b" };
+function statusInfo(s: string | undefined, t: (key: TranslationKeys) => string) {
+  if (s === "resolved") return { text: t("tickets_status_closed"), color: "#10b981" };
+  if (s === "reviewed") return { text: t("tickets_status_answered"), color: "#3b82f6" };
+  if (s === "dismissed") return { text: t("common_cancel"), color: "#94a3b8" };
+  return { text: t("tickets_status_open"), color: "#f59e0b" };
 }
 
 export default function SupportTicketDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -51,19 +54,19 @@ export default function SupportTicketDetailScreen() {
 
   async function handleSend() {
     if (!text.trim() || sending) return;
-    const t = text.trim();
+    const msg = text.trim();
     setText("");
     setSending(true);
     try {
-      await sendMessage(t);
+      await sendMessage(msg);
     } catch (e: any) {
-      showAlert("Hata", e?.message ?? "Mesaj gönderilemedi.");
-      setText(t);
+      showAlert(t("common_error"), e?.message ?? t("report_fail"));
+      setText(msg);
     }
     setSending(false);
   }
 
-  const st = statusInfo(ticket?.status);
+  const st = statusInfo(ticket?.status, t);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
@@ -75,7 +78,7 @@ export default function SupportTicketDetailScreen() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
-            Destek Talebi
+            {t("tickets_title")}
           </Text>
           {ticket && (
             <View style={styles.subtitleRow}>
@@ -105,10 +108,10 @@ export default function SupportTicketDetailScreen() {
             renderItem={({ item }) => <MessageBubble msg={item} c={c} />}
             ListHeaderComponent={
               <View style={[styles.metaCard, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.metaTitle, { color: c.textMuted }]}>Konu</Text>
+                <Text style={[styles.metaTitle, { color: c.textMuted }]}>{t("report_reason")}</Text>
                 <Text style={[styles.metaText, { color: c.text }]}>{ticket.reason}</Text>
                 <Text style={[styles.metaHint, { color: c.textMuted }]}>
-                  Talep tarihi: {new Date(ticket.createdAt).toLocaleString("tr-TR")}
+                  {new Date(ticket.createdAt).toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
                 </Text>
               </View>
             }
@@ -118,14 +121,14 @@ export default function SupportTicketDetailScreen() {
             <View style={[styles.closedBar, { backgroundColor: c.surface, borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>
               <Ionicons name="lock-closed-outline" size={16} color={c.textMuted} />
               <Text style={[styles.closedText, { color: c.textMuted }]}>
-                Bu talep kapatıldı. Yeni bir sorun için "Sorun Bildir" ekranını kullan.
+                {t("tickets_closed_bar")}
               </Text>
             </View>
           ) : (
             <View style={[styles.inputBar, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: insets.bottom + 8 }]}>
               <TextInput
                 style={[styles.input, { color: c.text, backgroundColor: c.surface, borderColor: c.border }]}
-                placeholder="Mesajını yaz..."
+                placeholder={t("chat_message_placeholder")}
                 placeholderTextColor={c.textMuted}
                 value={text}
                 onChangeText={setText}
@@ -152,13 +155,14 @@ export default function SupportTicketDetailScreen() {
 }
 
 function MessageBubble({ msg, c }: { msg: TicketMessage; c: any }) {
+  const { t, lang } = useLanguage();
   const isAdmin = msg.senderRole === "admin";
   return (
     <View style={{ alignItems: isAdmin ? "flex-start" : "flex-end" }}>
       {isAdmin && (
         <View style={styles.adminHeader}>
           <Ionicons name="shield-checkmark" size={12} color={c.primary} />
-          <Text style={[styles.adminName, { color: c.primary }]}>Destek Ekibi</Text>
+          <Text style={[styles.adminName, { color: c.primary }]}>{t("tickets_admin")}</Text>
         </View>
       )}
       <View
@@ -171,7 +175,7 @@ function MessageBubble({ msg, c }: { msg: TicketMessage; c: any }) {
       >
         <Text style={[styles.bubbleText, { color: isAdmin ? c.text : "#fff" }]}>{msg.text}</Text>
       </View>
-      <Text style={[styles.timeText, { color: c.textMuted }]}>{fmtTime(msg.createdAt)}</Text>
+      <Text style={[styles.timeText, { color: c.textMuted }]}>{fmtTime(msg.createdAt, lang)}</Text>
     </View>
   );
 }

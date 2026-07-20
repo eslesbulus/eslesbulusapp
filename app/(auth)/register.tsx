@@ -21,12 +21,29 @@ import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/dat
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "@/config/firebase";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithCredential,
+} from "firebase/auth";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/config/firebase";
 import { api } from "@/config/api";
 import { palette } from "@/constants/theme";
 import { firebaseAuthErrorMessage } from "@/constants/firebaseErrors";
 import { calculateAge } from "@/lib/age";
+import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
+import { useLanguage } from "@/context/LanguageContext";
+
+let GoogleSignin: any = null;
+let gStatusCodes: any = {};
+try {
+  const mod = require("@react-native-google-signin/google-signin");
+  GoogleSignin = mod.GoogleSignin;
+  gStatusCodes = mod.statusCodes;
+  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+} catch {}
 
 const MIN_AGE = 18;
 const MAX_DATE = (() => {
@@ -49,19 +66,21 @@ function passwordStrength(p: string): { score: 0 | 1 | 2 | 3; label: string; col
   const score = Math.min(s, 3) as 0 | 1 | 2 | 3;
   const map = [
     { label: "", color: "#666" },
-    { label: "Zayıf", color: "#F87171" },
-    { label: "Orta", color: "#FBBF24" },
-    { label: "Güçlü", color: "#34D399" },
+    { label: "weak", color: "#F87171" },
+    { label: "medium", color: "#FBBF24" },
+    { label: "strong", color: "#34D399" },
   ];
   return { score, ...map[score] };
 }
 
 export default function RegisterScreen() {
+  const { t, lang } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -95,29 +114,66 @@ export default function RegisterScreen() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    if (!GoogleSignin) {
+      showAlert(t("auth_google_register"), t("auth_google_expo"));
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) throw new Error(t("auth_id_token_error"));
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const { user } = await signInWithCredential(auth, credential);
+
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          name: user.displayName ?? "",
+          email: user.email ?? "",
+          photoURL: user.photoURL ?? "",
+          createdAt: serverTimestamp(),
+          profileComplete: false,
+        });
+      }
+    } catch (e: any) {
+      if (e.code === gStatusCodes.SIGN_IN_CANCELLED) return;
+      if (e.code === gStatusCodes.IN_PROGRESS) return;
+      showAlert(t("auth_google_register_failed"), e.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password) {
-      showAlert("Hata", "Tüm alanları doldur.");
+      showAlert(t("auth_error"), t("auth_all_fields_required"));
       return;
     }
     if (name.trim().length < 2) {
-      showAlert("Hata", "İsim en az 2 karakter olmalı.");
+      showAlert(t("auth_error"), t("auth_name_min"));
       return;
     }
     if (password.length < 6) {
-      showAlert("Hata", "Şifre en az 6 karakter olmalı.");
+      showAlert(t("auth_error"), t("auth_password_min_error"));
       return;
     }
     if (!birthDate || age == null) {
-      showAlert("Doğum Tarihi", "Doğum tarihini seçmelisin.");
+      showAlert(t("date_birthdate"), t("auth_birthdate_required"));
       return;
     }
     if (age < MIN_AGE) {
-      showAlert("Yaş Doğrulama", `Uygulamayı kullanmak için en az ${MIN_AGE} yaşında olmalısın.`);
+      showAlert(t("auth_error"), t("auth_age_check", { min: MIN_AGE }));
       return;
     }
     if (!termsAccepted) {
-      showAlert("Kullanım Sözleşmesi", "Devam etmek için kullanım sözleşmesini kabul etmelisin.");
+      showAlert(t("legal_terms_title"), t("auth_terms_required"));
       return;
     }
     setLoading(true);
@@ -132,7 +188,7 @@ export default function RegisterScreen() {
       });
       // RootNavigator routes to onboarding automatically
     } catch (e: any) {
-      showAlert("Kayıt başarısız", firebaseAuthErrorMessage(e.code));
+      showAlert(t("auth_register_failed"), firebaseAuthErrorMessage(e.code));
     } finally {
       setLoading(false);
     }
@@ -164,15 +220,15 @@ export default function RegisterScreen() {
 
             <Animated.View entering={FadeInDown.delay(120).duration(500)}>
               <View style={styles.glassCard}>
-                <Text style={styles.cardTitle}>Hesap Oluştur</Text>
-                <Text style={styles.cardSub}>Birkaç saniye, hemen başlıyoruz</Text>
+                <Text style={styles.cardTitle}>{t("auth_create_account")}</Text>
+                <Text style={styles.cardSub}>{t("auth_create_sub")}</Text>
 
                 {/* Name */}
                 <View style={styles.inputWrap}>
                   <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Adın"
+                    placeholder={t("auth_name")}
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     value={name}
                     onChangeText={setName}
@@ -187,7 +243,7 @@ export default function RegisterScreen() {
                   <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="E-posta"
+                    placeholder={t("auth_email")}
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     autoCapitalize="none"
                     keyboardType="email-address"
@@ -202,10 +258,14 @@ export default function RegisterScreen() {
                   <Ionicons name="lock-closed-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { paddingRight: 40 }]}
-                    placeholder="Şifre (en az 6 karakter)"
+                    placeholder={t("auth_password_min")}
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     secureTextEntry={!showPwd}
                     autoComplete="password-new"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    textContentType="newPassword"
                     value={password}
                     onChangeText={setPassword}
                   />
@@ -243,7 +303,7 @@ export default function RegisterScreen() {
                     </View>
                     {strength.label && (
                       <Text style={[styles.strengthLabel, { color: strength.color }]}>
-                        {strength.label}
+                        {strength.label === "weak" ? t("strength_weak") : strength.label === "medium" ? t("strength_medium") : strength.label === "strong" ? t("strength_strong") : ""}
                       </Text>
                     )}
                   </View>
@@ -263,16 +323,16 @@ export default function RegisterScreen() {
                     ]}
                   >
                     {birthDate
-                      ? birthDate.toLocaleDateString("tr-TR", {
+                      ? birthDate.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
                           day: "2-digit",
                           month: "long",
                           year: "numeric",
                         })
-                      : "Doğum Tarihi Seç"}
+                      : t("auth_birthdate")}
                   </Text>
                   {age != null && (
                     <View style={styles.ageBadge}>
-                      <Text style={styles.ageBadgeText}>{age} yaş</Text>
+                      <Text style={styles.ageBadgeText}>{t("common_age", { age })}</Text>
                     </View>
                   )}
                 </Pressable>
@@ -286,8 +346,8 @@ export default function RegisterScreen() {
                     {termsAccepted && <Ionicons name="checkmark" size={14} color="#fff" />}
                   </View>
                   <Text style={styles.checkboxLabel}>
-                    Kullanım sözleşmesini okudum ve{" "}
-                    <Text style={styles.checkboxLabelBold}>kabul ediyorum</Text>
+                    {t("auth_terms_read")}{" "}
+                    <Text style={styles.checkboxLabelBold}>{t("auth_terms_accept")}</Text>
                   </Text>
                 </Pressable>
 
@@ -300,15 +360,37 @@ export default function RegisterScreen() {
                   {loading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>Kayıt Ol</Text>
+                    <Text style={styles.primaryButtonText}>{t("auth_register")}</Text>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>{t("auth_or")}</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLoading}
+                  activeOpacity={0.85}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator color="#333" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={18} color="#4285F4" />
+                      <Text style={styles.googleButtonText}>{t("auth_google_register")}</Text>
+                    </>
                   )}
                 </TouchableOpacity>
 
                 <Link href="/(auth)/login" asChild>
                   <TouchableOpacity style={styles.loginLink} activeOpacity={0.7}>
                     <Text style={styles.loginLinkText}>
-                      Zaten hesabın var mı?{" "}
-                      <Text style={styles.loginLinkBold}>Giriş Yap</Text>
+                      {t("auth_has_account")}{" "}
+                      <Text style={styles.loginLinkBold}>{t("auth_login")}</Text>
                     </Text>
                   </TouchableOpacity>
                 </Link>
@@ -339,11 +421,11 @@ export default function RegisterScreen() {
             <Pressable style={styles.iosPickerSheet} onPress={(e) => e.stopPropagation()}>
               <View style={styles.iosPickerHeader}>
                 <Pressable onPress={() => setPickerOpen(false)} hitSlop={12}>
-                  <Text style={styles.iosPickerCancel}>İptal</Text>
+                  <Text style={styles.iosPickerCancel}>{t("date_cancel")}</Text>
                 </Pressable>
-                <Text style={styles.iosPickerTitle}>Doğum Tarihi</Text>
+                <Text style={styles.iosPickerTitle}>{t("date_birthdate")}</Text>
                 <Pressable onPress={() => setPickerOpen(false)} hitSlop={12}>
-                  <Text style={styles.iosPickerDone}>Tamam</Text>
+                  <Text style={styles.iosPickerDone}>{t("date_done")}</Text>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -354,7 +436,7 @@ export default function RegisterScreen() {
                 minimumDate={new Date(1920, 0, 1)}
                 onChange={handleDateChange}
                 themeVariant="dark"
-                locale="tr-TR"
+                locale={lang === "tr" ? "tr-TR" : "en-US"}
               />
             </Pressable>
           </Pressable>
@@ -370,7 +452,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Kullanım Sözleşmesi</Text>
+            <Text style={styles.modalTitle}>{t("legal_terms_title")}</Text>
             <Pressable onPress={() => setTermsModalVisible(false)} hitSlop={12}>
               <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
             </Pressable>
@@ -391,7 +473,7 @@ export default function RegisterScreen() {
               </View>
             ))}
             <Text style={styles.termsVersion}>
-              Son güncelleme: 19 Mayıs 2026 · Sürüm 1.0
+              {t("legal_last_updated")}
             </Text>
             <View style={{ height: 20 }} />
           </ScrollView>
@@ -399,7 +481,7 @@ export default function RegisterScreen() {
           {!hasScrolledToBottom && (
             <View style={styles.scrollHint}>
               <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.scrollHintText}>Kabul etmek için sona kadar kaydır</Text>
+              <Text style={styles.scrollHintText}>{t("legal_scroll_hint")}</Text>
             </View>
           )}
 
@@ -416,7 +498,7 @@ export default function RegisterScreen() {
               }}
               activeOpacity={0.85}
             >
-              <Text style={styles.acceptButtonText}>Okudum ve Kabul Ediyorum</Text>
+              <Text style={styles.acceptButtonText}>{t("legal_accept")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -648,6 +730,26 @@ const styles = StyleSheet.create({
   iosPickerCancel: { color: "rgba(255,255,255,0.65)", fontSize: 15 },
   iosPickerDone: { color: palette.primary, fontSize: 15, fontWeight: "700" },
   iosPickerTitle: { color: "#fff", fontSize: 15, fontWeight: "700" },
+
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 18,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
+  dividerText: { color: "rgba(255,255,255,0.45)", fontSize: 12 },
+
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    paddingVertical: 13,
+  },
+  googleButtonText: { fontSize: 15, fontWeight: "600", color: "#333" },
 
   loginLink: { marginTop: 18, alignItems: "center" },
   loginLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },

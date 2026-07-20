@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { TURKISH_CITIES, POPULAR_CITY_SHORTLIST } from "@/constants/cities";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   visible: boolean;
@@ -24,6 +25,7 @@ type Props = {
 
 export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
 
   const list = useMemo(() => {
@@ -53,7 +55,7 @@ export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: 
           <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
             <Ionicons name="close" size={26} color={c.text} />
           </Pressable>
-          <Text style={[styles.title, { color: c.text }]}>Şehir Seç</Text>
+          <Text style={[styles.title, { color: c.text }]}>{t("city_picker_title")}</Text>
           <View style={{ width: 26 }} />
         </View>
 
@@ -68,7 +70,7 @@ export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: 
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Şehir ara..."
+            placeholder={t("city_picker_search")}
             placeholderTextColor={c.textMuted}
             style={[styles.searchInput, { color: c.text }]}
             autoCorrect={false}
@@ -85,7 +87,7 @@ export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: 
         {!query && (
           <View style={styles.popularSection}>
             <Text style={[styles.sectionLabel, { color: c.textMuted }]}>
-              Popüler
+              {t("city_picker_popular")}
             </Text>
             <View style={styles.popularRow}>
               {POPULAR_CITY_SHORTLIST.map((city) => (
@@ -119,7 +121,7 @@ export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: 
                 { color: c.textMuted, marginTop: 16 },
               ]}
             >
-              Tüm Şehirler ({TURKISH_CITIES.length})
+              {t("city_picker_all")} ({TURKISH_CITIES.length})
             </Text>
           </View>
         )}
@@ -166,7 +168,7 @@ export function CityPicker({ visible, selected, onClose, onSelect, colors: c }: 
             <View style={styles.emptyWrap}>
               <Ionicons name="search" size={32} color={c.textMuted} />
               <Text style={[styles.emptyText, { color: c.textMuted }]}>
-                Sonuç bulunamadı
+                {t("city_picker_no_results")}
               </Text>
             </View>
           }

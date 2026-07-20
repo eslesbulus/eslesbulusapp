@@ -16,6 +16,7 @@ import Animated, {
   Easing,
 } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { width } = Dimensions.get("window");
 
@@ -24,34 +25,39 @@ type Props = {
   endDate?: string | null;
 };
 
-function formatEndDate(dateStr: string): string {
+function formatEndDate(
+  dateStr: string,
+  t: (key: any, params?: Record<string, string | number>) => string,
+  lang: string
+): string {
   const d = new Date(dateStr);
   const now = new Date();
   const diffMs = d.getTime() - now.getTime();
 
-  if (diffMs <= 0) return "Çok yakında";
+  if (diffMs <= 0) return t("maintenance_soon");
 
   const diffMin = Math.floor(diffMs / 60000);
   const diffHour = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHour / 24);
 
-  const dateFormatted = d.toLocaleDateString("tr-TR", {
+  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  const dateFormatted = d.toLocaleDateString(locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
-  const timeFormatted = d.toLocaleTimeString("tr-TR", {
+  const timeFormatted = d.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
 
   let relative = "";
   if (diffDay > 0) {
-    relative = `(${diffDay} gün ${diffHour % 24} saat sonra)`;
+    relative = `(${t("maintenance_days_hours", { days: diffDay, hours: diffHour % 24 })})`;
   } else if (diffHour > 0) {
-    relative = `(${diffHour} saat ${diffMin % 60} dakika sonra)`;
+    relative = `(${t("maintenance_hours_mins", { hours: diffHour, mins: diffMin % 60 })})`;
   } else {
-    relative = `(${diffMin} dakika sonra)`;
+    relative = `(${t("maintenance_mins", { mins: diffMin })})`;
   }
 
   return `${dateFormatted} ${timeFormatted}\n${relative}`;
@@ -116,6 +122,7 @@ function PulsingDot({ delay, color }: { delay: number; color: string }) {
 
 export default function MaintenanceScreen({ message, endDate }: Props) {
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
@@ -126,7 +133,7 @@ export default function MaintenanceScreen({ message, endDate }: Props) {
         </View>
 
         {/* Title */}
-        <Text style={[styles.title, { color: c.text }]}>Bakımdayız</Text>
+        <Text style={[styles.title, { color: c.text }]}>{t("maintenance_title")}</Text>
 
         {/* Dots */}
         <View style={styles.dotsRow}>
@@ -137,21 +144,21 @@ export default function MaintenanceScreen({ message, endDate }: Props) {
 
         {/* Message */}
         <Text style={[styles.message, { color: c.textMuted }]}>
-          {message || "Uygulamamızı sizin için geliştiriyoruz.\nKısa süre içinde geri döneceğiz!"}
+          {message || t("maintenance_desc")}
         </Text>
 
         {/* End date */}
         {endDate ? (
           <View style={[styles.dateCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.dateLabel, { color: c.primary }]}>Tahmini Açılış</Text>
-            <Text style={[styles.dateValue, { color: c.text }]}>{formatEndDate(endDate)}</Text>
+            <Text style={[styles.dateLabel, { color: c.primary }]}>{t("maintenance_estimated")}</Text>
+            <Text style={[styles.dateValue, { color: c.text }]}>{formatEndDate(endDate, t, lang)}</Text>
           </View>
         ) : null}
 
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: c.text }]}>💕 EşleşBuluş</Text>
-          <Text style={[styles.footerSub, { color: c.textMuted }]}>Anlayışınız için teşekkür ederiz</Text>
+          <Text style={[styles.footerSub, { color: c.textMuted }]}>{t("maintenance_thanks")}</Text>
         </View>
       </View>
     </SafeAreaView>

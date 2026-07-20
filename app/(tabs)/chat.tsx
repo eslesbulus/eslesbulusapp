@@ -15,31 +15,35 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight, FadeIn, FadeOut, SlideInUp, SlideOutUp } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKeys } from "@/i18n/tr";
 import { useChats } from "@/hooks/useChats";
 import { useUser } from "@/hooks/useUser";
 import { VipName } from "@/components/common/VipName";
 import { useEffect } from "react";
 
-function formatChatTime(ts: string | null): string {
+function formatChatTime(ts: string | null, t: (key: TranslationKeys, params?: Record<string, string>) => string, lang: string): string {
   if (!ts) return "";
   const d = new Date(ts);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "şimdi";
-  if (mins < 60) return `${mins} dk`;
+  if (mins < 1) return t("time_now");
+  if (mins < 60) return `${mins} ${t("time_min")}`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} sa`;
+  if (hours < 24) return `${hours} ${t("time_hour")}`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return "dün";
-  if (days < 7) return `${days} gün`;
-  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+  if (days === 1) return t("time_yesterday");
+  if (days < 7) return `${days} ${t("time_days")}`;
+  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  return d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
 type ViewMode = "active" | "archived";
 
 export default function ChatScreen() {
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
   const {
@@ -109,12 +113,12 @@ export default function ChatScreen() {
   function handleBulkDelete() {
     const count = selectedIds.size;
     showAlert(
-      "Sohbetleri Sil",
-      `${count} sohbeti silmek istediğine emin misin? Bu işlem geri alınamaz.`,
+      t("chat_list_delete_title"),
+      t("chat_list_delete_confirm", { count: String(count) }),
       [
-        { text: "İptal", style: "cancel" },
+        { text: t("common_cancel"), style: "cancel" },
         {
-          text: "Sil",
+          text: t("common_delete"),
           style: "destructive",
           onPress: () => {
             deleteBulk([...selectedIds]);
@@ -170,9 +174,9 @@ export default function ChatScreen() {
         </Animated.View>
       ) : (
         <View style={styles.header}>
-          <Text style={[styles.title, { color: c.text }]}>Sohbet</Text>
+          <Text style={[styles.title, { color: c.text }]}>{t("chat_title")}</Text>
           <Text style={[styles.sub, { color: c.textMuted }]}>
-            {chats.length > 0 ? `${chats.length} sohbet` : "Henüz sohbet yok"}
+            {chats.length > 0 ? t("chat_count", { count: String(chats.length) }) : t("chat_empty")}
           </Text>
         </View>
       )}
@@ -185,7 +189,7 @@ export default function ChatScreen() {
             style={[styles.tab, viewMode === "active" && { borderBottomColor: c.primary, borderBottomWidth: 2 }]}
           >
             <Text style={[styles.tabText, { color: viewMode === "active" ? c.primary : c.textMuted }]}>
-              Sohbetler
+              {t("chat_tab_active")}
             </Text>
           </Pressable>
           <Pressable
@@ -199,7 +203,7 @@ export default function ChatScreen() {
               style={{ marginRight: 4 }}
             />
             <Text style={[styles.tabText, { color: viewMode === "archived" ? c.primary : c.textMuted }]}>
-              Arşiv ({archivedChats.length})
+              {t("chat_tab_archive")} ({archivedChats.length})
             </Text>
           </Pressable>
         </View>
@@ -212,7 +216,7 @@ export default function ChatScreen() {
         ListEmptyComponent={
           loading ? (
             <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: c.textMuted }]}>Yükleniyor...</Text>
+              <Text style={[styles.emptyText, { color: c.textMuted }]}>{t("common_loading")}</Text>
             </View>
           ) : (
             <View style={styles.empty}>
@@ -223,8 +227,8 @@ export default function ChatScreen() {
               />
               <Text style={[styles.emptyText, { color: c.textMuted }]}>
                 {viewMode === "archived"
-                  ? "Arşivlenmiş sohbet yok"
-                  : "Kesfet sekmesinden birine mesaj gonder, sohbet burada acilir."}
+                  ? t("chat_archived_empty")
+                  : t("chat_discover_hint")}
               </Text>
             </View>
           )
@@ -272,6 +276,7 @@ function ChatRow({
   onLongPress: () => void;
 }) {
   const { user } = useUser(otherUid);
+  const { t, lang } = useLanguage();
   const photo = user?.photoURL || user?.photos?.[0];
   const name = user?.name || "...";
   const online = user?.online ?? false;
@@ -329,7 +334,7 @@ function ChatRow({
             fontSize={15}
           />
           <Text style={[styles.time, { color: hasUnread ? c.primary : c.textMuted }]}>
-            {formatChatTime(lastMessageAt)}
+            {formatChatTime(lastMessageAt, t, lang)}
           </Text>
         </View>
         <View style={styles.bottomRow}>

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useCoins } from "@/context/CoinsContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { GIFTS, VIP_GIFTS, Gift } from "@/constants/gifts";
 
 function hexToRgba(hex: string, alpha: number) {
@@ -35,11 +36,11 @@ type Props = {
   vipOnly?: boolean;
 };
 
-const RARITY_LABEL: Record<string, string> = {
-  common: "Sıradan",
-  rare: "Nadir",
-  epic: "Efsanevi",
-  legendary: "Destansı",
+const RARITY_KEYS: Record<string, string> = {
+  common: "gift_rarity_common",
+  rare: "gift_rarity_rare",
+  epic: "gift_rarity_epic",
+  legendary: "gift_rarity_legendary",
 };
 
 const RARITY_GRAD: Record<string, [string, string]> = {
@@ -51,13 +52,14 @@ const RARITY_GRAD: Record<string, [string, string]> = {
 
 export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vipOnly = false }: Props) {
   const { balance, spend } = useCoins();
+  const { t } = useLanguage();
   const [selected, setSelected] = useState<Gift | null>(null);
 
   async function handleSend() {
     if (!selected) return;
     const ok = await spend(selected.price);
     if (!ok) {
-      showAlert("Yetersiz Jeton", `Bu hediye için ${selected.price} jeton gerekli.\nBakiyen: ${balance}`);
+      showAlert(t("coins_insufficient"), t("coins_insufficient_desc", { price: String(selected.price), balance: String(balance) }));
       return;
     }
     onSend(selected);
@@ -71,7 +73,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
         <View style={styles.recipientRow}>
           <Image source={{ uri: recipientPhoto }} style={styles.recipientAvatar} />
           <Text style={[styles.headerSub, { color: c.textMuted }]} numberOfLines={1}>
-            {recipientName} için
+            {t("gift_for", { name: recipientName })}
           </Text>
         </View>
         <View style={[styles.balanceChip, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -112,11 +114,11 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
                   end={{ x: 1, y: 1 }}
                   style={styles.rarityRibbon}
                 >
-                  <Text style={styles.rarityText}>{RARITY_LABEL[g.rarity]}</Text>
+                  <Text style={styles.rarityText}>{t(RARITY_KEYS[g.rarity] as any)}</Text>
                 </LinearGradient>
                 <Text style={styles.giftEmoji}>{g.emoji}</Text>
                 <Text style={[styles.giftName, { color: c.text }]} numberOfLines={1}>
-                  {g.name}
+                  {t(g.nameKey)}
                 </Text>
                 <View style={[styles.priceRow, { backgroundColor: hexToRgba(g.color, 0.13) }]}>
                   <Text style={{ fontSize: 11 }}>🪙</Text>
@@ -134,10 +136,10 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
           <View style={styles.sendInfo}>
             <Text style={styles.sendEmoji}>{selected.emoji}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.sendGiftName, { color: c.text }]}>{selected.name}</Text>
+              <Text style={[styles.sendGiftName, { color: c.text }]}>{t(selected.nameKey)}</Text>
               <View style={styles.sendPriceRow}>
                 <Text style={{ fontSize: 13 }}>🪙</Text>
-                <Text style={[styles.sendPriceText, { color: c.textMuted }]}>{selected.price} jeton</Text>
+                <Text style={[styles.sendPriceText, { color: c.textMuted }]}>{selected.price} {t("coins_unit")}</Text>
               </View>
             </View>
           </View>
@@ -146,7 +148,7 @@ export function GiftSheet({ onSend, recipientName, recipientPhoto, colors: c, vi
             style={[styles.sendBtn, { backgroundColor: c.primary }]}
           >
             <Ionicons name="paper-plane" size={14} color="#fff" />
-            <Text style={styles.sendBtnText}>Gönder</Text>
+            <Text style={styles.sendBtnText}>{t("common_send")}</Text>
           </Pressable>
         </Animated.View>
       )}

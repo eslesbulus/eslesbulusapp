@@ -22,6 +22,7 @@ import { useState } from "react";
 import { ReportSheet } from "@/components/common/ReportSheet";
 import { VipName } from "@/components/common/VipName";
 import { type DisplayPost, formatTimeAgo } from "@/constants/mockPosts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { width: W } = Dimensions.get("window");
 
@@ -51,6 +52,7 @@ export function PostCard({
   onDelete,
 }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
+  const { t } = useLanguage();
   const scale = useSharedValue(1);
   const router = useRouter();
 
@@ -116,23 +118,23 @@ export function PostCard({
           onPress={() => {
             if (post.userId === currentUserId && onDelete) {
               showAlert(
-                "Gönderi Seçenekleri",
+                t("posts_options_title"),
                 undefined,
                 [
                   {
-                    text: "Gönderiyi Sil",
+                    text: t("posts_delete"),
                     style: "destructive",
                     onPress: () =>
                       showAlert(
-                        "Gönderiyi Sil",
-                        "Bu gönderiyi silmek istediğinden emin misin?",
+                        t("posts_delete"),
+                        t("posts_delete_confirm"),
                         [
-                          { text: "Sil", style: "destructive", onPress: () => onDelete(post.id) },
-                          { text: "İptal", style: "cancel" },
+                          { text: t("common_delete"), style: "destructive", onPress: () => onDelete(post.id) },
+                          { text: t("common_cancel"), style: "cancel" },
                         ]
                       ),
                   },
-                  { text: "İptal", style: "cancel" },
+                  { text: t("common_cancel"), style: "cancel" },
                 ]
               );
             } else {

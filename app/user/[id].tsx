@@ -35,6 +35,8 @@ import { SentToast } from "@/components/discover/SentToast";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { ReportSheet } from "@/components/common/ReportSheet";
 import { api } from "@/config/api";
+import { useLanguage } from "@/context/LanguageContext";
+import { getInterestLabel } from "@/constants/interests";
 
 const SCREEN_W = Dimensions.get("window").width;
 const HERO_H = SCREEN_W * 1.15;
@@ -43,6 +45,7 @@ export default function UserDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const { hasSent, sendRandomHi } = useInteractions();
   const { balance: tokenBalance } = useCoins();
   const insets = useSafeAreaInsets();
@@ -94,9 +97,9 @@ export default function UserDetail() {
       <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.notFound}>
-          <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
+          <Text style={[styles.notFoundText, { color: c.text }]}>{t("user_not_found")}</Text>
           <Pressable onPress={() => router.back()} style={styles.backLink}>
-            <Text style={[styles.backLinkText, { color: c.primary }]}>Geri dön</Text>
+            <Text style={[styles.backLinkText, { color: c.primary }]}>{t("user_go_back")}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -106,11 +109,11 @@ export default function UserDetail() {
   function openChat(draft?: string) {
     if (tokenBalance < TOKENS_PER_MESSAGE) {
       showAlert(
-        "Jeton Yetersiz 🪙",
-        `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
+        t("coins_insufficient"),
+        t("coins_insufficient_desc", { price: TOKENS_PER_MESSAGE, balance: tokenBalance }),
         [
-          { text: "İptal", style: "cancel" },
-          { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("coins_buy"), onPress: () => router.push("/premium/coins") },
         ]
       );
       return;
@@ -246,7 +249,7 @@ export default function UserDetail() {
                 ]}
               />
               <Text style={styles.metaText}>
-                {user.online ? "Çevrimiçi" : "Çevrimdışı"}
+                {user.online ? t("discover_online") : t("discover_offline")}
               </Text>
             </View>
           </View>
@@ -254,7 +257,7 @@ export default function UserDetail() {
 
         <Animated.View entering={FadeInDown.duration(400)} style={styles.body}>
           {user.bio ? (
-            <Section title="Hakkında" c={c}>
+            <Section title={t("user_bio")} c={c}>
               <Text style={[styles.bioText, { color: c.text }]}>{user.bio}</Text>
             </Section>
           ) : null}
@@ -265,18 +268,18 @@ export default function UserDetail() {
               <InfoRow icon="resize-outline" label="Boy" value={`${user.height} cm`} c={c} />
             )}
             {user.city && (
-              <InfoRow icon="location-outline" label="Şehir" value={user.city} c={c} />
+              <InfoRow icon="location-outline" label={t("edit_city")} value={user.city} c={c} />
             )}
             <InfoRow
               icon="time-outline"
-              label="Aktiflik"
-              value={user.online ? "Şu an çevrimiçi" : "Bilinmiyor"}
+              label={t("discover_online")}
+              value={user.online ? t("discover_online") : t("discover_offline")}
               c={c}
             />
           </Section>
 
           {(user.interests?.length ?? 0) > 0 && (
-            <Section title="İlgi Alanları" c={c}>
+            <Section title={t("user_interests")} c={c}>
               <View style={styles.chips}>
                 {user.interests!.map((it, i) => (
                   <Animated.View key={it} entering={FadeIn.delay(80 * i).duration(280)}>
@@ -286,7 +289,7 @@ export default function UserDetail() {
                         { backgroundColor: c.surface, borderColor: c.border },
                       ]}
                     >
-                      <Text style={[styles.chipText, { color: c.text }]}>{it}</Text>
+                      <Text style={[styles.chipText, { color: c.text }]}>{getInterestLabel(it, t)}</Text>
                     </View>
                   </Animated.View>
                 ))}
@@ -297,7 +300,7 @@ export default function UserDetail() {
           <UserPostsSection posts={userPosts} colors={c} />
 
           {photos.length > 1 && (
-            <Section title="Fotoğraflar" c={c}>
+            <Section title={t("user_photos")} c={c}>
               <View style={styles.galleryGrid}>
                 {photos.map((p, i) => (
                   <Image key={i} source={{ uri: p }} style={styles.galleryItem} />
@@ -327,7 +330,7 @@ export default function UserDetail() {
           ]}
         >
           <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
-          <Text style={styles.hiBtnText}>Mesaj Gönder</Text>
+          <Text style={styles.hiBtnText}>{t("user_send_message")}</Text>
         </Pressable>
       </View>
     </View>

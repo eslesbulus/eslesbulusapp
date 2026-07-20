@@ -35,25 +35,28 @@ import { StoryProgressBar } from "@/components/story/StoryProgressBar";
 import { StoryReactions } from "@/components/story/StoryReactions";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { VipName } from "@/components/common/VipName";
+import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKeys } from "@/i18n/tr";
 
 const SCREEN_W = Dimensions.get("window").width;
 const SCREEN_H = Dimensions.get("window").height;
 const DURATION = 5000;
 const EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-function timeAgo(d: Date): string {
+function timeAgo(d: Date, t: (key: TranslationKeys) => string): string {
   const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "az önce";
-  if (mins < 60) return `${mins}dk önce`;
+  if (mins < 1) return t("time_now");
+  if (mins < 60) return `${mins}${t("time_min")}`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}sa önce`;
-  return "bugün";
+  if (hrs < 24) return `${hrs}${t("time_hour")}`;
+  return t("time_today");
 }
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { users, loading: usersLoading } = useUsers();
   const { storiesByUser, storyUserIds, likeStory, replyToStory, loading: storiesLoading } = useStories();
@@ -263,11 +266,11 @@ export default function StoryScreen() {
       // Emoji = story like (5/day limit, premium unlimited)
       if (!canLikeStory) {
         showAlert(
-          "Günlük Limit Doldu",
-          `Bugün ${DAILY_STORY_LIKE_LIMIT} hikaye beğeni hakkını kullandın. Premium ile sınırsız beğen!`,
+          t("story_limit_title"),
+          t("story_limit_desc", { max: DAILY_STORY_LIKE_LIMIT }),
           [
-            { text: "İptal", style: "cancel" },
-            { text: "Premium Al 👑", onPress: () => router.push("/premium") },
+            { text: t("common_cancel"), style: "cancel" },
+            { text: t("discover_get_premium"), onPress: () => router.push("/premium") },
           ]
         );
         return;
@@ -280,11 +283,11 @@ export default function StoryScreen() {
       // Text = story reply (costs tokens like message)
       if (tokenBalance < TOKENS_PER_MESSAGE) {
         showAlert(
-          "Jeton Yetersiz 🪙",
-          `Yanıt göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor.`,
+          t("coins_insufficient"),
+          t("coins_insufficient_desc", { price: TOKENS_PER_MESSAGE, balance: tokenBalance }),
           [
-            { text: "İptal", style: "cancel" },
-            { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+            { text: t("common_cancel"), style: "cancel" },
+            { text: t("coins_buy"), onPress: () => router.push("/premium/coins") },
           ]
         );
         return;
@@ -360,13 +363,13 @@ export default function StoryScreen() {
                 <View style={styles.userRow}>
                   <VipName name={currentUser.name} vip={currentUser.vip} style={{ color: "#fff" }} fontSize={14} />
                   {currentUser.verified && <VerifiedBadge size={13} />}
-                  <Text style={styles.userTime}>· {currentStory ? timeAgo(currentStory.createdAt) : ""}</Text>
+                  <Text style={styles.userTime}>· {currentStory ? timeAgo(currentStory.createdAt, t) : ""}</Text>
                 </View>
               </View>
               {paused && (
                 <View style={styles.pausePill}>
                   <Ionicons name="pause" size={11} color="#fff" />
-                  <Text style={styles.pauseText}>Duraklatıldı</Text>
+                  <Text style={styles.pauseText}>{t("story_paused")}</Text>
                 </View>
               )}
               <Pressable onPress={close} hitSlop={10} style={styles.closeBtn}>

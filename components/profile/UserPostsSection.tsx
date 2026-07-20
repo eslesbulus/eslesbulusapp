@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import type { Post } from "@/hooks/usePosts";
 import { formatTimeAgo } from "@/constants/mockPosts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const SCREEN_W = Dimensions.get("window").width;
 const GRID_PAD = 16;
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function UserPostsSection({ posts, colors: c }: Props) {
+  const { t } = useLanguage();
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const activePosts = posts.filter((p) => !p.archived);
 
@@ -32,7 +34,7 @@ export function UserPostsSection({ posts, colors: c }: Props) {
   return (
     <View>
       <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
-        GONDERİLER ({activePosts.length})
+        {t("user_posts_title")} ({activePosts.length})
       </Text>
 
       <View style={styles.grid}>
@@ -86,7 +88,7 @@ export function UserPostsSection({ posts, colors: c }: Props) {
                 <View style={styles.detailMeta}>
                   <Ionicons name="heart" size={13} color={c.primary} />
                   <Text style={[styles.metaText, { color: c.textMuted }]}>
-                    {detailPost.likesCount} begeni
+                    {t("posts_likes", { count: detailPost.likesCount })}
                   </Text>
                   <Text style={[styles.metaText, { color: c.textMuted }]}>·</Text>
                   <Text style={[styles.metaText, { color: c.textMuted }]}>

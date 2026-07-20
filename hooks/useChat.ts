@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/config/api";
 import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import type { Gift } from "@/constants/gifts";
 
 export type StoryReplyData = {
@@ -53,14 +54,16 @@ function makeChatKey(a: string, b: string): string {
   return [a, b].sort().join("_");
 }
 
-function formatTime(ts: string | null): string {
+function formatTime(ts: string | null, lang: string = "tr"): string {
   if (!ts) return "";
   const d = new Date(ts);
-  return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function useChat(otherUid: string) {
   const { user } = useAuth();
+  const { t, lang } = useLanguage();
   const myUid = user?.uid ?? "";
   const chatKey = myUid && otherUid ? makeChatKey(myUid, otherUid) : "";
 
@@ -189,7 +192,7 @@ export function useChat(otherUid: string) {
         setMessages((prev) =>
           prev.map((m) => {
             if (data.messageIds.includes(m.id)) {
-              return { ...m, text: "Bu mesaj silindi", type: "text", deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined };
+              return { ...m, text: t("chat_message_deleted"), type: "text", deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined };
             }
             return m;
           })
@@ -292,25 +295,26 @@ export function useChat(otherUid: string) {
 
   const sendGift = useCallback((gift: Gift) => {
     if (!chatKey || !myUid) return;
+    const resolvedName = t(gift.nameKey);
     const optimistic: ChatMessage = {
       id: `pending_${Date.now()}`,
       senderId: myUid,
-      text: `🎁 ${gift.name}`,
+      text: `🎁 ${resolvedName}`,
       type: "gift",
       createdAt: new Date().toISOString(),
       status: "sent",
-      gift: { name: gift.name, emoji: gift.emoji, price: gift.price, color: gift.color } as Gift,
+      gift: { ...gift, nameKey: gift.nameKey } as Gift,
     };
     setMessages((prev) => [...prev, optimistic]);
     const socket = getSocket();
     if (socket?.connected) {
-      socket.emit("chat:send", { to: otherUid, text: `🎁 ${gift.name}`, type: "gift", gift: { name: gift.name, emoji: gift.emoji, price: gift.price, color: gift.color } });
+      socket.emit("chat:send", { to: otherUid, text: `🎁 ${resolvedName}`, type: "gift", gift: { nameKey: gift.nameKey, emoji: gift.emoji, price: gift.price, color: gift.color } });
     }
-  }, [chatKey, myUid, otherUid]);
+  }, [chatKey, myUid, otherUid, t]);
 
   const sendImage = useCallback(async (uri: string, mediaType: "image" | "video" = "image") => {
     if (!chatKey || !myUid) return;
-    const label = mediaType === "video" ? "🎥 Video" : "📷 Fotoğraf";
+    const label = mediaType === "video" ? `🎥 ${t("chat_video")}` : `📷 ${t("chat_photo")}`;
     // Optimistic mesaj
     const optimistic: ChatMessage = {
       id: `pending_${Date.now()}`,
@@ -351,7 +355,7 @@ export function useChat(otherUid: string) {
 
   const sendVoice = useCallback(async (uri: string, durationMillis: number) => {
     if (!chatKey || !myUid) return;
-    const label = "🎤 Sesli mesaj";
+    const label = `🎤 ${t("chat_voice")}`;
     const optimistic: ChatMessage = {
       id: `pending_${Date.now()}`,
       senderId: myUid,
@@ -435,6 +439,6 @@ export function useChat(otherUid: string) {
     isOtherTyping,
     myUid,
     chatId: chatKey,
-    formatTime,
+    formatTime: (ts: string | null) => formatTime(ts, lang),
   };
 }

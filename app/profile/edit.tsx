@@ -21,20 +21,22 @@ import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { CityPicker } from "@/components/common/CityPicker";
-import { INTERESTS_LIST, INTERESTS_MAX } from "@/constants/interests";
+import { INTERESTS_LIST, INTERESTS_MAX, migrateInterests } from "@/constants/interests";
+import { useLanguage } from "@/context/LanguageContext";
 
 const MAX_PHOTOS = 6;
 
 export default function EditProfileScreen() {
   const { profile, updateProfile } = useAuth();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
 
   const [name, setName] = useState(profile?.name ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [city, setCity] = useState(profile?.city ?? "");
-  const [interests, setInterests] = useState<string[]>(profile?.interests ?? []);
+  const [interests, setInterests] = useState<string[]>(migrateInterests(profile?.interests ?? []));
   const [mainPhoto, setMainPhoto] = useState(profile?.photoURL ?? "");
   const [photos, setPhotos] = useState<string[]>(profile?.photos ?? []);
   const [saving, setSaving] = useState(false);
@@ -43,7 +45,7 @@ export default function EditProfileScreen() {
   const pickMainPhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
+      showAlert(t("edit_permission_title"), t("edit_permission_gallery"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -55,16 +57,16 @@ export default function EditProfileScreen() {
     if (!result.canceled && result.assets[0]) {
       setMainPhoto(result.assets[0].uri);
     }
-  }, []);
+  }, [t]);
 
   const pickExtraPhoto = useCallback(async () => {
     if (photos.length >= MAX_PHOTOS) {
-      showAlert("Limit", `En fazla ${MAX_PHOTOS} fotoğraf ekleyebilirsin.`);
+      showAlert(t("setup_limit_title"), t("edit_photo_limit", { max: MAX_PHOTOS }));
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Fotoğraflara erişim izni verilmedi.");
+      showAlert(t("edit_permission_title"), t("edit_permission_gallery"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -76,7 +78,7 @@ export default function EditProfileScreen() {
     if (!result.canceled && result.assets[0]) {
       setPhotos((prev) => [...prev, result.assets[0].uri]);
     }
-  }, [photos]);
+  }, [photos, t]);
 
   const removePhoto = useCallback((idx: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
@@ -86,7 +88,7 @@ export default function EditProfileScreen() {
     setInterests((prev) => {
       if (prev.includes(item)) return prev.filter((i) => i !== item);
       if (prev.length >= INTERESTS_MAX) {
-        showAlert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
+        showAlert(t("setup_limit_title"), t("setup_limit_interests", { max: INTERESTS_MAX }));
         return prev;
       }
       return [...prev, item];
@@ -102,7 +104,7 @@ export default function EditProfileScreen() {
 
   async function handleSave() {
     if (!name.trim()) {
-      showAlert("Hata", "İsim boş olamaz.");
+      showAlert(t("common_error"), t("auth_name_min"));
       return;
     }
     setSaving(true);
@@ -131,7 +133,7 @@ export default function EditProfileScreen() {
       });
       router.back();
     } catch (e: any) {
-      showAlert("Hata", e.message ?? "Profil kaydedilemedi. Tekrar dene.");
+      showAlert(t("common_error"), e.message ?? t("edit_error"));
     } finally {
       setSaving(false);
     }
@@ -144,7 +146,7 @@ export default function EditProfileScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={c.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: c.text }]}>Profili Düzenle</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>{t("edit_title")}</Text>
         <Pressable
           onPress={handleSave}
           disabled={saving}
@@ -153,7 +155,7 @@ export default function EditProfileScreen() {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveBtnText}>Kaydet</Text>
+            <Text style={styles.saveBtnText}>{t("edit_save")}</Text>
           )}
         </Pressable>
       </View>
@@ -177,13 +179,13 @@ export default function EditProfileScreen() {
               <Ionicons name="camera" size={16} color="#fff" />
             </View>
           </Pressable>
-          <Text style={[styles.mainPhotoHint, { color: c.textMuted }]}>Profil fotoğrafı</Text>
+          <Text style={[styles.mainPhotoHint, { color: c.textMuted }]}>{t("edit_photo")}</Text>
         </Animated.View>
 
         {/* Ek Fotoğraflar */}
         <Animated.View entering={FadeInDown.delay(60).duration(350)} style={styles.section}>
           <Text style={[styles.label, { color: c.textMuted }]}>
-            Fotoğraflar ({photos.length}/{MAX_PHOTOS})
+            {t("edit_photos")} ({photos.length}/{MAX_PHOTOS})
           </Text>
           <View style={styles.photosGrid}>
             {photos.map((uri, idx) => (
@@ -210,11 +212,11 @@ export default function EditProfileScreen() {
 
         {/* İsim */}
         <Animated.View entering={FadeInDown.delay(100).duration(350)} style={styles.section}>
-          <Text style={[styles.label, { color: c.textMuted }]}>İsim</Text>
+          <Text style={[styles.label, { color: c.textMuted }]}>{t("edit_name")}</Text>
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Adın"
+            placeholder={t("edit_name_placeholder")}
             placeholderTextColor={c.textMuted}
             style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
             maxLength={40}
@@ -223,14 +225,14 @@ export default function EditProfileScreen() {
 
         {/* Şehir */}
         <Animated.View entering={FadeInDown.delay(140).duration(350)} style={styles.section}>
-          <Text style={[styles.label, { color: c.textMuted }]}>Şehir</Text>
+          <Text style={[styles.label, { color: c.textMuted }]}>{t("edit_city")}</Text>
           <Pressable
             onPress={() => setCityPickerOpen(true)}
             style={[styles.input, styles.citySelector, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <Ionicons name="location-outline" size={18} color={c.textMuted} />
             <Text style={[styles.citySelectorText, { color: city ? c.text : c.textMuted, flex: 1, marginLeft: 8 }]}>
-              {city || "Şehir seç"}
+              {city || t("setup_city_select")}
             </Text>
             <Ionicons name="chevron-down" size={18} color={c.textMuted} />
           </Pressable>
@@ -238,11 +240,11 @@ export default function EditProfileScreen() {
 
         {/* Biyografi */}
         <Animated.View entering={FadeInDown.delay(180).duration(350)} style={styles.section}>
-          <Text style={[styles.label, { color: c.textMuted }]}>Hakkımda</Text>
+          <Text style={[styles.label, { color: c.textMuted }]}>{t("edit_bio")}</Text>
           <TextInput
             value={bio}
             onChangeText={setBio}
-            placeholder="Kendini birkaç cümleyle anlat..."
+            placeholder={t("edit_bio_placeholder")}
             placeholderTextColor={c.textMuted}
             multiline
             numberOfLines={4}
@@ -259,15 +261,15 @@ export default function EditProfileScreen() {
         {/* İlgi Alanları */}
         <Animated.View entering={FadeInDown.delay(220).duration(350)} style={styles.section}>
           <Text style={[styles.label, { color: c.textMuted }]}>
-            İlgi Alanları ({interests.length}/{INTERESTS_MAX})
+            {t("edit_interests")} ({interests.length}/{INTERESTS_MAX})
           </Text>
           <View style={styles.interestsGrid}>
             {INTERESTS_LIST.map((item) => {
-              const active = interests.includes(item);
+              const active = interests.includes(item.id);
               return (
                 <Pressable
-                  key={item}
-                  onPress={() => toggleInterest(item)}
+                  key={item.id}
+                  onPress={() => toggleInterest(item.id)}
                   style={[
                     styles.chip,
                     {
@@ -277,7 +279,7 @@ export default function EditProfileScreen() {
                   ]}
                 >
                   <Text style={[styles.chipText, { color: active ? "#fff" : c.text }]}>
-                    {item}
+                    {t(item.labelKey)}
                   </Text>
                 </Pressable>
               );

@@ -26,6 +26,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useUser } from "@/hooks/useUser";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ export default function CallScreen() {
   const insets = useSafeAreaInsets();
   const { user, loading: userLoading } = useUser(id);
   const { profile } = useAuth();
+  const { t } = useLanguage();
   const userPhoto = user?.photoURL || user?.photos?.[0] || "";
   const myPhoto = profile?.photoURL || profile?.photos?.[0] || "";
   const userName = user?.name ?? "";
@@ -158,12 +160,12 @@ export default function CallScreen() {
         >
           <Text style={styles.videoName}>{userName}</Text>
           <Text style={styles.videoStatus}>
-            {callState === "ringing" ? "Aranıyor..." : formatDuration(duration)}
+            {callState === "ringing" ? t("call_calling") : formatDuration(duration)}
           </Text>
           {callState === "connected" && (
             <View style={styles.videoBadge}>
               <View style={styles.videoLiveDot} />
-              <Text style={styles.videoBadgeText}>CANLI</Text>
+              <Text style={styles.videoBadgeText}>{t("call_live")}</Text>
             </View>
           )}
         </Animated.View>
@@ -191,23 +193,23 @@ export default function CallScreen() {
         >
           <CtrlBtn
             icon={muted ? "mic-off" : "mic"}
-            label={muted ? "Sessiz" : "Mikrofon"}
+            label={muted ? t("call_muted") : t("call_microphone")}
             onPress={() => setMuted(!muted)}
             active={!muted}
           />
           <CtrlBtn
             icon={cameraOff ? "videocam-off" : "videocam"}
-            label={cameraOff ? "Kapalı" : "Kamera"}
+            label={cameraOff ? t("call_camera_off") : t("call_camera")}
             onPress={() => setCameraOff(!cameraOff)}
             active={!cameraOff}
           />
           <CtrlBtn
             icon="camera-reverse-outline"
-            label="Döndür"
+            label={t("call_flip")}
             onPress={() => {}}
             active
           />
-          <EndBtn onPress={handleEnd} />
+          <EndBtn label={t("call_end")} onPress={handleEnd} />
         </Animated.View>
       </View>
     );
@@ -241,13 +243,13 @@ export default function CallScreen() {
         <Text style={styles.voiceName}>{userName}</Text>
         <Text style={styles.voiceStatus}>
           {callState === "ringing"
-            ? "Aranıyor..."
-            : `Bağlı  •  ${formatDuration(duration)}`}
+            ? t("call_calling")
+            : t("call_connected_duration", { duration: formatDuration(duration) })}
         </Text>
         {callState === "connected" && (
           <Animated.View entering={FadeInUp.duration(300)} style={styles.connectedBadge}>
             <Ionicons name="lock-closed" size={11} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.connectedText}>Uçtan uca şifreli</Text>
+            <Text style={styles.connectedText}>{t("call_encrypted")}</Text>
           </Animated.View>
         )}
       </Animated.View>
@@ -259,23 +261,23 @@ export default function CallScreen() {
       >
         <CtrlBtn
           icon={muted ? "mic-off" : "mic"}
-          label={muted ? "Sessiz" : "Mikrofon"}
+          label={muted ? t("call_muted") : t("call_microphone")}
           onPress={() => setMuted(!muted)}
           active={!muted}
         />
         <CtrlBtn
           icon={speakerOn ? "volume-high" : "volume-medium-outline"}
-          label="Hoparlör"
+          label={t("call_speaker")}
           onPress={() => setSpeakerOn(!speakerOn)}
           active={speakerOn}
         />
         <CtrlBtn
           icon="chatbubble-outline"
-          label="Mesaj"
+          label={t("call_message")}
           onPress={() => router.back()}
           active={false}
         />
-        <EndBtn onPress={handleEnd} />
+        <EndBtn label={t("call_end")} onPress={handleEnd} />
       </Animated.View>
     </View>
   );
@@ -309,7 +311,7 @@ function CtrlBtn({
   );
 }
 
-function EndBtn({ onPress }: { onPress: () => void }) {
+function EndBtn({ onPress, label }: { onPress: () => void; label: string }) {
   return (
     <Pressable onPress={onPress} style={styles.ctrlItem}>
       <View style={styles.endBtn}>
@@ -320,7 +322,7 @@ function EndBtn({ onPress }: { onPress: () => void }) {
           style={{ transform: [{ rotate: "135deg" }] }}
         />
       </View>
-      <Text style={styles.ctrlLabel}>Kapat</Text>
+      <Text style={styles.ctrlLabel}>{label}</Text>
     </Pressable>
   );
 }

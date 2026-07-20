@@ -17,6 +17,7 @@ import { VerifiedBadge } from "@/components/common/VerifiedBadge";
 import { VipName } from "@/components/common/VipName";
 import { ReportSheet } from "@/components/common/ReportSheet";
 import { usePremium, DAILY_LIKE_LIMIT } from "@/context/PremiumContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   user: UserProfile;
@@ -26,6 +27,7 @@ type Props = {
 
 export function ProfileCardList({ user, onPressHi, onPress }: Props) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const { hasSent, isLiked, toggleLike } = useInteractions();
   const { canLike, useLike } = usePremium();
   const router = useRouter();
@@ -41,11 +43,11 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
   async function handleLike() {
     if (!canLike && !liked) {
       showAlert(
-        "Günlük Limit Doldu",
-        `Bugün ${DAILY_LIKE_LIMIT} beğeni hakkını kullandın. Premium üyelikle sınırsız beğen!`,
+        t("discover_daily_limit_title"),
+        t("discover_daily_limit_desc", { limit: DAILY_LIKE_LIMIT }),
         [
-          { text: "İptal", style: "cancel" },
-          { text: "Premium Al", onPress: () => router.push("/premium") },
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("discover_get_premium"), onPress: () => router.push("/premium") },
         ]
       );
       return;
@@ -105,7 +107,7 @@ export function ProfileCardList({ user, onPressHi, onPress }: Props) {
           </Text>
           <View style={[styles.onlineDot, { backgroundColor: user.online ? c.online : c.textMuted }]} />
           <Text style={[styles.meta, { color: user.online ? c.online : c.textMuted }]} numberOfLines={1}>
-            {user.online ? "Çevrimiçi" : "Çevrimdışı"}
+            {user.online ? t("discover_online") : t("discover_offline")}
           </Text>
         </View>
         {user.bio ? (

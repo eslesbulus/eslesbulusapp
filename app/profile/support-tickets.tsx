@@ -4,34 +4,44 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, Stack } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useMyTickets, type SupportTicketSummary } from "@/hooks/useSupportTickets";
+import type { TranslationKeys } from "@/i18n/tr";
 
-function statusLabel(s: SupportTicketSummary["status"]) {
-  if (s === "resolved") return { text: "Çözüldü", color: "#10b981" };
-  if (s === "reviewed") return { text: "İnceleniyor", color: "#3b82f6" };
-  if (s === "dismissed") return { text: "İptal", color: "#94a3b8" };
-  return { text: "Yeni", color: "#f59e0b" };
+function statusLabel(s: SupportTicketSummary["status"], t: (key: TranslationKeys) => string) {
+  if (s === "resolved") return { text: t("tickets_status_closed"), color: "#10b981" };
+  if (s === "reviewed") return { text: t("tickets_status_answered"), color: "#3b82f6" };
+  if (s === "dismissed") return { text: t("common_cancel"), color: "#94a3b8" };
+  return { text: t("tickets_status_open"), color: "#f59e0b" };
 }
 
-function typeLabel(t: SupportTicketSummary["type"]) {
-  return { user: "Kullanıcı Şikayeti", post: "Gönderi Şikayeti", message: "Mesaj Şikayeti", story: "Hikaye Şikayeti", support: "Destek Talebi" }[t] || t;
+function typeLabelFn(tp: SupportTicketSummary["type"], t: (key: TranslationKeys) => string) {
+  const map: Record<string, string> = {
+    user: t("tickets_type_report"),
+    post: t("tickets_type_report"),
+    message: t("tickets_type_report"),
+    story: t("tickets_type_report"),
+    support: t("tickets_type_support"),
+  };
+  return map[tp] || tp;
 }
 
-function fmtTime(iso: string) {
+function fmtTime(iso: string, t: (key: TranslationKeys) => string, lang: string) {
   const d = new Date(iso);
   const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "şimdi";
-  if (mins < 60) return `${mins}dk`;
+  if (mins < 1) return t("time_now");
+  if (mins < 60) return `${mins}${t("time_min")}`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}sa`;
+  if (hrs < 24) return `${hrs}${t("time_hour")}`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}g`;
-  return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+  if (days < 7) return `${days}${t("time_days")}`;
+  return d.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "2-digit", month: "short" });
 }
 
 export default function SupportTicketsScreen() {
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
   const { tickets, loading, refresh } = useMyTickets();
@@ -44,7 +54,7 @@ export default function SupportTicketsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={c.text} />
         </Pressable>
-        <Text style={[styles.title, { color: c.text }]}>Taleplerim</Text>
+        <Text style={[styles.title, { color: c.text }]}>{t("tickets_title")}</Text>
         <Pressable onPress={refresh} hitSlop={12}>
           <Ionicons name="refresh" size={20} color={c.textMuted} />
         </Pressable>
@@ -57,9 +67,9 @@ export default function SupportTicketsScreen() {
       ) : tickets.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="chatbubbles-outline" size={44} color={c.textMuted} />
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Henüz talep yok</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t("tickets_empty")}</Text>
           <Text style={[styles.emptySub, { color: c.textMuted }]}>
-            Sorun bildir veya şikayet ettiğinde burada görürsün.
+            {t("tickets_empty")}
           </Text>
         </View>
       ) : (
@@ -68,7 +78,7 @@ export default function SupportTicketsScreen() {
           keyExtractor={(t) => t.id}
           contentContainerStyle={{ padding: 16, gap: 10 }}
           renderItem={({ item, index }) => {
-            const st = statusLabel(item.status);
+            const st = statusLabel(item.status, t);
             return (
               <Animated.View entering={FadeInDown.delay(index * 40).duration(280)}>
                 <Pressable
@@ -85,7 +95,7 @@ export default function SupportTicketsScreen() {
                         size={12}
                         color={c.primary}
                       />
-                      <Text style={[styles.typeText, { color: c.primary }]}>{typeLabel(item.type)}</Text>
+                      <Text style={[styles.typeText, { color: c.primary }]}>{typeLabelFn(item.type, t)}</Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: `${st.color}20` }]}>
                       <Text style={[styles.statusText, { color: st.color }]}>{st.text}</Text>
@@ -98,17 +108,17 @@ export default function SupportTicketsScreen() {
 
                   {item.messageCount > 1 && (
                     <Text style={[styles.lastMsg, { color: c.textMuted }]} numberOfLines={1}>
-                      Son: {item.lastMessage}
+                      {item.lastMessage}
                     </Text>
                   )}
 
                   <View style={styles.rowBottom}>
                     <Text style={[styles.timeText, { color: c.textMuted }]}>
-                      {fmtTime(item.updatedAt)}
+                      {fmtTime(item.updatedAt, t, lang)}
                     </Text>
                     {item.unread > 0 && (
                       <View style={[styles.unreadPill, { backgroundColor: "#EF4444" }]}>
-                        <Text style={styles.unreadText}>{item.unread} yeni</Text>
+                        <Text style={styles.unreadText}>{item.unread}</Text>
                       </View>
                     )}
                   </View>

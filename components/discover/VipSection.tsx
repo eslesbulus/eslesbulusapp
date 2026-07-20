@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
 import { VerifiedBadge } from "@/components/common/VerifiedBadge";
@@ -11,6 +12,7 @@ type Props = { onPressUser?: (u: UserProfile) => void };
 
 export function VipSection({ onPressUser }: Props) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const s = styles(theme.colors);
   const { users } = useUsers();
   const vipUsers = users.filter((u) => u.vip).slice(0, 12);
@@ -22,10 +24,10 @@ export function VipSection({ onPressUser }: Props) {
       <View style={s.header}>
         <View style={s.titleRow}>
           <Ionicons name="diamond" size={16} color={theme.colors.secondary} />
-          <Text style={[s.title, { color: theme.colors.text }]}>VIP Üyeler</Text>
+          <Text style={[s.title, { color: theme.colors.text }]}>{t("vip_section_title")}</Text>
         </View>
         <Pressable>
-          <Text style={[s.seeAll, { color: theme.colors.secondary }]}>Tümü</Text>
+          <Text style={[s.seeAll, { color: theme.colors.secondary }]}>{t("vip_section_all")}</Text>
         </Pressable>
       </View>
 

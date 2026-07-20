@@ -22,28 +22,83 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from "firebase/auth";
-import { auth } from "@/config/firebase";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import type { TranslationKeys } from "@/i18n/tr";
 import { palette } from "@/constants/theme";
 import { firebaseAuthErrorMessage } from "@/constants/firebaseErrors";
+import { GOOGLE_WEB_CLIENT_ID } from "@/constants/googleAuth";
+
+let GoogleSignin: any = null;
+let gStatusCodes: any = {};
+try {
+  const mod = require("@react-native-google-signin/google-signin");
+  GoogleSignin = mod.GoogleSignin;
+  gStatusCodes = mod.statusCodes;
+  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+} catch {}
 
 const DEV_ADMIN_EMAIL = "admin";
 const DEV_ADMIN_PASSWORD = "admin";
 
 export default function LoginScreen() {
   const { signInAsDevAdmin } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
+  const LEGAL_ITEMS = getLegalItems(t);
   const [openLegal, setOpenLegal] = useState<(typeof LEGAL_ITEMS)[number] | null>(null);
   const insets = useSafeAreaInsets();
 
+  async function handleGoogleSignIn() {
+    if (!GoogleSignin) {
+      showAlert(t("auth_google"), t("auth_google_expo"));
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) throw new Error(t("auth_id_token_error"));
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const { user } = await signInWithCredential(auth, credential);
+
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          name: user.displayName ?? "",
+          email: user.email ?? "",
+          photoURL: user.photoURL ?? "",
+          createdAt: serverTimestamp(),
+          profileComplete: false,
+        });
+      }
+    } catch (e: any) {
+      if (e.code === gStatusCodes.SIGN_IN_CANCELLED) return;
+      if (e.code === gStatusCodes.IN_PROGRESS) return;
+      showAlert(t("auth_google_failed"), e.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
   async function handleEmailLogin() {
     if (!email.trim() || !password) {
-      showAlert("Hata", "E-posta ve şifre boş bırakılamaz.");
+      showAlert(t("auth_error"), t("auth_email_password_required"));
       return;
     }
     setLoading(true);
@@ -57,9 +112,8 @@ export default function LoginScreen() {
 
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // Routing handled by AuthContext + RootNavigator
     } catch (e: any) {
-      showAlert("Giriş başarısız", firebaseAuthErrorMessage(e.code));
+      showAlert(t("auth_login_failed"), firebaseAuthErrorMessage(e.code));
     } finally {
       setLoading(false);
     }
@@ -67,24 +121,19 @@ export default function LoginScreen() {
 
   async function handleForgotPassword() {
     if (!email.trim()) {
-      showAlert("E-posta gerekli", "Şifreni sıfırlamak için önce e-postanı yaz.");
+      showAlert(t("auth_forgot_email_required_title"), t("auth_forgot_email_required"));
       return;
     }
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      showAlert(
-        "Sıfırlama bağlantısı gönderildi",
-        `${email.trim()} adresine şifre sıfırlama linki gönderdik.`
-      );
+      showAlert(t("auth_reset_sent"), t("auth_reset_sent_desc", { email: email.trim() }));
     } catch (e: any) {
-      showAlert("Hata", firebaseAuthErrorMessage(e.code));
+      showAlert(t("auth_error"), firebaseAuthErrorMessage(e.code));
     }
   }
 
   return (
     <View style={styles.container}>
-      {/* Video + gradient handled by (auth)/_layout.tsx */}
-
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
@@ -108,15 +157,15 @@ export default function LoginScreen() {
 
             <Animated.View entering={FadeInDown.delay(120).duration(500)}>
               <View style={styles.glassCard}>
-                <Text style={styles.cardTitle}>Hoş Geldin</Text>
-                <Text style={styles.cardSub}>Giriş yap, eşleşmen başlasın</Text>
+                <Text style={styles.cardTitle}>{t("auth_welcome")}</Text>
+                <Text style={styles.cardSub}>{t("auth_welcome_sub")}</Text>
 
                 {/* Email */}
                 <View style={styles.inputWrap}>
                   <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="E-posta"
+                    placeholder={t("auth_email")}
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     autoCapitalize="none"
                     keyboardType="email-address"
@@ -131,12 +180,15 @@ export default function LoginScreen() {
                   <Ionicons name="lock-closed-outline" size={18} color="rgba(255,255,255,0.55)" style={styles.inputIcon} />
                   <TextInput
                     style={[styles.input, { paddingRight: 40 }]}
-                    placeholder="Şifre"
+                    placeholder={t("auth_password")}
                     placeholderTextColor="rgba(255,255,255,0.45)"
                     secureTextEntry={!showPwd}
                     autoComplete="password"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    spellCheck={false}
+                    textContentType="password"
+                    importantForAutofill="yes"
                     value={password}
                     onChangeText={setPassword}
                   />
@@ -154,7 +206,7 @@ export default function LoginScreen() {
                 </View>
 
                 <Pressable onPress={handleForgotPassword} style={styles.forgotWrap}>
-                  <Text style={styles.forgotText}>Şifremi unuttum</Text>
+                  <Text style={styles.forgotText}>{t("auth_forgot")}</Text>
                 </Pressable>
 
                 <TouchableOpacity
@@ -166,29 +218,37 @@ export default function LoginScreen() {
                   {loading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>Giriş Yap</Text>
+                    <Text style={styles.primaryButtonText}>{t("auth_login")}</Text>
                   )}
                 </TouchableOpacity>
 
-                {/* Divider for future Google */}
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>ya da</Text>
+                  <Text style={styles.dividerText}>{t("auth_or")}</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
-                <View style={styles.googleDisabledWrap}>
-                  <Ionicons name="logo-google" size={18} color="rgba(255,255,255,0.5)" />
-                  <Text style={styles.googleDisabledText}>
-                    Google ile giriş — yakında
-                  </Text>
-                </View>
+                <TouchableOpacity
+                  style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLoading}
+                  activeOpacity={0.85}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator color="#333" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-google" size={18} color="#4285F4" />
+                      <Text style={styles.googleButtonText}>{t("auth_google")}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
                 <Link href="/(auth)/register" asChild>
                   <TouchableOpacity style={styles.registerLink} activeOpacity={0.7}>
                     <Text style={styles.registerLinkText}>
-                      Hesabın yok mu?{" "}
-                      <Text style={styles.registerLinkBold}>Kayıt Ol</Text>
+                      {t("auth_no_account")}{" "}
+                      <Text style={styles.registerLinkBold}>{t("auth_register")}</Text>
                     </Text>
                   </TouchableOpacity>
                 </Link>
@@ -205,7 +265,7 @@ export default function LoginScreen() {
         pointerEvents="box-none"
       >
         <Text style={styles.legalNotice}>
-          Uygulamayı kullanarak gizlilik politikamızı ve kullanıcı sözleşmemizi kabul etmiş olursunuz.
+          {t("auth_legal_notice")}
         </Text>
         <View style={styles.legalLinks}>
           {LEGAL_ITEMS.map((item, i) => (
@@ -243,23 +303,25 @@ export default function LoginScreen() {
   );
 }
 
-const LEGAL_ITEMS = [
-  {
-    key: "terms",
-    title: "Kullanım Şartları",
-    body: "Eşleşbulus, 18 yaş ve üzeri kullanıcılara yönelik bir sosyal tanışma platformudur. Uygulamayı kullanarak yasalara uygun davranmayı, diğer kullanıcılara saygılı olmayı ve sahte bilgi paylaşmamayı kabul edersiniz. Hizmet ihlali durumunda hesabınız uyarısız askıya alınabilir veya kalıcı olarak kapatılabilir.",
-  },
-  {
-    key: "privacy",
-    title: "Gizlilik Sözleşmesi",
-    body: "Adınız, e-posta adresiniz, profil fotoğrafınız ve şehir bilginiz güvenli sunucularımızda şifreli olarak saklanır. Verileriniz hiçbir koşulda üçüncü taraflarla satılmaz veya paylaşılmaz. Dilediğiniz zaman hesabınızı ve tüm verilerinizi kalıcı olarak silebilirsiniz. Detaylar için destek@eslesbulus.com adresine başvurabilirsiniz.",
-  },
-  {
-    key: "kvkk",
-    title: "KVKK",
-    body: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel verilerinize erişme, düzeltme, silme ve işlemeye itiraz etme haklarına sahipsiniz. Veri sorumlusu olarak Eşleşbulus, verilerinizi yalnızca hizmetin sunulması amacıyla işlemektedir. İlgili talepleriniz için destek@eslesbulus.com adresine e-posta gönderebilirsiniz.",
-  },
-];
+function getLegalItems(t: (key: TranslationKeys, params?: Record<string, string | number>) => string) {
+  return [
+    {
+      key: "terms",
+      title: t("legal_terms"),
+      body: "Eşleşbulus, 18 yaş ve üzeri kullanıcılara yönelik bir sosyal tanışma platformudur. Uygulamayı kullanarak yasalara uygun davranmayı, diğer kullanıcılara saygılı olmayı ve sahte bilgi paylaşmamayı kabul edersiniz. Hizmet ihlali durumunda hesabınız uyarısız askıya alınabilir veya kalıcı olarak kapatılabilir.",
+    },
+    {
+      key: "privacy",
+      title: t("legal_privacy"),
+      body: "Adınız, e-posta adresiniz, profil fotoğrafınız ve şehir bilginiz güvenli sunucularımızda şifreli olarak saklanır. Verileriniz hiçbir koşulda üçüncü taraflarla satılmaz veya paylaşılmaz. Dilediğiniz zaman hesabınızı ve tüm verilerinizi kalıcı olarak silebilirsiniz. Detaylar için destek@eslesbulus.com adresine başvurabilirsiniz.",
+    },
+    {
+      key: "kvkk",
+      title: t("legal_kvkk"),
+      body: "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel verilerinize erişme, düzeltme, silme ve işlemeye itiraz etme haklarına sahipsiniz. Veri sorumlusu olarak Eşleşbulus, verilerinizi yalnızca hizmetin sunulması amacıyla işlemektedir. İlgili talepleriniz için destek@eslesbulus.com adresine e-posta gönderebilirsiniz.",
+    },
+  ];
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "transparent" },
@@ -364,18 +426,16 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
   dividerText: { color: "rgba(255,255,255,0.45)", fontSize: 12 },
 
-  googleDisabledWrap: {
+  googleButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
+    gap: 10,
+    backgroundColor: "#fff",
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingVertical: 13,
   },
-  googleDisabledText: { fontSize: 13, color: "rgba(255,255,255,0.55)", fontWeight: "500" },
+  googleButtonText: { fontSize: 15, fontWeight: "600", color: "#333" },
 
   registerLink: { marginTop: 18, alignItems: "center" },
   registerLinkText: { color: "rgba(255,255,255,0.65)", fontSize: 14 },
@@ -421,7 +481,6 @@ const styles = StyleSheet.create({
     textDecorationColor: "rgba(255,255,255,0.25)",
   },
 
-  // Legal modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "transparent",

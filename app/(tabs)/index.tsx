@@ -16,6 +16,7 @@ import Animated, { FadeIn, Layout } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
@@ -38,6 +39,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 
 export default function DiscoverScreen() {
   const { theme, mode } = useTheme();
+  const { t } = useLanguage();
   const { profile } = useAuth();
   const { sendRandomHi } = useInteractions();
   const { canSendHi, useHi } = usePremium();
@@ -85,11 +87,11 @@ export default function DiscoverScreen() {
   async function handlePressHi(user: UserProfile) {
     if (!canSendHi) {
       showAlert(
-        "Günlük Limit Doldu",
-        `Bugün ${DAILY_HI_LIMIT} hi mesajı hakkını kullandın. Premium üyelikle sınırsız gönder!`,
+        t("discover_daily_limit_title"),
+        t("discover_daily_limit_desc", { limit: String(DAILY_HI_LIMIT) }),
         [
-          { text: "İptal", style: "cancel" },
-          { text: "Premium Al 👑", onPress: () => router.push("/premium") },
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("discover_get_premium"), onPress: () => router.push("/premium") },
         ]
       );
       return;
@@ -117,9 +119,9 @@ export default function DiscoverScreen() {
 
       <View style={styles.header}>
         <View>
-          <Text style={[styles.brand, { color: c.text }]}>Keşfet</Text>
+          <Text style={[styles.brand, { color: c.text }]}>{t("discover_title")}</Text>
           <Text style={[styles.subtitle, { color: c.textMuted }]}>
-            {users.length} kişi {filterCount > 0 ? "filtreli" : "yakınında"}
+            {t("discover_people_count", { count: String(users.length) })} {filterCount > 0 ? t("discover_filtered") : t("discover_nearby")}
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -155,7 +157,7 @@ export default function DiscoverScreen() {
 
         <View style={styles.toolbar}>
           <View>
-            <Text style={[styles.sectionTitle, { color: c.text }]}>Sana yakın</Text>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>{t("discover_near_you")}</Text>
             {filterCount > 0 && (
               <Pressable
                 onPress={() => setFilters(DEFAULT_FILTERS)}
@@ -163,7 +165,7 @@ export default function DiscoverScreen() {
               >
                 <Ionicons name="close-circle" size={12} color={c.primary} />
                 <Text style={[styles.clearFiltersText, { color: c.primary }]}>
-                  {filterCount} filtre — Temizle
+                  {t("discover_filter_clear", { count: String(filterCount) })}
                 </Text>
               </Pressable>
             )}
@@ -175,7 +177,7 @@ export default function DiscoverScreen() {
           <View style={styles.emptyWrap}>
             <ActivityIndicator size="large" color={c.primary} />
             <Text style={[styles.emptyHint, { color: c.textMuted, marginTop: 12 }]}>
-              Yükleniyor...
+              {t("discover_loading")}
             </Text>
           </View>
         ) : error && users.length === 0 ? (
@@ -183,15 +185,15 @@ export default function DiscoverScreen() {
             <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Ionicons name="cloud-offline-outline" size={32} color={c.textMuted} />
             </View>
-            <Text style={[styles.emptyTitle, { color: c.text }]}>Bağlantı hatası</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>{t("discover_connection_error")}</Text>
             <Text style={[styles.emptyHint, { color: c.textMuted }]}>
-              İnternet bağlantını kontrol et
+              {t("discover_check_connection")}
             </Text>
             <Pressable
               onPress={onRefresh}
               style={[styles.emptyBtn, { backgroundColor: c.primary }]}
             >
-              <Text style={styles.emptyBtnText}>Tekrar dene</Text>
+              <Text style={styles.emptyBtnText}>{t("discover_retry")}</Text>
             </Pressable>
           </View>
         ) : users.length === 0 ? (
@@ -199,15 +201,15 @@ export default function DiscoverScreen() {
             <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Ionicons name="search" size={32} color={c.textMuted} />
             </View>
-            <Text style={[styles.emptyTitle, { color: c.text }]}>Sonuç yok</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>{t("discover_no_results")}</Text>
             <Text style={[styles.emptyHint, { color: c.textMuted }]}>
-              Filtreyi gevşet ya da temizle
+              {t("discover_loosen_filter")}
             </Text>
             <Pressable
               onPress={() => setFilters(DEFAULT_FILTERS)}
               style={[styles.emptyBtn, { backgroundColor: c.primary }]}
             >
-              <Text style={styles.emptyBtnText}>Filtreyi sıfırla</Text>
+              <Text style={styles.emptyBtnText}>{t("discover_reset_filter")}</Text>
             </Pressable>
           </View>
         ) : (

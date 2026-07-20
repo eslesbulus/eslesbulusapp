@@ -15,6 +15,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 type VerificationStatus = "idle" | "pending" | "approved" | "rejected";
 
@@ -27,6 +28,7 @@ type Props = {
 
 export function VerificationSheet({ visible, onClose, colors: c, currentStatus = "idle" }: Props) {
   const { refreshProfile } = useAuth();
+  const { t, lang } = useLanguage();
   const [photo, setPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -40,7 +42,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
     if (!permission?.granted) {
       const r = await requestPermission();
       if (!r.granted) {
-        showAlert("İzin Gerekli", "Selfie çekebilmek için kamera iznine ihtiyacımız var.");
+        showAlert(t("verify_permission_title"), t("verify_permission_desc"));
         return;
       }
     }
@@ -57,7 +59,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
         setCameraOpen(false);
       }
     } catch (e: any) {
-      showAlert("Hata", e?.message ?? "Fotoğraf çekilemedi.");
+      showAlert(t("verify_error"), e?.message ?? t("verify_capture_fail"));
     }
     setCapturing(false);
   }
@@ -73,7 +75,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
       // Profil ekranındaki alt-satır (İnceleniyor…) hemen güncellensin
       refreshProfile().catch(() => {});
     } catch (e: any) {
-      showAlert("Hata", e?.message ?? "Doğrulama gönderilemedi. Lütfen tekrar dene.");
+      showAlert(t("verify_error"), e?.message ?? t("verify_send_fail"));
     }
     setSending(false);
   }
@@ -101,7 +103,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
           <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={c.text} />
           </Pressable>
-          <Text style={[styles.title, { color: c.text }]}>Hesabı Doğrula</Text>
+          <Text style={[styles.title, { color: c.text }]}>{t("verify_title")}</Text>
           {!isPending && !isApproved && photo ? (
             <Pressable
               onPress={handleSend}
@@ -111,7 +113,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
               {sending ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.sendBtnText}>Gönder</Text>
+                <Text style={styles.sendBtnText}>{t("verify_send")}</Text>
               )}
             </Pressable>
           ) : (
@@ -124,9 +126,9 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
           {isApproved && (
             <View style={[styles.statusCard, { backgroundColor: "#16a34a18", borderColor: "#16a34a40" }]}>
               <Ionicons name="checkmark-circle" size={40} color="#16a34a" />
-              <Text style={[styles.statusTitle, { color: "#16a34a" }]}>Hesabın Doğrulandı ✓</Text>
+              <Text style={[styles.statusTitle, { color: "#16a34a" }]}>{t("verify_approved_title")}</Text>
               <Text style={[styles.statusSub, { color: c.textMuted }]}>
-                Profilinde onaylı rozeti görünüyor. Tebrikler!
+                {t("verify_approved_desc")}
               </Text>
             </View>
           )}
@@ -135,9 +137,9 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
           {isPending && !isApproved && (
             <View style={[styles.statusCard, { backgroundColor: `${c.primary}12`, borderColor: `${c.primary}30` }]}>
               <Ionicons name="time-outline" size={40} color={c.primary} />
-              <Text style={[styles.statusTitle, { color: c.primary }]}>İnceleniyor…</Text>
+              <Text style={[styles.statusTitle, { color: c.primary }]}>{t("verify_pending_title")}</Text>
               <Text style={[styles.statusSub, { color: c.textMuted }]}>
-                Doğrulama fotoğrafın ekibimize iletildi. En geç 24 saat içinde sonuçlanır.
+                {t("verify_pending_desc")}
               </Text>
             </View>
           )}
@@ -146,9 +148,9 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
           {isRejected && (
             <View style={[styles.statusCard, { backgroundColor: "#dc262618", borderColor: "#dc262640" }]}>
               <Ionicons name="close-circle" size={40} color="#dc2626" />
-              <Text style={[styles.statusTitle, { color: "#dc2626" }]}>Doğrulama Reddedildi</Text>
+              <Text style={[styles.statusTitle, { color: "#dc2626" }]}>{t("verify_rejected_title")}</Text>
               <Text style={[styles.statusSub, { color: c.textMuted }]}>
-                Fotoğraf koşulları sağlanmadı. Lütfen aşağıdaki kurallara dikkat ederek tekrar deneyin.
+                {t("verify_rejected_desc")}
               </Text>
             </View>
           )}
@@ -159,29 +161,29 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
               {/* Açıklama */}
               <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
                 <Text style={[styles.infoTitle, { color: c.text }]}>
-                  📋 Doğrulama Nasıl Yapılır?
+                  {t("verify_how_title")}
                 </Text>
                 <Text style={[styles.infoText, { color: c.textMuted }]}>
-                  Hesabının gerçek olduğunu doğrulamak için yüzünü ve elinde tuttuğun bir kağıdı gösteren bir selfie çekmen gerekiyor.
+                  {t("verify_how_desc")}
                 </Text>
               </View>
 
               {/* Kurallar */}
               <View style={[styles.rulesCard, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.rulesTitle, { color: c.text }]}>Kağıda şunları yaz:</Text>
+                <Text style={[styles.rulesTitle, { color: c.text }]}>{t("verify_paper_title")}</Text>
                 <View style={[styles.paperExample, { backgroundColor: c.surface, borderColor: c.border }]}>
                   <Text style={[styles.paperLine, { color: c.text }]}>Eşleş Buluş</Text>
                   <Text style={[styles.paperDate, { color: c.textMuted }]}>
-                    {new Date().toLocaleDateString("tr-TR")}
+                    {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US")}
                   </Text>
                 </View>
 
                 {[
-                  { icon: "checkmark-circle", color: "#16a34a", text: "Kağıt elde tutulmalı, yüz net görünmeli" },
-                  { icon: "checkmark-circle", color: "#16a34a", text: "Yüz maskelenmemiş, gözlük takılabilir" },
-                  { icon: "checkmark-circle", color: "#16a34a", text: "İyi aydınlatmalı bir ortamda çekilmeli" },
-                  { icon: "close-circle", color: "#dc2626", text: "Filtreli veya düzenlenmiş fotoğraf kabul edilmez" },
-                  { icon: "close-circle", color: "#dc2626", text: "Başka bir kişinin fotoğrafı kabul edilmez" },
+                  { icon: "checkmark-circle", color: "#16a34a", text: t("verify_rule_1") },
+                  { icon: "checkmark-circle", color: "#16a34a", text: t("verify_rule_2") },
+                  { icon: "checkmark-circle", color: "#16a34a", text: t("verify_rule_3") },
+                  { icon: "close-circle", color: "#dc2626", text: t("verify_rule_4") },
+                  { icon: "close-circle", color: "#dc2626", text: t("verify_rule_5") },
                 ].map((r, i) => (
                   <View key={i} style={styles.ruleRow}>
                     <Ionicons name={r.icon as any} size={16} color={r.color} />
@@ -205,7 +207,7 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
                     style={[styles.retakeBtn, { backgroundColor: c.card, borderColor: c.border }]}
                   >
                     <Ionicons name="camera-reverse-outline" size={16} color={c.primary} />
-                    <Text style={[styles.retakeBtnText, { color: c.primary }]}>Yeniden Çek</Text>
+                    <Text style={[styles.retakeBtnText, { color: c.primary }]}>{t("verify_retake")}</Text>
                   </Pressable>
                 </View>
               ) : (
@@ -214,12 +216,12 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
                   style={[styles.cameraBtn, { backgroundColor: c.primary }]}
                 >
                   <Ionicons name="camera" size={26} color="#fff" />
-                  <Text style={styles.cameraBtnText}>Selfie Çek</Text>
+                  <Text style={styles.cameraBtnText}>{t("verify_take_selfie")}</Text>
                 </Pressable>
               )}
 
               <Text style={[styles.privacy, { color: c.textMuted }]}>
-                🔒 Fotoğrafın sadece doğrulama amacıyla kullanılır ve ekibimiz tarafından incelendikten sonra silinir.
+                {t("verify_privacy")}
               </Text>
             </>
           )}
@@ -245,13 +247,13 @@ export function VerificationSheet({ visible, onClose, colors: c, currentStatus =
             </Pressable>
             <View style={styles.cameraHintPill}>
               <Ionicons name="camera-reverse-outline" size={13} color="#fff" />
-              <Text style={styles.cameraHintText}>Ön Kamera</Text>
+              <Text style={styles.cameraHintText}>{t("verify_front_camera")}</Text>
             </View>
             <View style={{ width: 40 }} />
           </View>
           {/* Alt bar — çekim düğmesi */}
           <View style={styles.cameraBottomBar}>
-            <Text style={styles.cameraHelp}>Yüzünü ve elindeki kağıdı net göster</Text>
+            <Text style={styles.cameraHelp}>{t("verify_camera_help")}</Text>
             <Pressable
               onPress={handleCapture}
               disabled={capturing}

@@ -3,10 +3,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { Platform, StyleSheet, View, Text } from "react-native";
 import { BlurView } from "expo-blur";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useChats } from "@/hooks/useChats";
 
 export default function TabsLayout() {
   const { theme, mode } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
   const { totalUnreadChats } = useChats();
 
@@ -42,7 +44,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Kesfet",
+          title: t("tab_discover"),
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name={focused ? "compass" : "compass-outline"} color={color} />
           ),
@@ -51,7 +53,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="matches"
         options={{
-          title: "Eslesmeler",
+          title: t("tab_matches"),
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name={focused ? "heart" : "heart-outline"} color={color} />
           ),
@@ -60,7 +62,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="posts"
         options={{
-          title: "Gonderi",
+          title: t("tab_posts"),
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               name={focused ? "add-circle" : "add-circle-outline"}
@@ -72,7 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Sohbet",
+          title: t("tab_chat"),
           tabBarIcon: ({ color, focused }) => (
             <TabIcon
               name={focused ? "chatbubble" : "chatbubble-outline"}
@@ -85,7 +87,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
+          title: t("tab_profile"),
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name={focused ? "person" : "person-outline"} color={color} />
           ),

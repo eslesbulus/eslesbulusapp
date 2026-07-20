@@ -81,6 +81,7 @@ export const typography = {
 };
 
 export type ThemeMode = "light" | "dark";
+export type ThemePreference = "system" | "light" | "dark";
 
 export type Theme = {
   mode: ThemeMode;

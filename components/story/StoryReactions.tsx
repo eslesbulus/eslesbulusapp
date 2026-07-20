@@ -15,6 +15,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from "react-native-reanimated";
+import { useLanguage } from "@/context/LanguageContext";
 
 const EMOJIS = ["❤️", "🔥", "😂", "😮", "😍", "👏"];
 
@@ -26,6 +27,7 @@ type Props = {
 };
 
 export function StoryReactions({ userName, onSend, onFocusInput, onBlurInput }: Props) {
+  const { t } = useLanguage();
   const [text, setText] = useState("");
   const [popEmoji, setPopEmoji] = useState<string | null>(null);
   const popScale = useSharedValue(0);
@@ -71,7 +73,7 @@ export function StoryReactions({ userName, onSend, onFocusInput, onBlurInput }: 
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder={`${userName} kullanıcısına mesaj…`}
+          placeholder={t("story_reaction_placeholder", { name: userName })}
           placeholderTextColor="rgba(255,255,255,0.55)"
           style={styles.input}
           onFocus={onFocusInput}

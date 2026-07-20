@@ -6,21 +6,23 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function BlockedUsersScreen() {
   const { blockedUsers, unblockUser } = useBlockedUsers();
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
 
   function handleUnblock(id: string, name: string) {
     showAlert(
-      "Engeli Kaldır",
-      `${name} adlı kullanıcının engelini kaldırmak istediğinden emin misin?`,
+      t("blocked_unblock"),
+      t("blocked_unblock_confirm", { name }),
       [
-        { text: "İptal", style: "cancel" },
+        { text: t("common_cancel"), style: "cancel" },
         {
-          text: "Engeli Kaldır",
+          text: t("blocked_unblock"),
           onPress: () => unblockUser(id),
         },
       ]
@@ -34,7 +36,7 @@ export default function BlockedUsersScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={c.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: c.text }]}>Engellenen Kullanıcılar</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>{t("blocked_title")}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -43,9 +45,9 @@ export default function BlockedUsersScreen() {
           <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Ionicons name="shield-checkmark-outline" size={36} color={c.textMuted} />
           </View>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Engellenen kimse yok</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t("blocked_empty")}</Text>
           <Text style={[styles.emptyDesc, { color: c.textMuted }]}>
-            Engellediğin kullanıcılar burada görünür.
+            {t("blocked_empty")}
           </Text>
         </View>
       ) : (
@@ -60,14 +62,14 @@ export default function BlockedUsersScreen() {
               <View style={styles.cardInfo}>
                 <Text style={[styles.cardName, { color: c.text }]}>{item.name}</Text>
                 <Text style={[styles.cardDate, { color: c.textMuted }]}>
-                  {new Date(item.blockedAt).toLocaleDateString("tr-TR")} tarihinde engellendi
+                  {new Date(item.blockedAt).toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US")}
                 </Text>
               </View>
               <Pressable
                 onPress={() => handleUnblock(item.id, item.name)}
                 style={[styles.unblockBtn, { borderColor: c.primary }]}
               >
-                <Text style={[styles.unblockBtnText, { color: c.primary }]}>Kaldır</Text>
+                <Text style={[styles.unblockBtnText, { color: c.primary }]}>{t("blocked_unblock")}</Text>
               </Pressable>
             </Animated.View>
           ))}

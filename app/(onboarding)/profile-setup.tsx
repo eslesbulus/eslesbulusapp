@@ -31,19 +31,34 @@ import { useAuth } from "@/context/AuthContext";
 import { palette } from "@/constants/theme";
 import { INTERESTS_LIST, INTERESTS_MAX } from "@/constants/interests";
 import { CityPicker } from "@/components/common/CityPicker";
+import { useLanguage } from "@/context/LanguageContext";
 
-const GENDERS = ["Erkek", "Kadın", "Diğer"] as const;
+const GENDER_KEYS = ["male", "female", "other"] as const;
+type GenderKey = typeof GENDER_KEYS[number];
 type Step = "photo" | "info" | "about";
 
 export default function ProfileSetupScreen() {
   const { user, profile, refreshProfile } = useAuth();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>("photo");
   const [photoUri, setPhotoUri] = useState<string>(user?.photoURL ?? "");
   // Name was set during register — read latest from profile/auth, no local edit needed
   const currentName = profile?.name || user?.displayName || "";
-  const [gender, setGender] = useState<"" | "Erkek" | "Kadın" | "Diğer">("");
+  const [gender, setGender] = useState<GenderKey | "">("");
+
+  const GENDER_LABEL_MAP: Record<GenderKey, string> = {
+    male: t("setup_gender_male"),
+    female: t("setup_gender_female"),
+    other: t("setup_gender_other"),
+  };
+  // Map gender key to Firestore value (always stored in Turkish for backward compat)
+  const GENDER_VALUE_MAP: Record<GenderKey, string> = {
+    male: "Erkek",
+    female: "Kadın",
+    other: "Diğer",
+  };
   const [city, setCity] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
@@ -82,7 +97,7 @@ export default function ProfileSetupScreen() {
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Galeri izni verilmedi.");
+      showAlert(t("setup_permission_title"), t("setup_permission_gallery"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -100,7 +115,7 @@ export default function ProfileSetupScreen() {
     setInterests((prev) => {
       if (prev.includes(item)) return prev.filter((i) => i !== item);
       if (prev.length >= INTERESTS_MAX) {
-        showAlert("Limit", `En fazla ${INTERESTS_MAX} ilgi alanı seçebilirsin.`);
+        showAlert(t("setup_limit_title"), t("setup_limit_interests", { max: INTERESTS_MAX }));
         return prev;
       }
       return [...prev, item];
@@ -117,14 +132,14 @@ export default function ProfileSetupScreen() {
   function goNext() {
     if (step === "photo") {
       if (!photoUri) {
-        showAlert("Fotoğraf Gerekli", "Devam etmek için profil fotoğrafı eklemelisin.");
+        showAlert(t("setup_photo_required_title"), t("setup_photo_required_desc"));
         return;
       }
       setStep("info");
     }
     else if (step === "info") {
-      if (!gender) return showAlert("Hata", "Cinsiyet seç.");
-      if (!city) return showAlert("Hata", "Şehir seç.");
+      if (!gender) return showAlert(t("common_error"), t("setup_error_gender"));
+      if (!city) return showAlert(t("common_error"), t("setup_error_city"));
       setStep("about");
     }
   }
@@ -132,7 +147,7 @@ export default function ProfileSetupScreen() {
   async function handleSave() {
     if (saving) return;
     if (interests.length === 0) {
-      showAlert("Hata", "En az bir ilgi alanı seç.");
+      showAlert(t("common_error"), t("setup_error_interests"));
       return;
     }
     setSaving(true);
@@ -150,7 +165,7 @@ export default function ProfileSetupScreen() {
       // Don't overwrite name if it's empty — register already set it
       const updates: Record<string, unknown> = {
         photoURL: downloadURL,
-        gender,
+        gender: GENDER_VALUE_MAP[gender as GenderKey] ?? gender,
         city,
         bio: bio.trim(),
         interests,
@@ -163,7 +178,7 @@ export default function ProfileSetupScreen() {
       await api.put("/api/users/me", updates);
       await refreshProfile();
     } catch (e: any) {
-      showAlert("Kayıt başarısız", e.message ?? "Bilinmeyen hata");
+      showAlert(t("auth_register_failed"), e.message ?? t("common_error"));
     } finally {
       setSaving(false);
     }
@@ -242,9 +257,9 @@ export default function ProfileSetupScreen() {
               {step === "photo" && (
                 <Animated.View entering={FadeInDown.duration(360)}>
                   <BlurView intensity={28} tint="dark" style={styles.glassCard}>
-                    <Text style={styles.stepTitle}>Profil Fotoğrafın</Text>
+                    <Text style={styles.stepTitle}>{t("setup_photo_title")}</Text>
                     <Text style={styles.stepSubtitle}>
-                      İlk izlenim önemli. En güzel kareni seç.
+                      {t("setup_photo_desc")}
                     </Text>
 
                     <Pressable onPress={pickPhoto} style={styles.photoCircle}>
@@ -253,7 +268,7 @@ export default function ProfileSetupScreen() {
                       ) : (
                         <View style={styles.photoPlaceholder}>
                           <Ionicons name="camera-outline" size={42} color={palette.primary} />
-                          <Text style={styles.photoPlaceholderText}>Fotoğraf Ekle</Text>
+                          <Text style={styles.photoPlaceholderText}>{t("setup_photo_add")}</Text>
                         </View>
                       )}
                       <View style={styles.photoEditBadge}>
@@ -266,7 +281,7 @@ export default function ProfileSetupScreen() {
                       onPress={goNext}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.primaryButtonText}>Devam Et</Text>
+                      <Text style={styles.primaryButtonText}>{t("setup_continue")}</Text>
                     </TouchableOpacity>
                   </BlurView>
                 </Animated.View>
@@ -276,13 +291,13 @@ export default function ProfileSetupScreen() {
               {step === "info" && (
                 <Animated.View entering={FadeInDown.duration(360)}>
                   <BlurView intensity={28} tint="dark" style={styles.glassCard}>
-                    <Text style={styles.stepTitle}>Kendini Tanıt</Text>
-                    <Text style={styles.stepSubtitle}>Temel bilgilerini girelim.</Text>
+                    <Text style={styles.stepTitle}>{t("setup_info_title")}</Text>
+                    <Text style={styles.stepSubtitle}>{t("setup_info_desc")}</Text>
 
                     {/* Gender */}
-                    <Text style={styles.fieldLabel}>Cinsiyet</Text>
+                    <Text style={styles.fieldLabel}>{t("setup_gender")}</Text>
                     <View style={styles.genderRow}>
-                      {GENDERS.map((g) => {
+                      {GENDER_KEYS.map((g) => {
                         const active = gender === g;
                         return (
                           <Pressable
@@ -291,7 +306,7 @@ export default function ProfileSetupScreen() {
                             onPress={() => setGender(g)}
                           >
                             <Text style={[styles.genderChipText, active && styles.genderChipTextActive]}>
-                              {g}
+                              {GENDER_LABEL_MAP[g]}
                             </Text>
                           </Pressable>
                         );
@@ -299,14 +314,14 @@ export default function ProfileSetupScreen() {
                     </View>
 
                     {/* City */}
-                    <Text style={styles.fieldLabel}>Şehir</Text>
+                    <Text style={styles.fieldLabel}>{t("setup_city")}</Text>
                     <Pressable
                       style={[styles.input, styles.cityPicker]}
                       onPress={() => setCityPickerOpen(true)}
                     >
                       <Ionicons name="location-outline" size={18} color={glassColors.textMuted} />
                       <Text style={[styles.cityPickerText, !city && { color: glassColors.textMuted }]}>
-                        {city || "Şehir seç"}
+                        {city || t("setup_city_select")}
                       </Text>
                       <Ionicons name="chevron-down" size={18} color={glassColors.textMuted} />
                     </Pressable>
@@ -316,7 +331,7 @@ export default function ProfileSetupScreen() {
                       onPress={goNext}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.primaryButtonText}>Devam Et</Text>
+                      <Text style={styles.primaryButtonText}>{t("setup_continue")}</Text>
                     </TouchableOpacity>
                   </BlurView>
                 </Animated.View>
@@ -326,9 +341,9 @@ export default function ProfileSetupScreen() {
               {step === "about" && (
                 <Animated.View entering={FadeInDown.duration(360)}>
                   <BlurView intensity={28} tint="dark" style={styles.glassCard}>
-                    <Text style={styles.stepTitle}>Seni Anlat</Text>
+                    <Text style={styles.stepTitle}>{t("setup_bio_title")}</Text>
                     <Text style={styles.stepSubtitle}>
-                      Bio ve ilgi alanların (en fazla {INTERESTS_MAX}).
+                      {t("setup_bio_desc", { max: INTERESTS_MAX })}
                     </Text>
 
                     <View style={styles.inputWrap}>
@@ -337,7 +352,7 @@ export default function ProfileSetupScreen() {
                         style={[styles.input, styles.bioInput]}
                         value={bio}
                         onChangeText={setBio}
-                        placeholder="Kendini kısaca anlat (opsiyonel)"
+                        placeholder={t("setup_bio_placeholder")}
                         placeholderTextColor={glassColors.textMuted}
                         multiline
                         maxLength={200}
@@ -346,19 +361,19 @@ export default function ProfileSetupScreen() {
                     <Text style={styles.charCount}>{bio.length}/200</Text>
 
                     <Text style={styles.fieldLabel}>
-                      İlgi Alanları ({interests.length}/{INTERESTS_MAX})
+                      {t("setup_interests")} ({interests.length}/{INTERESTS_MAX})
                     </Text>
                     <View style={styles.interestsGrid}>
                       {INTERESTS_LIST.map((item) => {
-                        const active = interests.includes(item);
+                        const active = interests.includes(item.id);
                         return (
                           <Pressable
-                            key={item}
+                            key={item.id}
                             style={[styles.interestChip, active && styles.interestChipActive]}
-                            onPress={() => toggleInterest(item)}
+                            onPress={() => toggleInterest(item.id)}
                           >
                             <Text style={[styles.interestChipText, active && styles.interestChipTextActive]}>
-                              {item}
+                              {t(item.labelKey)}
                             </Text>
                           </Pressable>
                         );
@@ -374,7 +389,7 @@ export default function ProfileSetupScreen() {
                       {saving ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text style={styles.primaryButtonText}>Tamamla</Text>
+                        <Text style={styles.primaryButtonText}>{t("setup_complete")}</Text>
                       )}
                     </TouchableOpacity>
                   </BlurView>

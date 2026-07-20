@@ -3,7 +3,8 @@ import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, SlideInDown, SlideOutDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
-import { HI_MESSAGES } from "@/constants/messageTemplates";
+import { useLanguage } from "@/context/LanguageContext";
+import { HI_MESSAGES, getHiText } from "@/constants/messageTemplates";
 import type { UserProfile } from "@/context/AuthContext";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
 
 export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
   const { theme, mode } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
 
   if (!user) return null;
@@ -48,10 +50,10 @@ export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
             <Image source={{ uri: user.photoURL || user.photos?.[0] }} style={styles.avatar} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: c.text }]}>
-                {user.name}'e selam gönder
+                {t("hi_modal_title", { name: user.name })}
               </Text>
               <Text style={[styles.sub, { color: c.textMuted }]}>
-                Bir mesaj seç, tek dokunuşla gönder
+                {t("hi_modal_subtitle")}
               </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
@@ -67,7 +69,7 @@ export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
             renderItem={({ item, index }) => (
               <Animated.View entering={FadeIn.delay(index * 25).duration(200)}>
                 <Pressable
-                  onPress={() => onSend(user, item.id, item.text)}
+                  onPress={() => onSend(user, item.id, getHiText(item, lang))}
                   style={({ pressed }) => [
                     styles.msg,
                     {
@@ -79,7 +81,7 @@ export function HiMessageModal({ visible, user, onClose, onSend }: Props) {
                 >
                   <Text style={styles.emoji}>{item.emoji}</Text>
                   <Text style={[styles.msgText, { color: c.text }]} numberOfLines={2}>
-                    {item.text}
+                    {getHiText(item, lang)}
                   </Text>
                   <Ionicons name="send" size={16} color={c.primary} />
                 </Pressable>

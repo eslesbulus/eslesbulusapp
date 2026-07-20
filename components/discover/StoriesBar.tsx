@@ -9,6 +9,7 @@ import { useUsers } from "@/hooks/useUsers";
 import { useStories } from "@/hooks/useStories";
 import { useAuth } from "@/context/AuthContext";
 import { VipName } from "@/components/common/VipName";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   onPressUser?: (user: UserProfile) => void;
@@ -17,6 +18,7 @@ type Props = {
 
 export function StoriesBar({ onPressUser, onPressAdd }: Props) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const s = styles(theme.colors);
   const { profile } = useAuth();
   const { users } = useUsers();
@@ -92,7 +94,7 @@ export function StoriesBar({ onPressUser, onPressAdd }: Props) {
             </View>
           )}
           <Text style={s.name} numberOfLines={1}>
-            {hasMyStory ? "Hikayen" : "Ekle"}
+            {hasMyStory ? t("stories_my_story") : t("stories_add")}
           </Text>
         </Pressable>
 

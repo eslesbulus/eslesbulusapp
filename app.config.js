@@ -44,8 +44,7 @@ module.exports = {
           },
         },
       ],
-      // TODO: Google Sign-In — Expo Go'da native modül yok. APK build için aktif et.
-      // "@react-native-google-signin/google-signin",
+      "@react-native-google-signin/google-signin",
       "expo-video",
       [
         "expo-audio",

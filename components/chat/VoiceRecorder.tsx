@@ -19,6 +19,7 @@ import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
 } from "expo-audio";
+import { useLanguage } from "@/context/LanguageContext";
 
 const CANCEL_X = -100; // sola bu kadar kaydırınca iptal
 const LOCK_Y = -80; // yukarı bu kadar kaydırınca kilitle
@@ -49,6 +50,7 @@ export function VoiceRecorder({
   colors: any;
   onSend: (uri: string, durationMillis: number) => void;
 }) {
+  const { t } = useLanguage();
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
 
   const [recording, setRecording] = useState(false);
@@ -79,7 +81,7 @@ export function VoiceRecorder({
   async function ensurePermission(): Promise<boolean> {
     const { granted } = await requestRecordingPermissionsAsync();
     if (!granted) {
-      showAlert("Mikrofon İzni", "Sesli mesaj göndermek için mikrofon iznine ihtiyaç var.");
+      showAlert(t("voice_permission_title"), t("voice_permission_desc"));
     }
     return granted;
   }
@@ -273,7 +275,7 @@ export function VoiceRecorder({
               </Pressable>
               <View style={styles.lockedCenter}>
                 <Ionicons name="lock-closed" size={14} color={c.primary} />
-                <Text style={[styles.lockedText, { color: c.textMuted }]}>Kaydediliyor</Text>
+                <Text style={[styles.lockedText, { color: c.textMuted }]}>{t("voice_recording")}</Text>
               </View>
               <Pressable hitSlop={10} onPress={() => doStop(false)} style={[styles.sendBtn, { backgroundColor: c.primary }]}>
                 <Ionicons name="send" size={18} color="#fff" />
@@ -283,7 +285,7 @@ export function VoiceRecorder({
             <Animated.View style={[styles.slideHint, slideHintStyle]}>
               <Ionicons name="chevron-back" size={18} color={cancelArmed ? "#EF4444" : c.textMuted} />
               <Text style={[styles.slideText, { color: cancelArmed ? "#EF4444" : c.textMuted }]}>
-                {cancelArmed ? "Bırak ve iptal et" : "Kaydırarak iptal et"}
+                {cancelArmed ? t("voice_release_cancel") : t("voice_slide_cancel")}
               </Text>
             </Animated.View>
           )}

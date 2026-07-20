@@ -21,6 +21,7 @@ import { useRouter } from "expo-router";
 import { usePremium, PremiumPlan } from "@/context/PremiumContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const GOLD = "#D4AF37";
@@ -28,81 +29,60 @@ const GOLD_LIGHT = "#F5D97A";
 const GOLD_DARK = "#9A7A1A";
 
 // ── Paketler ─────────────────────────────────────────────────
-const PACKAGES: {
+type PackageRow = {
   id: PremiumPlan;
-  label: string;
-  duration: string;
+  labelKey: string;
+  durationKey: string;
   price: string;
-  perDay: string;
-  badge: string | null;
+  perDayKey: string;
+  badgeKey: string | null;
   popular: boolean;
-}[] = [
+};
+
+const PACKAGES_KEYS: PackageRow[] = [
   {
     id: "day",
-    label: "1 Günlük",
-    duration: "24 Saat",
+    labelKey: "premium_pkg_day_label",
+    durationKey: "premium_pkg_day_duration",
     price: "₺19,99",
-    perDay: "₺19,99/gün",
-    badge: null,
+    perDayKey: "premium_pkg_day_perday",
+    badgeKey: null,
     popular: false,
   },
   {
     id: "week",
-    label: "7 Günlük",
-    duration: "1 Hafta",
+    labelKey: "premium_pkg_week_label",
+    durationKey: "premium_pkg_week_duration",
     price: "₺69,99",
-    perDay: "₺10,00/gün",
-    badge: "En Popüler",
+    perDayKey: "premium_pkg_week_perday",
+    badgeKey: "premium_badge_popular",
     popular: true,
   },
   {
     id: "month",
-    label: "1 Aylık",
-    duration: "30 Gün",
+    labelKey: "premium_pkg_month_label",
+    durationKey: "premium_pkg_month_duration",
     price: "₺149,99",
-    perDay: "₺5,00/gün",
-    badge: "En İyi Değer",
+    perDayKey: "premium_pkg_month_perday",
+    badgeKey: "premium_badge_best_value",
     popular: false,
   },
 ];
 
 // ── Özellikler ────────────────────────────────────────────────
 const FEATURES = [
-  {
-    icon: "heart" as const,
-    label: "Sınırsız Beğeni",
-    desc: "Günlük limit yok, istediğin kadar beğen",
-  },
-  {
-    icon: "hand-right" as const,
-    label: "Sınırsız Hi Mesajı",
-    desc: "Tüm profillere sınırsız selam gönder",
-  },
-  {
-    icon: "eye" as const,
-    label: "Profilini Görüntüleyenler",
-    desc: "Kim baktığını gör, gizem yok",
-  },
-  {
-    icon: "heart-circle" as const,
-    label: "Seni Beğenenler",
-    desc: "Sana kalp atan kişileri keşfet",
-  },
-  {
-    icon: "diamond" as const,
-    label: "VIP Rozeti",
-    desc: "Profilinde altın VIP etiketi taş",
-  },
-  {
-    icon: "rocket" as const,
-    label: "Öncelikli Görünüm",
-    desc: "Keşfet'te diğerlerinin önüne çık",
-  },
+  { icon: "heart" as const, labelKey: "premium_feat_unlimited_likes", descKey: "premium_feat_unlimited_likes_desc" },
+  { icon: "hand-right" as const, labelKey: "premium_feat_unlimited_hi", descKey: "premium_feat_unlimited_hi_desc" },
+  { icon: "eye" as const, labelKey: "premium_feat_viewers", descKey: "premium_feat_viewers_desc" },
+  { icon: "heart-circle" as const, labelKey: "premium_feat_likers", descKey: "premium_feat_likers_desc" },
+  { icon: "diamond" as const, labelKey: "premium_feat_vip_badge", descKey: "premium_feat_vip_badge_desc" },
+  { icon: "rocket" as const, labelKey: "premium_feat_priority", descKey: "premium_feat_priority_desc" },
 ];
 
 export default function PremiumScreen() {
   const { isPremium, premiumExpiry, activatePremium } = usePremium();
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const isDark = theme.mode === "dark";
   const router = useRouter();
@@ -114,58 +94,68 @@ export default function PremiumScreen() {
 
   // Planlar admin panelden yönetilir; boşsa yerel varsayılana düş
   const packages = useMemo(() => {
-    if (!cfgPlans || cfgPlans.length === 0) return PACKAGES;
+    if (!cfgPlans || cfgPlans.length === 0) {
+      return PACKAGES_KEYS.map((pk) => ({
+        id: pk.id,
+        label: t(pk.labelKey as any),
+        duration: t(pk.durationKey as any),
+        price: pk.price,
+        perDay: t(pk.perDayKey as any),
+        badge: pk.badgeKey ? t(pk.badgeKey as any) : null,
+        popular: pk.popular,
+      }));
+    }
     return cfgPlans.map((p) => {
-      const base = PACKAGES.find((x) => x.id === p.id);
+      const base = PACKAGES_KEYS.find((x) => x.id === p.id);
       return {
         id: p.id as PremiumPlan,
-        label: p.label || base?.label || p.id,
-        duration: p.duration || base?.duration || "",
+        label: p.label || (base ? t(base.labelKey as any) : p.id),
+        duration: p.duration || (base ? t(base.durationKey as any) : ""),
         price: p.price,
-        perDay: p.perDay || base?.perDay || "",
-        badge: p.popular ? "En Popüler" : base?.badge ?? null,
+        perDay: p.perDay || (base ? t(base.perDayKey as any) : ""),
+        badge: p.popular ? t("premium_badge_popular") : (base?.badgeKey ? t(base.badgeKey as any) : null),
         popular: !!p.popular,
       };
     });
-  }, [cfgPlans]);
+  }, [cfgPlans, t]);
 
   useEffect(() => {
     if (!isPremium || !premiumExpiry) { setRemaining(""); return; }
     function calc() {
       const diff = premiumExpiry!.getTime() - Date.now();
-      if (diff <= 0) { setRemaining("Süresi doldu"); return; }
+      if (diff <= 0) { setRemaining(t("premium_expired")); return; }
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff % 86400000) / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
-      if (d > 0) setRemaining(`${d}g ${h}sa ${m}dk kaldı`);
-      else if (h > 0) setRemaining(`${h}sa ${m}dk kaldı`);
-      else setRemaining(`${m}dk kaldı`);
+      if (d > 0) setRemaining(t("premium_remaining_dhm", { d: String(d), h: String(h), m: String(m) }));
+      else if (h > 0) setRemaining(t("premium_remaining_hm", { h: String(h), m: String(m) }));
+      else setRemaining(t("premium_remaining_m", { m: String(m) }));
     }
     calc();
     const timer = setInterval(calc, 60000);
     return () => clearInterval(timer);
-  }, [isPremium, premiumExpiry]);
+  }, [isPremium, premiumExpiry, t]);
 
   async function handlePurchase() {
     const pkg = packages.find((p) => p.id === selected) ?? packages[0];
     showAlert(
-      "Premium'a Geç 👑",
-      `${pkg.label} paket — ${pkg.price}\n\nSatın almak istiyor musun?`,
+      t("premium_confirm_title"),
+      t("premium_confirm_message", { label: pkg.label, price: pkg.price }),
       [
-        { text: "İptal", style: "cancel" },
+        { text: t("common_cancel"), style: "cancel" },
         {
-          text: "Satın Al",
+          text: t("premium_buy"),
           onPress: async () => {
             setLoading(true);
             try {
               await activatePremium(selected);
               showAlert(
-                "🎉 Tebrikler!",
-                "VIP Premium üyeliğin aktifleştirildi. Ayrıcalıkların seni bekliyor!",
-                [{ text: "Harika!", onPress: () => router.back() }]
+                t("premium_congrats_title"),
+                t("premium_congrats_message"),
+                [{ text: t("premium_congrats_ok"), onPress: () => router.back() }]
               );
             } catch {
-              showAlert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
+              showAlert(t("common_error"), t("common_purchase_error"));
             } finally {
               setLoading(false);
             }
@@ -214,15 +204,14 @@ export default function PremiumScreen() {
 
           <Text style={styles.heroTitle}>VIP Premium</Text>
           <Text style={[styles.heroSub, { color: c.textMuted }]}>
-            Tüm kısıtlamaları kaldır, öne çık.{"\n"}
-            Gerçek bağlantılar için en iyi araçlar.
+            {t("premium_hero_subtitle")}
           </Text>
 
           {isPremium && premiumExpiry && (
             <Animated.View entering={FadeInDown.delay(200).duration(300)} style={styles.activePill}>
               <Ionicons name="checkmark-circle" size={14} color={GOLD} />
               <Text style={styles.activePillText}>
-                Aktif · {premiumExpiry.toLocaleDateString("tr-TR")}'e kadar
+                {t("premium_active_until", { date: premiumExpiry.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US") })}
               </Text>
             </Animated.View>
           )}
@@ -237,12 +226,12 @@ export default function PremiumScreen() {
             <View style={[styles.featureHeaderIcon, { backgroundColor: `${GOLD}18` }]}>
               <Ionicons name="star" size={16} color={GOLD} />
             </View>
-            <Text style={[styles.featuresCardTitle, { color: c.text }]}>Premium Ayrıcalıkları</Text>
+            <Text style={[styles.featuresCardTitle, { color: c.text }]}>{t("premium_privileges")}</Text>
           </View>
 
           {FEATURES.map((f, i) => (
             <View
-              key={f.label}
+              key={f.labelKey}
               style={[
                 styles.featureRow,
                 i < FEATURES.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
@@ -252,8 +241,8 @@ export default function PremiumScreen() {
                 <Ionicons name={f.icon} size={17} color={GOLD} />
               </View>
               <View style={styles.featureTexts}>
-                <Text style={[styles.featureLabel, { color: c.text }]}>{f.label}</Text>
-                <Text style={[styles.featureDesc, { color: c.textMuted }]}>{f.desc}</Text>
+                <Text style={[styles.featureLabel, { color: c.text }]}>{t(f.labelKey as any)}</Text>
+                <Text style={[styles.featureDesc, { color: c.textMuted }]}>{t(f.descKey as any)}</Text>
               </View>
               <Ionicons name="checkmark-circle" size={18} color={GOLD} />
             </View>
@@ -265,7 +254,7 @@ export default function PremiumScreen() {
           entering={FadeInDown.delay(280).duration(400)}
           style={styles.packagesSection}
         >
-          <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>Plan Seç</Text>
+          <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>{t("premium_select_plan")}</Text>
 
           <View style={styles.packagesRow}>
             {packages.map((pkg) => {
@@ -336,7 +325,7 @@ export default function PremiumScreen() {
           style={styles.safePayRow}
         >
           <Ionicons name="lock-closed" size={12} color={c.textMuted} />
-          <Text style={[styles.safePayText, { color: c.textMuted }]}>Güvenli ödeme · SSL şifreli</Text>
+          <Text style={[styles.safePayText, { color: c.textMuted }]}>{t("premium_safe_payment")}</Text>
         </Animated.View>
       </ScrollView>
 
@@ -368,7 +357,7 @@ export default function PremiumScreen() {
               <View style={{ alignItems: "center" }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="checkmark-circle" size={20} color="#000" />
-                  <Text style={styles.ctaBtnText}>Premium Aktif ✓</Text>
+                  <Text style={styles.ctaBtnText}>{t("premium_active_status")}</Text>
                 </View>
                 {remaining ? (
                   <Text style={{ color: "rgba(0,0,0,0.6)", fontSize: 11, fontWeight: "700", marginTop: 2 }}>{remaining}</Text>
@@ -377,14 +366,14 @@ export default function PremiumScreen() {
             ) : (
               <>
                 <Ionicons name="diamond" size={20} color="#000" />
-                <Text style={styles.ctaBtnText}>Premium'a Geç</Text>
+                <Text style={styles.ctaBtnText}>{t("premium_upgrade")}</Text>
               </>
             )}
           </LinearGradient>
         </Pressable>
 
         <Text style={[styles.ctaNote, { color: c.textMuted }]}>
-          Abonelik otomatik yenilenmez · İptal kolaylıkla yapılabilir
+          {t("premium_no_auto_renew")}
         </Text>
       </Animated.View>
     </View>

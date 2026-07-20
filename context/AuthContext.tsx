@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut as fbSignOut, User } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { api } from "@/config/api";
 import { connectSocket, disconnectSocket, getSocket } from "@/config/socket";
+import { useLanguage } from "@/context/LanguageContext";
 
 export type UserProfile = {
   uid: string;
@@ -80,6 +81,7 @@ const DEV_ADMIN_PROFILE: UserProfile = {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,11 +180,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verificationNote: data.note ?? prev.verificationNote,
       } : prev);
       if (data.status === "approved") {
-        showAlert("Hesabın Doğrulandı ✓", "Tebrikler! Profilinde onay rozeti gösteriliyor.");
+        showAlert(t("verify_approved_title"), t("verify_approved_desc"));
       } else if (data.status === "rejected") {
         showAlert(
-          "Doğrulama Reddedildi",
-          data.note ? `Sebep: ${data.note}` : "Kurallara uygun yeni bir selfie ile tekrar deneyebilirsin."
+          t("verify_rejected_title"),
+          data.note ? `${t("verify_rejected_reason")}: ${data.note}` : t("verify_rejected_desc")
         );
       }
     };

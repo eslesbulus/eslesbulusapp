@@ -24,6 +24,8 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
+import type { ThemePreference } from "@/constants/theme";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
 import { usePremium } from "@/context/PremiumContext";
 import { useCoins } from "@/context/CoinsContext";
@@ -42,7 +44,8 @@ const PHOTO_ITEM_W = Math.floor((SCREEN_W - PHOTO_PADDING * 2 - PHOTO_GAP * 2) /
 
 export default function ProfileScreen() {
   const { user, profile, isDevAdmin, signOut } = useAuth();
-  const { theme, mode, toggle } = useTheme();
+  const { theme, mode, preference, setPreference } = useTheme();
+  const { lang, setLang, t } = useLanguage();
   const { blockedUsers } = useBlockedUsers();
   const { isPremium, premiumExpiry, dailyLikesUsed, dailyHisUsed } = usePremium();
   const { balance: tokenBalance } = useCoins();
@@ -65,14 +68,14 @@ export default function ProfileScreen() {
   }
 
   function handleLogout() {
-    showAlert("Çıkış Yap", "Hesabından çıkış yapmak istediğine emin misin?", [
-      { text: "İptal", style: "cancel" },
-      { text: "Çıkış Yap", style: "destructive", onPress: () => signOut() },
+    showAlert(t("profile_logout_title"), t("profile_logout_confirm"), [
+      { text: t("common_cancel"), style: "cancel" },
+      { text: t("profile_logout_title"), style: "destructive", onPress: () => signOut() },
     ]);
   }
 
   const age = calcAge(profile?.birthDate);
-  const displayName = profile?.name ?? user?.displayName ?? "Kullanıcı";
+  const displayName = profile?.name ?? user?.displayName ?? t("profile_user_fallback");
   const photo = profile?.photoURL;
   const extraPhotos = profile?.photos ?? [];
   const photoCount = (photo ? 1 : 0) + extraPhotos.length;
@@ -134,13 +137,13 @@ export default function ProfileScreen() {
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <StatItem label="Fotoğraf" value={String(photoCount)} />
+            <StatItem label={t("profile_photo_count")} value={String(photoCount)} />
             <View style={styles.statDivider} />
-            <StatItem label="İlgi Alanı" value={String(profile?.interests?.length ?? 0)} />
+            <StatItem label={t("profile_interest_count")} value={String(profile?.interests?.length ?? 0)} />
             <View style={styles.statDivider} />
             <StatItem
-              label="Üyelik"
-              value={isPremium ? "VIP ✦" : (profile?.profileComplete ? "Standart" : "Eksik")}
+              label={t("profile_membership")}
+              value={isPremium ? "VIP ✦" : (profile?.profileComplete ? t("profile_membership_standard") : t("profile_membership_incomplete"))}
             />
           </View>
         </LinearGradient>
@@ -152,7 +155,7 @@ export default function ProfileScreen() {
             style={[styles.editBtn, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <Ionicons name="create-outline" size={18} color={c.primary} />
-            <Text style={[styles.editBtnText, { color: c.primary }]}>Profili Düzenle</Text>
+            <Text style={[styles.editBtnText, { color: c.primary }]}>{t("profile_edit")}</Text>
           </Pressable>
         </Animated.View>
 
@@ -175,21 +178,21 @@ export default function ProfileScreen() {
               <Text style={[styles.quickCardLabel, { color: c.textMuted }]}>Premium</Text>
               {isPremium ? (
                 <Text style={[styles.quickCardValue, { color: c.secondary }]}>
-                  VIP Aktif ✓
+                  {t("profile_vip_active")}
                 </Text>
               ) : (
                 <Text style={[styles.quickCardValue, { color: c.text }]}>
-                  Premium Al →
+                  {t("profile_get_premium")}
                 </Text>
               )}
               {isPremium && premiumExpiry && (
                 <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
-                  {premiumExpiry.toLocaleDateString("tr-TR")}'e kadar
+                  {t("profile_until", { date: premiumExpiry.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US") })}
                 </Text>
               )}
               {!isPremium && (
                 <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
-                  Beğeni: {10 - dailyLikesUsed}/10
+                  {t("profile_likes_remaining", { remaining: String(10 - dailyLikesUsed), total: "10" })}
                 </Text>
               )}
             </View>
@@ -205,12 +208,12 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 18 }}>🪙</Text>
             </View>
             <View style={styles.quickCardTexts}>
-              <Text style={[styles.quickCardLabel, { color: c.textMuted }]}>Jetonlarım</Text>
+              <Text style={[styles.quickCardLabel, { color: c.textMuted }]}>{t("profile_my_tokens")}</Text>
               <Text style={[styles.quickCardValue, { color: c.text }]}>
-                {tokenBalance} Jeton
+                {t("profile_token_count", { count: String(tokenBalance) })}
               </Text>
               <Text style={[styles.quickCardSub, { color: c.textMuted }]}>
-                ≈ {Math.floor(tokenBalance / 10)} mesaj
+                {t("profile_approx_messages", { count: String(Math.floor(tokenBalance / 10)) })}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
@@ -239,7 +242,7 @@ export default function ProfileScreen() {
         {/* ── Fotoğraflar ── */}
         {(photo || extraPhotos.length > 0) && (
           <Animated.View entering={FadeInDown.delay(120).duration(350)}>
-            <SectionHeader title={`Fotoğraflar (${photoCount})`} c={c} />
+            <SectionHeader title={`${t("profile_photos")} (${photoCount})`} c={c} />
             <View style={styles.photosGrid}>
               {[...(photo ? [photo] : []), ...extraPhotos].slice(0, 9).map((uri, i) => (
                 <Image
@@ -254,19 +257,19 @@ export default function ProfileScreen() {
 
         {/* ── Hesap Ayarları ── */}
         <Animated.View entering={FadeInDown.delay(140).duration(350)}>
-          <SectionHeader title="Hesap" c={c} />
+          <SectionHeader title={t("settings_account")} c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <RowItem
               icon="mail-outline"
-              label="E-posta"
+              label={t("settings_email")}
               value={user?.email ?? "—"}
               c={c}
             />
             <Divider c={c} />
             <RowItem
               icon="diamond-outline"
-              label="Üyelik Planı"
-              value={isPremium ? "VIP Premium ✦" : "Standart"}
+              label={t("settings_plan")}
+              value={isPremium ? t("settings_plan_vip") : t("profile_membership_standard")}
               c={c}
             />
           </View>
@@ -274,38 +277,83 @@ export default function ProfileScreen() {
 
         {/* ── Görünüm ── */}
         <Animated.View entering={FadeInDown.delay(180).duration(350)}>
-          <SectionHeader title="Görünüm" c={c} />
+          <SectionHeader title={t("settings_appearance")} c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
+            {/* Tema seçici */}
             <View style={styles.rowItem}>
               <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
-                <Ionicons name="moon-outline" size={18} color={c.primary} />
+                <Ionicons name="color-palette-outline" size={18} color={c.primary} />
               </View>
-              <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>Karanlık Mod</Text>
-              <Switch
-                value={mode === "dark"}
-                onValueChange={toggle}
-                trackColor={{ false: c.border, true: c.primary }}
-                thumbColor="#fff"
-              />
+              <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>{t("settings_theme")}</Text>
+            </View>
+            <View style={styles.segmentRow}>
+              {([
+                { key: "system" as ThemePreference, label: t("settings_theme_system"), icon: "phone-portrait-outline" as const },
+                { key: "light" as ThemePreference, label: t("settings_theme_light"), icon: "sunny-outline" as const },
+                { key: "dark" as ThemePreference, label: t("settings_theme_dark"), icon: "moon-outline" as const },
+              ]).map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setPreference(opt.key)}
+                  style={[
+                    styles.segmentBtn,
+                    { borderColor: preference === opt.key ? c.primary : c.border },
+                    preference === opt.key && { backgroundColor: `${c.primary}18` },
+                  ]}
+                >
+                  <Ionicons name={opt.icon} size={15} color={preference === opt.key ? c.primary : c.textMuted} />
+                  <Text style={[styles.segmentLabel, { color: preference === opt.key ? c.primary : c.textMuted }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {/* Dil seçici */}
+            <View style={[styles.rowItem, { marginTop: 8 }]}>
+              <View style={[styles.rowIcon, { backgroundColor: `${c.primary}18` }]}>
+                <Ionicons name="language-outline" size={18} color={c.primary} />
+              </View>
+              <Text style={[styles.rowLabel, { color: c.text, flex: 1 }]}>{t("settings_language")}</Text>
+            </View>
+            <View style={styles.segmentRow}>
+              {([
+                { key: "tr" as const, label: "Türkçe", flag: "🇹🇷" },
+                { key: "en" as const, label: "English", flag: "🇬🇧" },
+              ]).map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setLang(opt.key)}
+                  style={[
+                    styles.segmentBtn,
+                    { borderColor: lang === opt.key ? c.primary : c.border, flex: 1 },
+                    lang === opt.key && { backgroundColor: `${c.primary}18` },
+                  ]}
+                >
+                  <Text style={{ fontSize: 16 }}>{opt.flag}</Text>
+                  <Text style={[styles.segmentLabel, { color: lang === opt.key ? c.primary : c.textMuted }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
         </Animated.View>
 
         {/* ── Doğrulama ── */}
         <Animated.View entering={FadeInDown.delay(200).duration(350)}>
-          <SectionHeader title="Doğrulama" c={c} />
+          <SectionHeader title={t("settings_verification")} c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
               icon="shield-checkmark-outline"
-              label="Hesabı Doğrula"
+              label={t("settings_verify_account")}
               value={
                 profile?.verified
-                  ? "Doğrulandı ✓"
+                  ? t("settings_verified")
                   : profile?.verificationStatus === "pending"
-                  ? "İnceleniyor…"
+                  ? t("settings_verification_pending")
                   : profile?.verificationStatus === "rejected"
-                  ? "Reddedildi · Tekrar dene"
-                  : "Onaylı rozet kazan"
+                  ? t("settings_verification_rejected")
+                  : t("settings_verification_hint")
               }
               onPress={() => setVerificationOpen(true)}
               c={c}
@@ -315,18 +363,18 @@ export default function ProfileScreen() {
 
         {/* ── Gizlilik ve Güvenlik ── */}
         <Animated.View entering={FadeInDown.delay(220).duration(350)}>
-          <SectionHeader title="Gizlilik ve Güvenlik" c={c} />
+          <SectionHeader title={t("settings_privacy")} c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
               icon="shield-checkmark-outline"
-              label="Gizlilik Politikası"
+              label={t("settings_privacy_policy")}
               onPress={() => router.push("/profile/privacy-policy")}
               c={c}
             />
             <Divider c={c} />
             <NavRow
               icon="ban-outline"
-              label="Engellenen Kullanıcılar"
+              label={t("settings_blocked_users")}
               badge={blockedUsers.length > 0 ? String(blockedUsers.length) : undefined}
               onPress={() => router.push("/profile/blocked-users")}
               c={c}
@@ -336,27 +384,27 @@ export default function ProfileScreen() {
 
         {/* ── Destek ── */}
         <Animated.View entering={FadeInDown.delay(260).duration(350)}>
-          <SectionHeader title="Destek" c={c} />
+          <SectionHeader title={t("settings_support")} c={c} />
           <View style={[styles.group, { backgroundColor: c.card, borderColor: c.border }]}>
             <NavRow
               icon="alert-circle-outline"
-              label="Sorun Bildir"
-              value="Bize ulaşın"
+              label={t("settings_report")}
+              value={t("settings_report_contact")}
               onPress={() => setReportOpen(true)}
               c={c}
             />
             <Divider c={c} />
             <NavRow
               icon="help-circle-outline"
-              label="Yardım Merkezi"
-              onPress={() => showAlert("Yardım", "destek@eslesbulus.com")}
+              label={t("settings_help")}
+              onPress={() => showAlert(t("common_help"), "destek@eslesbulus.com")}
               c={c}
             />
             <Divider c={c} />
             <NavRow
               icon="mail-outline"
-              label="Destek Talepleri"
-              value={tickets.length > 0 ? `${tickets.length} talep` : "Henüz yok"}
+              label={t("settings_tickets")}
+              value={tickets.length > 0 ? t("settings_tickets_count", { count: String(tickets.length) }) : t("settings_tickets_none")}
               badge={unreadTickets > 0 ? String(unreadTickets) : undefined}
               onPress={() => router.push("/profile/support-tickets")}
               c={c}
@@ -364,7 +412,7 @@ export default function ProfileScreen() {
             <Divider c={c} />
             <NavRow
               icon="information-circle-outline"
-              label="Uygulama Hakkında"
+              label={t("settings_about")}
               value="v1.0.0"
               onPress={() => setAboutOpen(true)}
               c={c}
@@ -407,7 +455,7 @@ export default function ProfileScreen() {
             style={[styles.logoutBtn, { borderColor: "#E53935" }]}
           >
             <Ionicons name="log-out-outline" size={18} color="#E53935" />
-            <Text style={[styles.logoutText, { color: "#E53935" }]}>Çıkış Yap</Text>
+            <Text style={[styles.logoutText, { color: "#E53935" }]}>{t("settings_logout")}</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -488,6 +536,7 @@ function NavRow({
 }
 
 function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; onClose: () => void; colors: any }) {
+  const { t } = useLanguage();
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -504,7 +553,7 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
 
   async function handleSend() {
     if (!text.trim()) {
-      showAlert("Hata", "Lütfen sorununuzu yazın.");
+      showAlert(t("common_error"), t("report_empty_error"));
       return;
     }
     setSending(true);
@@ -516,16 +565,16 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
       }
       await api.post("/api/reports", {
         type: "support",
-        reason: "Sorun Bildir",
+        reason: t("report_reason"),
         details: text.trim(),
         photo: photoUrl || undefined,
       });
       setText("");
       setPhoto(null);
       onClose();
-      showAlert("Gönderildi", "Sorun bildiriminiz alındı. Destek Talepleri'nden takip edebilirsiniz.");
+      showAlert(t("report_success"), t("report_success_desc"));
     } catch (e: any) {
-      showAlert("Hata", e?.message ?? "Gönderilemedi, tekrar deneyin.");
+      showAlert(t("common_error"), e?.message ?? t("report_fail"));
     }
     setSending(false);
   }
@@ -547,13 +596,13 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
         <Pressable onPress={handleClose} style={styles.reportOverlay}>
           <Pressable onPress={(e) => e.stopPropagation()} style={[styles.reportSheet, { backgroundColor: c.card }]}>
             <View style={[styles.reportHandle, { backgroundColor: c.border }]} />
-            <Text style={[styles.reportTitle, { color: c.text }]}>Sorun Bildir</Text>
+            <Text style={[styles.reportTitle, { color: c.text }]}>{t("report_title")}</Text>
             <Text style={[styles.reportSubtitle, { color: c.textMuted }]}>
-              Yaşadığınız sorunu detaylıca açıklayın, isterseniz ekran görüntüsü ekleyin.
+              {t("report_subtitle")}
             </Text>
             <TextInput
               style={[styles.reportInput, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
-              placeholder="Sorununuzu buraya yazın..."
+              placeholder={t("report_placeholder")}
               placeholderTextColor={c.textMuted}
               multiline
               value={text}
@@ -571,12 +620,12 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
             ) : (
               <Pressable onPress={handlePickPhoto} style={[styles.reportPhotoBtn, { borderColor: c.border }]}>
                 <Ionicons name="image-outline" size={20} color={c.primary} />
-                <Text style={{ color: c.primary, fontWeight: "600", fontSize: 14 }}>Ekran Görüntüsü Ekle</Text>
+                <Text style={{ color: c.primary, fontWeight: "600", fontSize: 14 }}>{t("report_add_screenshot")}</Text>
               </Pressable>
             )}
             <View style={styles.reportActions}>
               <Pressable onPress={handleClose} style={[styles.reportCancelBtn, { borderColor: c.border }]}>
-                <Text style={{ color: c.textMuted, fontWeight: "600" }}>İptal</Text>
+                <Text style={{ color: c.textMuted, fontWeight: "600" }}>{t("common_cancel")}</Text>
               </Pressable>
               <Pressable
                 onPress={handleSend}
@@ -586,7 +635,7 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
                 {sending ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>Gönder</Text>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>{t("report_send")}</Text>
                 )}
               </Pressable>
             </View>
@@ -600,11 +649,12 @@ function ReportIssueModal({ visible, onClose, colors: c }: { visible: boolean; o
 }
 
 function AboutModal({ visible, onClose, colors: c }: { visible: boolean; onClose: () => void; colors: any }) {
+  const { t } = useLanguage();
   const infoRows = [
-    { icon: "code-slash-outline" as const, label: "Sürüm", value: "1.0.0" },
-    { icon: "business-outline" as const, label: "Geliştirici", value: "EşleşBuluş" },
-    { icon: "mail-outline" as const, label: "İletişim", value: "destek@eslesbulus.com" },
-    { icon: "shield-checkmark-outline" as const, label: "Gizlilik", value: "KVKK Uyumlu" },
+    { icon: "code-slash-outline" as const, label: t("about_version"), value: "1.0.0" },
+    { icon: "business-outline" as const, label: t("about_developer"), value: "EşleşBuluş" },
+    { icon: "mail-outline" as const, label: t("about_contact"), value: "destek@eslesbulus.com" },
+    { icon: "shield-checkmark-outline" as const, label: t("about_privacy"), value: t("about_privacy_value") },
   ];
 
   return (
@@ -615,7 +665,7 @@ function AboutModal({ visible, onClose, colors: c }: { visible: boolean; onClose
           <View style={{ alignItems: "center", paddingVertical: 20, gap: 8 }}>
             <Image source={require("@/assets/icon.png")} style={{ width: 64, height: 64, borderRadius: 20 }} />
             <Text style={{ fontSize: 22, fontWeight: "800", color: c.text }}>EşleşBuluş</Text>
-            <Text style={{ fontSize: 13, color: c.textMuted }}>Kalbini dinle, eşini bul</Text>
+            <Text style={{ fontSize: 13, color: c.textMuted }}>{t("about_slogan")}</Text>
           </View>
           <View style={{ paddingHorizontal: 16, gap: 1 }}>
             {infoRows.map((row, i) => (
@@ -629,11 +679,11 @@ function AboutModal({ visible, onClose, colors: c }: { visible: boolean; onClose
             ))}
           </View>
           <View style={{ alignItems: "center", paddingVertical: 20, gap: 4 }}>
-            <Text style={{ fontSize: 11, color: c.textMuted }}>Tüm hakları saklıdır.</Text>
+            <Text style={{ fontSize: 11, color: c.textMuted }}>{t("about_rights")}</Text>
             <Text style={{ fontSize: 11, color: c.textMuted }}>2024-2025 EşleşBuluş</Text>
           </View>
           <Pressable onPress={onClose} style={{ alignSelf: "center", paddingVertical: 12, paddingHorizontal: 32, backgroundColor: c.primary, borderRadius: 14, marginBottom: 16 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Kapat</Text>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("common_close")}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -840,6 +890,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#222",
     resizeMode: "cover",
+  },
+
+  segmentRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  segmentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  segmentLabel: {
+    fontSize: 12.5,
+    fontWeight: "600",
   },
 
   logoutWrap: { paddingHorizontal: 16, marginTop: 24 },

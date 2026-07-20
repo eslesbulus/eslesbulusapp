@@ -16,6 +16,7 @@ import { useUsers } from "@/hooks/useUsers";
 import type { UserProfile } from "@/context/AuthContext";
 import { type DisplayPost } from "@/constants/mockPosts";
 import { addSharedPost } from "@/constants/sharedPostsStore";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   visible: boolean;
@@ -27,6 +28,7 @@ type Props = {
 
 export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props) {
   const insets = useSafeAreaInsets();
+  const { t, lang } = useLanguage();
   const { users } = useUsers();
   const chatUsers = users.slice(0, 6);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -48,7 +50,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
     await new Promise((r) => setTimeout(r, 600));
     setSending(false);
     const recipients = chatUsers.filter((u) => selected.has(u.uid));
-    const sentAt = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    const sentAt = new Date().toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit" });
 
     // Store'a kaydet — chat ekranı açıldığında okuyacak
     recipients.forEach((u) => {
@@ -106,7 +108,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
 
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: c.border }]}>
-            <Text style={[styles.title, { color: c.text }]}>Gönderiyi Paylaş</Text>
+            <Text style={[styles.title, { color: c.text }]}>{t("share_title")}</Text>
             <Pressable
               onPress={handleSend}
               disabled={selected.size === 0 || sending}
@@ -119,7 +121,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                 <Text style={styles.sendBtnText}>…</Text>
               ) : (
                 <Text style={styles.sendBtnText}>
-                  {selected.size > 0 ? `Gönder (${selected.size})` : "Gönder"}
+                  {selected.size > 0 ? t("share_send_count", { count: selected.size }) : t("share_send")}
                 </Text>
               )}
             </Pressable>
@@ -130,7 +132,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
             <View style={[styles.postPreview, { backgroundColor: c.surface, borderColor: c.border }]}>
               {post.userPhoto ? <Image source={{ uri: post.userPhoto }} style={styles.postPreviewAvatar} /> : null}
               <Text style={[styles.postPreviewText, { color: c.text }]} numberOfLines={2}>
-                {post.text || "Fotoğraf"}
+                {post.text || t("share_photo")}
               </Text>
             </View>
           )}
@@ -142,19 +144,19 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                 <View style={[styles.sentIcon, { backgroundColor: `${c.primary}18` }]}>
                   <Ionicons name="checkmark-circle" size={44} color={c.primary} />
                 </View>
-                <Text style={[styles.sentTitle, { color: c.text }]}>Gönderildi!</Text>
+                <Text style={[styles.sentTitle, { color: c.text }]}>{t("share_sent_title")}</Text>
                 <Text style={[styles.sentDesc, { color: c.textMuted }]}>
-                  {sentNames} kişisine paylaşıldı
+                  {t("share_sent_desc", { names: sentNames })}
                 </Text>
               </View>
             </Animated.View>
           )}
 
           {/* Kullanıcı Listesi */}
-          <Text style={[styles.subTitle, { color: c.textMuted }]}>Kişi Seç</Text>
+          <Text style={[styles.subTitle, { color: c.textMuted }]}>{t("share_select_person")}</Text>
           {chatUsers.length === 0 && (
             <View style={styles.emptyUsers}>
-              <Text style={[styles.emptyUsersText, { color: c.textMuted }]}>Henüz eşleşme yok</Text>
+              <Text style={[styles.emptyUsersText, { color: c.textMuted }]}>{t("share_no_matches")}</Text>
             </View>
           )}
           <FlatList
@@ -184,7 +186,7 @@ export function ShareSheet({ visible, post, onClose, onSent, colors: c }: Props)
                   <View style={styles.userInfo}>
                     <Text style={[styles.userName, { color: c.text }]}>{item.name}</Text>
                     <Text style={[styles.userMeta, { color: c.textMuted }]}>
-                      {item.online ? "Çevrimiçi" : "Çevrimdışı"}
+                      {item.online ? t("discover_online") : t("discover_offline")}
                     </Text>
                   </View>
                   <View

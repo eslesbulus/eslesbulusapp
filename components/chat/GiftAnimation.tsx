@@ -11,6 +11,7 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { Gift } from "@/constants/gifts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { height: H } = Dimensions.get("window");
 
@@ -31,6 +32,7 @@ type Props = {
 };
 
 export function GiftAnimation({ gift, onDone }: Props) {
+  const { t } = useLanguage();
   const scale = useSharedValue(0);
   const ty = useSharedValue(60);
   const rotate = useSharedValue(0);
@@ -113,7 +115,7 @@ export function GiftAnimation({ gift, onDone }: Props) {
 
         <Animated.View style={[styles.giftWrap, giftStyle]}>
           <Text style={styles.giftEmoji}>{gift.emoji}</Text>
-          <Text style={styles.giftName}>{gift.name}</Text>
+          <Text style={styles.giftName}>{t(gift.nameKey)}</Text>
         </Animated.View>
       </View>
     </View>

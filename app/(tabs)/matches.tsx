@@ -15,6 +15,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { useInteractions } from "@/context/InteractionsContext";
 import { usePremium } from "@/context/PremiumContext";
@@ -32,6 +33,7 @@ const FREE_VISIBLE_LIKED = 1;
 
 export default function MatchesScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
   const router = useRouter();
   const { profile } = useAuth();
@@ -73,14 +75,14 @@ export default function MatchesScreen() {
       >
         {/* ── Header ── */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: c.text }]}>Eşleşmeler</Text>
+          <Text style={[styles.title, { color: c.text }]}>{t("matches_title")}</Text>
           {!isPremium && (
             <Pressable
               onPress={() => router.push("/premium")}
               style={[styles.premiumBadge, { backgroundColor: `${c.secondary}18`, borderColor: `${c.secondary}40` }]}
             >
               <Ionicons name="diamond" size={12} color={c.secondary} />
-              <Text style={[styles.premiumBadgeText, { color: c.secondary }]}>Premium'a Geç</Text>
+              <Text style={[styles.premiumBadgeText, { color: c.secondary }]}>{t("matches_go_premium")}</Text>
             </Pressable>
           )}
         </View>
@@ -88,7 +90,7 @@ export default function MatchesScreen() {
         {/* ── Profilimi Görüntüleyenler ── */}
         <Animated.View entering={FadeInDown.delay(60).duration(380)}>
           <SectionLabel
-            title="Profilimi Görüntüleyenler"
+            title={t("matches_viewers")}
             count={VIEWERS.length}
             c={c}
             isPremium={isPremium}
@@ -96,7 +98,8 @@ export default function MatchesScreen() {
 
           {!isPremium && (
             <PremiumBanner
-              text="Seni kimin görüntülediğini görmek için"
+              text={t("matches_viewers_lock")}
+              ctaText={t("matches_get_premium")}
               c={c}
               onPress={() => router.push("/premium")}
             />
@@ -149,7 +152,7 @@ export default function MatchesScreen() {
         {/* ── Seni Beğenenler ── */}
         <Animated.View entering={FadeInDown.delay(140).duration(380)}>
           <SectionLabel
-            title="Seni Beğenenler"
+            title={t("matches_liked_me")}
             count={LIKED_ME.length}
             c={c}
             icon="heart"
@@ -158,7 +161,8 @@ export default function MatchesScreen() {
 
           {!isPremium && (
             <PremiumBanner
-              text="Seni beğenenleri görmek için"
+              text={t("matches_liked_me_lock")}
+              ctaText={t("matches_get_premium")}
               c={c}
               onPress={() => router.push("/premium")}
             />
@@ -194,7 +198,7 @@ export default function MatchesScreen() {
                     <View style={styles.blurOverlay}>
                       <View style={styles.blurLockCard}>
                         <Ionicons name="lock-closed" size={22} color="#fff" />
-                        <Text style={styles.blurLockText}>Premium'a Geç</Text>
+                        <Text style={styles.blurLockText}>{t("matches_go_premium")}</Text>
                       </View>
                     </View>
                   ) : (
@@ -221,7 +225,7 @@ export default function MatchesScreen() {
         {/* ── Beğendiklerim ── */}
         <Animated.View entering={FadeInDown.delay(220).duration(380)}>
           <SectionLabel
-            title="Beğendiklerim"
+            title={t("matches_my_likes")}
             count={myLikedList.length}
             c={c}
             icon="heart-outline"
@@ -230,7 +234,7 @@ export default function MatchesScreen() {
             <View style={[styles.emptyLikes, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Ionicons name="heart-outline" size={28} color={c.textMuted} />
               <Text style={[styles.emptyLikesText, { color: c.textMuted }]}>
-                Keşfet'te kalp ikonuna bas
+                {t("matches_my_likes_empty")}
               </Text>
             </View>
           ) : (
@@ -268,10 +272,12 @@ function PremiumBanner({
   text,
   c,
   onPress,
+  ctaText,
 }: {
   text: string;
   c: any;
   onPress: () => void;
+  ctaText: string;
 }) {
   return (
     <Pressable
@@ -280,7 +286,7 @@ function PremiumBanner({
     >
       <Ionicons name="lock-closed" size={14} color={c.secondary} />
       <Text style={[styles.premiumBannerText, { color: c.secondary }]}>
-        {text} <Text style={{ fontWeight: "800" }}>Premium al →</Text>
+        {text} <Text style={{ fontWeight: "800" }}>{ctaText}</Text>
       </Text>
     </Pressable>
   );

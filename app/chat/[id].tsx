@@ -41,6 +41,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { usePremium } from "@/context/PremiumContext";
@@ -61,22 +62,28 @@ import { VoiceMessageBubble } from "@/components/chat/VoiceMessageBubble";
 import { VipName } from "@/components/common/VipName";
 import * as Clipboard from "expo-clipboard";
 import { setAudioModeAsync } from "expo-audio";
+import type { TranslationKeys } from "@/i18n/tr";
 
-function formatLastSeen(lastActive?: number | string | null): string {
-  if (!lastActive) return "çevrimdışı";
+function formatLastSeen(
+  lastActive: number | string | null | undefined,
+  t: (key: TranslationKeys, params?: Record<string, string | number>) => string,
+  lang: string
+): string {
+  if (!lastActive) return t("discover_offline");
   const d = typeof lastActive === "number" ? new Date(lastActive) : new Date(lastActive);
-  if (isNaN(d.getTime())) return "çevrimdışı";
+  if (isNaN(d.getTime())) return t("discover_offline");
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "az önce görüldü";
-  if (mins < 60) return `${mins} dk önce görüldü`;
+  if (mins < 1) return t("time_now");
+  if (mins < 60) return `${mins} ${t("time_min")}`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} sa önce görüldü`;
+  if (hours < 24) return `${hours} ${t("time_hour")}`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return "dün görüldü";
-  if (days < 7) return `${days} gün önce görüldü`;
-  return `son görülme ${d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}`;
+  if (days === 1) return t("time_yesterday");
+  if (days < 7) return `${days} ${t("time_days")}`;
+  const locale = lang === "tr" ? "tr-TR" : "en-US";
+  return d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
 function startOfDay(d: Date): number {
@@ -88,19 +95,23 @@ function sameDay(a: string | null, b: string | null): boolean {
   return startOfDay(new Date(a)) === startOfDay(new Date(b));
 }
 
-// WhatsApp tarzı gün etiketi: Bugün / Dün / Perşembe / 12 Mayıs / 12 Mayıs 2025
-function dateSeparatorLabel(d: Date): string {
+function dateSeparatorLabel(
+  d: Date,
+  t: (key: TranslationKeys) => string,
+  lang: string
+): string {
   const now = new Date();
+  const locale = lang === "tr" ? "tr-TR" : "en-US";
   const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-  if (diffDays <= 0) return "Bugün";
-  if (diffDays === 1) return "Dün";
+  if (diffDays <= 0) return t("time_today");
+  if (diffDays === 1) return t("time_yesterday");
   if (diffDays < 7) {
-    const wd = d.toLocaleDateString("tr-TR", { weekday: "long" });
-    return wd.charAt(0).toLocaleUpperCase("tr-TR") + wd.slice(1);
+    const wd = d.toLocaleDateString(locale, { weekday: "long" });
+    return wd.charAt(0).toLocaleUpperCase(locale) + wd.slice(1);
   }
   const sameYear = d.getFullYear() === now.getFullYear();
   return d.toLocaleDateString(
-    "tr-TR",
+    locale,
     sameYear ? { day: "numeric", month: "long" } : { day: "numeric", month: "long", year: "numeric" }
   );
 }
@@ -116,6 +127,7 @@ function hexToRgba(hex: string, alpha: number) {
 
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
+  const { t, lang } = useLanguage();
   const { user, loading: userLoading } = useUser(id);
   const { messages, loading: chatLoading, loadMore, hasMore, sendText, sendGift, sendImage, sendVoice, sendSharedPost, reactToMessage, emitTyping, isOtherTyping, myUid, formatTime } = useChat(id);
   const { markRead } = useChats();
@@ -171,7 +183,7 @@ export default function ChatDetailScreen() {
     const d = m.createdAt ? new Date(m.createdAt) : new Date();
     const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     if (dayKey !== lastDayKey) {
-      rows.push({ type: "sep", id: `sep_${dayKey}`, label: dateSeparatorLabel(d) });
+      rows.push({ type: "sep", id: `sep_${dayKey}`, label: dateSeparatorLabel(d, t, lang) });
       lastDayKey = dayKey;
     }
     const prev = displayMessages[i - 1];
@@ -255,12 +267,12 @@ export default function ChatDetailScreen() {
   function handleDeleteSelected() {
     const ids = [...selectedMsgIds];
     showAlert(
-      "Mesajları Sil",
-      `${ids.length} mesajı nasıl silmek istiyorsun?`,
+      t("chat_delete_title"),
+      t("chat_delete_confirm"),
       [
-        { text: "İptal", style: "cancel" },
+        { text: t("common_cancel"), style: "cancel" },
         {
-          text: "Benden Sil",
+          text: t("chat_delete_for_me"),
           onPress: () => {
             // Sadece local'den kaldir
             deleteMessagesLocal(ids);
@@ -268,7 +280,7 @@ export default function ChatDetailScreen() {
           },
         },
         {
-          text: "Herkesten Sil",
+          text: t("chat_delete_for_all"),
           style: "destructive",
           onPress: () => {
             deleteMessagesForAll(ids);
@@ -393,11 +405,11 @@ export default function ChatDetailScreen() {
     if (tokenBalance < TOKENS_PER_MESSAGE) {
       sendingRef.current = false;
       showAlert(
-        "Jeton Yetersiz 🪙",
-        `Mesaj göndermek için ${TOKENS_PER_MESSAGE} jeton gerekiyor. Şu an ${tokenBalance} jetonun var.`,
+        t("coins_insufficient"),
+        t("coins_insufficient_desc", { price: TOKENS_PER_MESSAGE, balance: tokenBalance }),
         [
-          { text: "İptal", style: "cancel" },
-          { text: "Jeton Al →", onPress: () => router.push("/premium/coins") },
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("coins_buy"), onPress: () => router.push("/premium/coins") },
         ]
       );
       return;
@@ -407,7 +419,7 @@ export default function ChatDetailScreen() {
     const reply = replyingTo ? {
       messageId: replyingTo.id,
       senderId: replyingTo.senderId,
-      text: replyingTo.text || (replyingTo.type === "image" ? "📷 Fotoğraf" : replyingTo.type === "video" ? "🎥 Video" : ""),
+      text: replyingTo.text || (replyingTo.type === "image" ? `📷 ${t("chat_photo")}` : replyingTo.type === "video" ? `🎥 ${t("chat_video")}` : ""),
       type: replyingTo.type,
     } as ReplyToData : null;
     setTextSync("");
@@ -451,9 +463,9 @@ export default function ChatDetailScreen() {
           </>
         ) : (
           <View style={styles.notFound}>
-            <Text style={[styles.notFoundText, { color: c.text }]}>Kullanıcı bulunamadı</Text>
+            <Text style={[styles.notFoundText, { color: c.text }]}>{t("user_not_found")}</Text>
             <Pressable onPress={() => router.back()} style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12, backgroundColor: c.primary }}>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Geri Dön</Text>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>{t("user_go_back")}</Text>
             </Pressable>
           </View>
         )}
@@ -507,7 +519,7 @@ export default function ChatDetailScreen() {
             <View style={{ flex: 1 }}>
               <VipName name={user.name} vip={user.vip} style={{ color: c.text }} fontSize={15} />
               <Text style={[styles.headerStatus, { color: user.online ? c.online : c.textMuted }]}>
-                {user.online ? "çevrimiçi" : formatLastSeen(user.lastActive)}
+                {user.online ? t("chat_online") : formatLastSeen(user.lastActive, t, lang)}
               </Text>
             </View>
           </Pressable>
@@ -564,10 +576,10 @@ export default function ChatDetailScreen() {
                 )}
                 <Text style={[styles.matchedText, { color: c.text }]}>
                   <Text style={{ fontWeight: "700" }}>{user.name} </Text>
-                  ile eşleştiniz
+                  {t("chat_match_card_text")}
                 </Text>
                 <Text style={[styles.matchedSub, { color: c.textMuted }]}>
-                  Selam de, sohbet başlasın
+                  {t("chat_match_card_text")}
                 </Text>
               </View>
             )
@@ -585,7 +597,7 @@ export default function ChatDetailScreen() {
             const fromMe = msg.senderId === myUid;
             const isDeleted = msg.deleted || deletedForAllIds.has(msg.id);
             const displayMsg = isDeleted
-              ? { ...msg, text: "Bu mesaj silindi", type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
+              ? { ...msg, text: t("chat_message_deleted"), type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
               : msg;
             return (
               <BubbleWrapper
@@ -620,7 +632,7 @@ export default function ChatDetailScreen() {
               <TypingDot delay={200} color={c.primary} />
               <TypingDot delay={400} color={c.primary} />
             </View>
-            <Text style={[styles.typingText, { color: c.textMuted }]}>{user?.name ?? ""} yazıyor</Text>
+            <Text style={[styles.typingText, { color: c.textMuted }]}>{user?.name ?? ""} {t("chat_typing")}</Text>
           </Animated.View>
         )}
 
@@ -629,10 +641,10 @@ export default function ChatDetailScreen() {
           <View style={[styles.replyBanner, { backgroundColor: c.surface, borderTopColor: c.border, borderLeftColor: c.primary }]}>
             <View style={styles.replyBannerBody}>
               <Text style={[styles.replyBannerName, { color: c.primary }]}>
-                {replyingTo.senderId === myUid ? "Kendin" : user?.name ?? ""}
+                {replyingTo.senderId === myUid ? t("chat_self") : user?.name ?? ""}
               </Text>
               <Text style={[styles.replyBannerText, { color: c.textMuted }]} numberOfLines={1}>
-                {replyingTo.type === "image" ? "📷 Fotoğraf" : replyingTo.type === "video" ? "🎥 Video" : replyingTo.text}
+                {replyingTo.type === "image" ? `📷 ${t("chat_photo")}` : replyingTo.type === "video" ? `🎥 ${t("chat_video")}` : replyingTo.text}
               </Text>
             </View>
             <Pressable onPress={() => setReplyingTo(null)} hitSlop={8} style={{ padding: 4 }}>
@@ -653,7 +665,7 @@ export default function ChatDetailScreen() {
             <TextInput
               ref={inputRef}
               style={[styles.input, { color: c.text }]}
-              placeholder="Mesaj"
+              placeholder={t("chat_message_placeholder")}
               placeholderTextColor={c.textMuted}
               value={text}
               onChangeText={setTextSync}
@@ -683,12 +695,12 @@ export default function ChatDetailScreen() {
             <View style={[styles.panelTabs, { borderBottomColor: c.border }]}>
               <Pressable onPress={() => switchTab("emoji")} style={styles.panelTabBtn}>
                 <Ionicons name="happy-outline" size={20} color={panelTab === "emoji" ? c.primary : c.textMuted} />
-                <Text style={[styles.panelTabLabel, { color: panelTab === "emoji" ? c.primary : c.textMuted }]}>Emoji</Text>
+                <Text style={[styles.panelTabLabel, { color: panelTab === "emoji" ? c.primary : c.textMuted }]}>{t("chat_emoji_tab")}</Text>
                 {panelTab === "emoji" && <View style={[styles.panelTabUnderline, { backgroundColor: c.primary }]} />}
               </Pressable>
               <Pressable onPress={() => switchTab("gift")} style={styles.panelTabBtn}>
                 <Ionicons name="gift-outline" size={20} color={panelTab === "gift" ? c.primary : c.textMuted} />
-                <Text style={[styles.panelTabLabel, { color: panelTab === "gift" ? c.primary : c.textMuted }]}>Hediye</Text>
+                <Text style={[styles.panelTabLabel, { color: panelTab === "gift" ? c.primary : c.textMuted }]}>{t("chat_gift_tab")}</Text>
                 {panelTab === "gift" && <View style={[styles.panelTabUnderline, { backgroundColor: c.primary }]} />}
               </Pressable>
               <Pressable onPress={() => switchTab("vip")} style={styles.panelTabBtn}>
@@ -713,15 +725,15 @@ export default function ChatDetailScreen() {
                 ) : (
                   <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 }}>
                     <Text style={{ fontSize: 40 }}>👑</Text>
-                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#D4AF37" }}>VIP Hediyeler</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#D4AF37" }}>{t("chat_vip_gifts")}</Text>
                     <Text style={{ fontSize: 13, color: c.textMuted, textAlign: "center" }}>
-                      Özel VIP hediyeler göndermek için Premium üyelik gerekiyor.
+                      {t("chat_vip_gifts")}
                     </Text>
                     <Pressable
                       onPress={() => { setPanelTab(null); router.push("/premium"); }}
                       style={{ backgroundColor: "#D4AF37", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16, marginTop: 4 }}
                     >
-                      <Text style={{ color: "#000", fontWeight: "800", fontSize: 14 }}>Premium'a Geç</Text>
+                      <Text style={{ color: "#000", fontWeight: "800", fontSize: 14 }}>{t("matches_go_premium")}</Text>
                     </Pressable>
                   </View>
                 )
@@ -755,12 +767,12 @@ export default function ChatDetailScreen() {
             style={[styles.attachSheet, { backgroundColor: c.card, paddingBottom: Math.max(insets.bottom + 12, 28) }]}
           >
             <View style={[styles.attachHandle, { backgroundColor: c.border }]} />
-            <Text style={[styles.attachTitle, { color: c.text }]}>Paylaş</Text>
+            <Text style={[styles.attachTitle, { color: c.text }]}>{t("posts_share")}</Text>
             <View style={styles.attachGrid}>
               {[
-                { icon: "camera", label: "Kamera", color: "#7C3AED" },
-                { icon: "images", label: "Galeri", color: "#2563EB" },
-                { icon: "videocam", label: "Video", color: "#DC2626" },
+                { icon: "camera", label: t("chat_camera"), color: "#7C3AED" },
+                { icon: "images", label: t("chat_gallery"), color: "#2563EB" },
+                { icon: "videocam", label: t("posts_video"), color: "#DC2626" },
               ].map((item) => (
                 <Pressable
                   key={item.label}
@@ -769,21 +781,21 @@ export default function ChatDetailScreen() {
                     setAttachOpen(false);
                     if (item.icon === "camera") {
                       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                      if (status !== "granted") { showAlert("İzin Gerekli", "Kamera izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_camera")); return; }
                       const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "image");
                       }
                     } else if (item.icon === "images") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { showAlert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_gallery")); return; }
                       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "image");
                       }
                     } else if (item.icon === "videocam") {
                       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { showAlert("İzin Gerekli", "Galeri izni verilmedi."); return; }
+                      if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_gallery")); return; }
                       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
                         await sendImage(res.assets[0].uri, "video");
@@ -957,6 +969,7 @@ const Bubble = memo(function Bubble({
   showReactionBar?: boolean;
   onToggleReactionBar?: () => void;
 }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const tailRadius = 6;
   const fullRadius = 18;
@@ -1059,7 +1072,7 @@ const Bubble = memo(function Bubble({
             />
             <View style={styles.storyReplyLabel}>
               <Ionicons name="play-circle-outline" size={14} color="#fff" />
-              <Text style={styles.storyReplyLabelText}>Hikaye</Text>
+              <Text style={styles.storyReplyLabelText}>{t("chat_story_reply")}</Text>
             </View>
           </View>
           {/* Reply text/emoji */}
@@ -1111,7 +1124,7 @@ const Bubble = memo(function Bubble({
           ) : null}
           <View style={styles.sharedPostTapHint}>
             <Ionicons name="arrow-forward-circle-outline" size={13} color={c.textMuted} />
-            <Text style={[styles.sharedPostTapHintText, { color: c.textMuted }]}>Gönderilere git</Text>
+            <Text style={[styles.sharedPostTapHintText, { color: c.textMuted }]}>{t("chat_go_posts")}</Text>
           </View>
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
@@ -1168,13 +1181,13 @@ const Bubble = memo(function Bubble({
       ) : msg.gift ? (
         <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
-          <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.name}</Text>
+          <Text style={[styles.giftBubbleName, { color: c.text }]}>{msg.gift.nameKey ? t(msg.gift.nameKey) : (msg.gift as any).name}</Text>
           <View style={styles.giftBubblePrice}>
             <Text style={{ fontSize: 12 }}>🪙</Text>
             <Text style={[styles.giftBubblePriceText, { color: c.textMuted }]}>{msg.gift.price}</Text>
           </View>
           <Text style={[styles.giftBubbleTag, { color: msg.gift.color }]}>
-            {fromMe ? "Hediye gönderdin" : "Sana hediye gönderdi"}
+            {fromMe ? t("chat_gift_sent") : t("chat_gift_received")}
           </Text>
           <View style={styles.metaRow}>
             <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
@@ -1239,10 +1252,10 @@ const Bubble = memo(function Bubble({
           {msg.replyTo && !isDeleted && (
             <View style={[styles.replyQuote, { backgroundColor: fromMe ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.06)", borderLeftColor: c.primary }]}>
               <Text style={[styles.replyQuoteName, { color: fromMe ? "rgba(255,255,255,0.9)" : c.primary }]} numberOfLines={1}>
-                {msg.replyTo.senderId === myUid ? "Sen" : ""}
+                {msg.replyTo.senderId === myUid ? t("chat_you") : ""}
               </Text>
               <Text style={[styles.replyQuoteText, { color: fromMe ? "rgba(255,255,255,0.7)" : c.textMuted }]} numberOfLines={1}>
-                {msg.replyTo.text || "📷 Medya"}
+                {msg.replyTo.text || `📷 ${t("chat_media")}`}
               </Text>
             </View>
           )}

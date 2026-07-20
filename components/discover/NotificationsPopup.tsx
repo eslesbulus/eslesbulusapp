@@ -16,6 +16,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useNotifications, type NotificationData } from "@/hooks/useNotifications";
 import { notifLabel, formatNotifTime } from "@/constants/notifications";
 import { usePremium } from "@/context/PremiumContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   visible: boolean;
@@ -31,6 +32,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
   const router = useRouter();
   const c = theme.colors;
   const { isPremium } = usePremium();
+  const { t } = useLanguage();
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, clearAll } = useNotifications();
 
   const [mounted, setMounted] = useState(visible);
@@ -116,7 +118,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Ionicons name="notifications" size={18} color={c.primary} />
-            <Text style={[styles.title, { color: c.text }]}>Bildirimler</Text>
+            <Text style={[styles.title, { color: c.text }]}>{t("notif_title")}</Text>
             {unreadCount > 0 && (
               <View style={[styles.unreadPill, { backgroundColor: c.primary }]}>
                 <Text style={styles.unreadText}>{unreadCount}</Text>
@@ -229,7 +231,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="notifications-off-outline" size={40} color={c.textMuted} />
-              <Text style={[styles.emptyText, { color: c.textMuted }]}>Bildirim yok</Text>
+              <Text style={[styles.emptyText, { color: c.textMuted }]}>{t("notif_empty")}</Text>
             </View>
           }
         />

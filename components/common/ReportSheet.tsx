@@ -21,15 +21,16 @@ import Animated, {
 import { useTheme } from "@/context/ThemeContext";
 import { useBlockedUsers } from "@/context/BlockedUsersContext";
 import { api } from "@/config/api";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { height: H } = Dimensions.get("window");
 
-const REPORT_REASONS = [
-  { id: "inappropriate", label: "Uygunsuz içerik", icon: "warning-outline" as const },
-  { id: "spam", label: "Spam", icon: "alert-circle-outline" as const },
-  { id: "fake", label: "Sahte profil", icon: "person-remove-outline" as const },
-  { id: "harassment", label: "Taciz / Zorbalık", icon: "hand-left-outline" as const },
-  { id: "other", label: "Diğer", icon: "ellipsis-horizontal-circle-outline" as const },
+const REPORT_REASON_KEYS = [
+  { id: "inappropriate", key: "report_sheet_reason_inappropriate", icon: "warning-outline" as const },
+  { id: "spam", key: "report_sheet_reason_spam", icon: "alert-circle-outline" as const },
+  { id: "fake", key: "report_sheet_reason_fake", icon: "person-remove-outline" as const },
+  { id: "harassment", key: "report_sheet_reason_harassment", icon: "hand-left-outline" as const },
+  { id: "other", key: "report_sheet_reason_other", icon: "ellipsis-horizontal-circle-outline" as const },
 ];
 
 type Props = {
@@ -46,6 +47,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
   const { theme } = useTheme();
   const c = theme.colors;
   const { blockUser } = useBlockedUsers();
+  const { t } = useLanguage();
 
   const [step, setStep] = useState<"menu" | "reasons" | "done">("menu");
   const [mounted, setMounted] = useState(visible);
@@ -81,7 +83,7 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
     handleClose();
     if (targetId && targetName && targetPhoto !== undefined) {
       blockUser({ uid: targetId, name: targetName, photoURL: targetPhoto ?? "" });
-      showAlert("Engellendi", `${targetName} engellendi.`);
+      showAlert(t("report_sheet_blocked"), t("report_sheet_blocked_desc", { name: targetName }));
       onBlock?.();
     }
   }
@@ -99,12 +101,12 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
       });
     } catch (e: any) {
       handleClose();
-      showAlert("Hata", e?.message ?? "Şikayet gönderilemedi. Tekrar dene.");
+      showAlert(t("report_sheet_error"), e?.message ?? t("report_sheet_error"));
       return;
     }
     setTimeout(() => {
       handleClose();
-      showAlert("Şikayet Alındı", "Şikayetin incelemeye alındı. Teşekkürler.");
+      showAlert(t("report_sheet_success_title"), t("report_sheet_success_desc"));
     }, 1000);
   }
 
@@ -127,13 +129,13 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
         {step === "menu" && (
           <>
             <Text style={[styles.title, { color: c.text }]}>
-              {targetName ? `@${targetName}` : "Gönderi"}
+              {targetName ? `@${targetName}` : t("report_sheet_fallback_name")}
             </Text>
 
             {type === "user" && (
               <SheetItem
                 icon="ban-outline"
-                label="Engelle"
+                label={t("report_sheet_block")}
                 color="#E53935"
                 onPress={handleBlock}
                 c={c}
@@ -141,14 +143,14 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
             )}
             <SheetItem
               icon="flag-outline"
-              label={type === "user" ? "Kullanıcıyı Şikayet Et" : "Gönderiyi Şikayet Et"}
+              label={type === "user" ? t("report_sheet_report_user") : t("report_sheet_report_post")}
               color={c.primary}
               onPress={() => setStep("reasons")}
               c={c}
             />
             <SheetItem
               icon="close-circle-outline"
-              label="İptal"
+              label={t("common_cancel")}
               color={c.textMuted}
               onPress={handleClose}
               c={c}
@@ -158,15 +160,15 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
 
         {step === "reasons" && (
           <>
-            <Text style={[styles.title, { color: c.text }]}>Şikayet Sebebi</Text>
+            <Text style={[styles.title, { color: c.text }]}>{t("report_sheet_reason_title")}</Text>
             <Text style={[styles.subtitle, { color: c.textMuted }]}>
-              Bu {type === "user" ? "hesabı" : "gönderiyi"} neden şikayet ediyorsun?
+              {t("report_sheet_reason_desc", { type })}
             </Text>
-            {REPORT_REASONS.map((r) => (
+            {REPORT_REASON_KEYS.map((r) => (
               <SheetItem
                 key={r.id}
                 icon={r.icon}
-                label={r.label}
+                label={t(r.key as any)}
                 color={c.text}
                 onPress={() => handleReport(r.id)}
                 c={c}
@@ -180,9 +182,9 @@ export function ReportSheet({ visible, onClose, type, targetName, targetId, targ
             <View style={[styles.doneIcon, { backgroundColor: `${c.primary}15` }]}>
               <Ionicons name="checkmark-circle" size={44} color={c.primary} />
             </View>
-            <Text style={[styles.doneTitle, { color: c.text }]}>Şikayet Gönderildi</Text>
+            <Text style={[styles.doneTitle, { color: c.text }]}>{t("report_sheet_done_title")}</Text>
             <Text style={[styles.doneDesc, { color: c.textMuted }]}>
-              İncelemeye alındı, teşekkürler.
+              {t("report_sheet_done_desc")}
             </Text>
           </View>
         )}

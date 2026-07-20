@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api } from "@/config/api";
 import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
-import { HI_MESSAGES } from "@/constants/messageTemplates";
+import { HI_MESSAGES, getHiText } from "@/constants/messageTemplates";
+import { useLanguage } from "@/context/LanguageContext";
 
 export type SentHi = {
   userId: string;
@@ -30,6 +31,7 @@ const InteractionsContext = createContext<Ctx | null>(null);
 
 export function InteractionsProvider({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
+  const { lang } = useLanguage();
   const [sentHis, setSentHis] = useState<Record<string, SentHi>>({});
   const [likedUsers, setLikedUsers] = useState<Record<string, LikedRef>>({});
 
@@ -70,10 +72,11 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
       const existing = sentHis[userId];
       if (existing) return existing;
       const msg = HI_MESSAGES[Math.floor(Math.random() * HI_MESSAGES.length)];
+      const text = getHiText(msg, lang);
       const sent: SentHi = {
         userId,
         messageId: msg.id,
-        text: msg.text,
+        text,
         emoji: msg.emoji,
         at: Date.now(),
       };
@@ -82,7 +85,7 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
       await api.post("/api/users/me/send-hi", {
         userId,
         messageId: msg.id,
-        text: msg.text,
+        text,
         emoji: msg.emoji,
       });
 
@@ -91,7 +94,7 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
       if (socket) {
         socket.emit("chat:send", {
           to: userId,
-          text: `${msg.emoji} ${msg.text}`,
+          text: `${msg.emoji} ${text}`,
           type: "text",
         });
       }

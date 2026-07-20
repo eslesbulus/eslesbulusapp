@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { LogBox, AppState } from "react-native";
+import { LogBox, AppState, View, Image, ActivityIndicator, StyleSheet } from "react-native";
 import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { getSocket } from "@/config/socket";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { InteractionsProvider } from "@/context/InteractionsContext";
 import { BlockedUsersProvider } from "@/context/BlockedUsersContext";
 import { CoinsProvider } from "@/context/CoinsContext";
@@ -84,11 +86,26 @@ LogBox.ignoreLogs([
   "Push notifications",
 ]);
 
+const INTRO_SEEN_KEY = "intro_seen";
+
 function RootNavigator() {
   const { user, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const navState = useRootNavigationState();
+  const [introChecked, setIntroChecked] = useState(false);
+  const [introSeen, setIntroSeen] = useState(true);
+
+  // Intro görülmüş mü kontrol et
+  useEffect(() => {
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem(INTRO_SEEN_KEY);
+        setIntroSeen(seen === "1");
+      } catch {}
+      setIntroChecked(true);
+    })();
+  }, []);
 
   // Push notification kaydı ve dinleyicisi
   usePushNotifications();
@@ -130,23 +147,46 @@ function RootNavigator() {
   }, [user]);
 
   useEffect(() => {
-    if (!navState?.key) return; // navigator not mounted yet
-    if (loading) return;
+    if (!navState?.key) return;
+    if (loading || !introChecked) return;
 
     const inAuth = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "(onboarding)";
 
     if (!user) {
       if (!inAuth) router.replace("/(auth)/login");
-    } else if (!profile?.profileComplete) {
+    } else if (profile === null) {
+      // Profile henüz API'den yüklenmedi — splash göster
+    } else if (!profile.profileComplete) {
       if (!inOnboarding) router.replace("/(onboarding)/profile-setup");
+    } else if (!introSeen) {
+      if (!inOnboarding) router.replace("/(onboarding)/intro");
     } else {
       if (inAuth || inOnboarding) router.replace("/(tabs)");
     }
-  }, [navState?.key, user, profile, loading, segments]);
+  }, [navState?.key, user, profile, loading, segments, introChecked, introSeen]);
 
   const { mode, theme } = useTheme();
   const bgColor = theme.colors.background;
+
+  const showSplash = loading || !introChecked || (user && profile === null);
+
+  if (showSplash) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <View style={splashStyles.container}>
+          <Image
+            source={require("../assets/icon.png")}
+            style={splashStyles.logo}
+            resizeMode="contain"
+          />
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" style={splashStyles.spinner} />
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
@@ -160,6 +200,23 @@ function RootNavigator() {
     </>
   );
 }
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#440d1e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 28,
+  },
+  spinner: {
+    marginTop: 24,
+  },
+});
 
 // Bakım kontrolü — ThemeProvider'ın ALTINDA kalır ki tema (ve kullanıcı tercihi)
 // bakım moduna girip çıkarken sıfırlanmasın. Bakım ekranı da temayı kullanır.
@@ -198,8 +255,10 @@ function ThemedRoot() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <ThemedRoot />
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <ThemedRoot />
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

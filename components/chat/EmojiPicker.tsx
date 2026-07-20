@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from "react-native";
 import { EMOJI_CATEGORIES } from "@/constants/gifts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { width: W } = Dimensions.get("window");
 const COLS = 7;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function EmojiPicker({ onPick, colors: c }: Props) {
+  const { t } = useLanguage();
   const [tab, setTab] = useState(EMOJI_CATEGORIES[0].id);
   const active = EMOJI_CATEGORIES.find((cat) => cat.id === tab) ?? EMOJI_CATEGORIES[0];
 
@@ -45,7 +47,7 @@ export function EmojiPicker({ onPick, colors: c }: Props) {
               ]}
             >
               <Text style={[styles.tabText, { color: isActive ? "#fff" : c.text }]}>
-                {cat.label}
+                {t(cat.labelKey)}
               </Text>
             </Pressable>
           );

@@ -64,26 +64,26 @@ export function CustomAlertProvider({ children }: { children: React.ReactNode })
     return <>{children}</>;
   }
 
-  const buttons = config.buttons ?? [{ text: "Tamam", style: "default" }];
+  const buttons = config.buttons ?? [{ text: "OK", style: "default" }];
   const hasCancel = buttons.some((b) => b.style === "cancel");
-  const t = config.title?.toLowerCase() ?? "";
+  const tl = config.title?.toLowerCase() ?? "";
 
   const iconName = config.icon ?? (
-    t.includes("hata") || t.includes("başarısız") ? "alert-circle" :
-    t.includes("başarı") || t.includes("gönderildi") || t.includes("paylaşıldı") || t.includes("kaydedildi") || t.includes("tamamlandı") || t.includes("alındı") || t.includes("doğrulandı") ? "checkmark-circle" :
-    t.includes("uyarı") || t.includes("dikkat") || t.includes("limit") ? "warning" :
-    t.includes("çıkış") || t.includes("sil") || t.includes("engel") ? "warning" :
-    t.includes("izin") ? "lock-closed" :
-    t.includes("jeton") || t.includes("yetersiz") ? "wallet" :
+    tl.includes("hata") || tl.includes("başarısız") || tl.includes("error") || tl.includes("failed") ? "alert-circle" :
+    tl.includes("başarı") || tl.includes("gönderildi") || tl.includes("paylaşıldı") || tl.includes("kaydedildi") || tl.includes("tamamlandı") || tl.includes("alındı") || tl.includes("doğrulandı") || tl.includes("success") || tl.includes("sent") || tl.includes("received") || tl.includes("verified") || tl.includes("activated") ? "checkmark-circle" :
+    tl.includes("uyarı") || tl.includes("dikkat") || tl.includes("limit") || tl.includes("warning") || tl.includes("reached") ? "warning" :
+    tl.includes("çıkış") || tl.includes("sil") || tl.includes("engel") || tl.includes("log out") || tl.includes("delete") || tl.includes("block") ? "warning" :
+    tl.includes("izin") || tl.includes("permission") ? "lock-closed" :
+    tl.includes("jeton") || tl.includes("yetersiz") || tl.includes("token") || tl.includes("insufficient") ? "wallet" :
     "information-circle"
   );
 
   const iconColor = config.iconColor ?? (
-    t.includes("hata") || t.includes("başarısız") ? "#EF4444" :
-    t.includes("başarı") || t.includes("gönderildi") || t.includes("paylaşıldı") || t.includes("kaydedildi") || t.includes("tamamlandı") || t.includes("alındı") || t.includes("doğrulandı") ? "#22C55E" :
-    t.includes("uyarı") || t.includes("dikkat") || t.includes("limit") || t.includes("yetersiz") ? "#F59E0B" :
-    t.includes("çıkış") || t.includes("sil") || t.includes("engel") ? "#EF4444" :
-    t.includes("izin") ? "#F59E0B" :
+    tl.includes("hata") || tl.includes("başarısız") || tl.includes("error") || tl.includes("failed") ? "#EF4444" :
+    tl.includes("başarı") || tl.includes("gönderildi") || tl.includes("paylaşıldı") || tl.includes("kaydedildi") || tl.includes("tamamlandı") || tl.includes("alındı") || tl.includes("doğrulandı") || tl.includes("success") || tl.includes("sent") || tl.includes("received") || tl.includes("verified") || tl.includes("activated") ? "#22C55E" :
+    tl.includes("uyarı") || tl.includes("dikkat") || tl.includes("limit") || tl.includes("yetersiz") || tl.includes("warning") || tl.includes("reached") || tl.includes("insufficient") ? "#F59E0B" :
+    tl.includes("çıkış") || tl.includes("sil") || tl.includes("engel") || tl.includes("log out") || tl.includes("delete") || tl.includes("block") ? "#EF4444" :
+    tl.includes("izin") || tl.includes("permission") ? "#F59E0B" :
     c.primary
   );
 

@@ -24,6 +24,7 @@ import Animated, {
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { usePremium } from "@/context/PremiumContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useRouter } from "expo-router";
 import { Alert } from "react-native";
 import {
@@ -51,6 +52,7 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
   const { theme, mode } = useTheme();
   const { profile } = useAuth();
   const { isPremium } = usePremium();
+  const { t } = useLanguage();
   const router = useRouter();
   const c = theme.colors;
   const [local, setLocal] = useState<Filters>(initial);
@@ -97,11 +99,11 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
     // Specific gender filter requires premium
     if (g !== "all" && !isPremium) {
       showAlert(
-        "Premium Gerekli 👑",
-        "Cinsiyete göre filtre kullanmak Premium üyelik gerektirir. \"Tümü\" seçeneğiyle karışık olarak görüntüleyebilirsiniz.",
+        t("filter_premium_required"),
+        t("filter_premium_desc"),
         [
-          { text: "İptal", style: "cancel" },
-          { text: "Premium Al", onPress: () => { onClose(); router.push("/premium"); } },
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("discover_get_premium"), onPress: () => { onClose(); router.push("/premium"); } },
         ]
       );
       return;
@@ -138,13 +140,13 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
 
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: c.text }]}>Filtreler</Text>
-            <Text style={[styles.sub, { color: c.textMuted }]}>{count} aktif filtre</Text>
+            <Text style={[styles.title, { color: c.text }]}>{t("filter_title")}</Text>
+            <Text style={[styles.sub, { color: c.textMuted }]}>{t("filter_active_count", { count })}</Text>
           </View>
           {count > 0 && (
             <Pressable onPress={reset} hitSlop={8} style={styles.resetBtn}>
               <Ionicons name="refresh" size={14} color={c.primary} />
-              <Text style={[styles.resetText, { color: c.primary }]}>Sıfırla</Text>
+              <Text style={[styles.resetText, { color: c.primary }]}>{t("filter_reset")}</Text>
             </Pressable>
           )}
           <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
@@ -153,14 +155,14 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Section title="Yaş Aralığı" c={c}>
+          <Section title={t("filter_age_range")} c={c}>
             <View style={styles.ageRow}>
               <Text style={[styles.ageVal, { color: c.text }]}>{local.ageMin}</Text>
               <View style={[styles.ageLine, { backgroundColor: c.border }]} />
               <Text style={[styles.ageVal, { color: c.text }]}>{local.ageMax}</Text>
             </View>
             <View style={styles.sliderBlock}>
-              <Text style={[styles.sliderLabel, { color: c.textMuted }]}>Minimum</Text>
+              <Text style={[styles.sliderLabel, { color: c.textMuted }]}>{t("filter_min")}</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={AGE_BOUND.min}
@@ -174,7 +176,7 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
               />
             </View>
             <View style={styles.sliderBlock}>
-              <Text style={[styles.sliderLabel, { color: c.textMuted }]}>Maximum</Text>
+              <Text style={[styles.sliderLabel, { color: c.textMuted }]}>{t("filter_max")}</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={local.ageMin}
@@ -189,17 +191,17 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
             </View>
           </Section>
 
-          <Section title="Cinsiyet" c={c}>
+          <Section title={t("filter_gender")} c={c}>
             <View style={styles.segment}>
-              <SegBtn label="Tümü" active={local.gender === "all"} onPress={() => setGender("all")} c={c} />
-              <SegBtn label="Kadın" icon="female" active={local.gender === "Kadın"} onPress={() => setGender("Kadın")} c={c} locked={!isPremium} />
-              <SegBtn label="Erkek" icon="male" active={local.gender === "Erkek"} onPress={() => setGender("Erkek")} c={c} locked={!isPremium} />
+              <SegBtn label={t("filter_gender_all")} active={local.gender === "all"} onPress={() => setGender("all")} c={c} />
+              <SegBtn label={t("filter_gender_female")} icon="female" active={local.gender === "Kadın"} onPress={() => setGender("Kadın")} c={c} locked={!isPremium} />
+              <SegBtn label={t("filter_gender_male")} icon="male" active={local.gender === "Erkek"} onPress={() => setGender("Erkek")} c={c} locked={!isPremium} />
             </View>
           </Section>
 
           <Section
-            title="Popüler Şehirler"
-            hint={local.cities.length > 0 ? `${local.cities.length} seçili` : "İstediğin kadar seç"}
+            title={t("filter_popular_cities")}
+            hint={local.cities.length > 0 ? t("filter_cities_selected", { count: local.cities.length }) : t("filter_cities_hint")}
             c={c}
           >
             <View style={styles.chips}>
@@ -222,10 +224,10 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
             </View>
           </Section>
 
-          <Section title="Daha Fazla" c={c}>
+          <Section title={t("filter_more")} c={c}>
             <ToggleRow
               icon="radio"
-              label="Sadece çevrimiçi"
+              label={t("filter_online_only")}
               value={local.onlineOnly}
               onChange={(v) => setLocal((s) => ({ ...s, onlineOnly: v }))}
               c={c}
@@ -233,8 +235,8 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
             <View style={[styles.divider, { backgroundColor: c.border }]} />
             <ToggleRow
               icon="shield-checkmark"
-              label="Sadece onaylı profiller"
-              hint="Mavi tikli kullanıcılar"
+              label={t("filter_verified_only")}
+              hint={t("filter_verified_hint")}
               value={local.verifiedOnly}
               onChange={(v) => setLocal((s) => ({ ...s, verifiedOnly: v }))}
               c={c}
@@ -250,7 +252,7 @@ export function FilterSheet({ visible, initial, onClose, onApply }: Props) {
               { backgroundColor: c.primary, transform: [{ scale: pressed ? 0.97 : 1 }] },
             ]}
           >
-            <Text style={styles.applyText}>Uygula {count > 0 ? `(${count})` : ""}</Text>
+            <Text style={styles.applyText}>{count > 0 ? t("filter_apply_count", { count }) : t("filter_apply")}</Text>
           </Pressable>
         </View>
       </Animated.View>

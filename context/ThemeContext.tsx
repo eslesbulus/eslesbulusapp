@@ -1,37 +1,32 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { buildTheme, Theme, ThemeMode } from "@/constants/theme";
+import { buildTheme, Theme, ThemeMode, ThemePreference } from "@/constants/theme";
 
 type ThemeContextType = {
   theme: Theme;
   mode: ThemeMode;
-  setMode: (m: ThemeMode) => void;
+  preference: ThemePreference;
+  setPreference: (p: ThemePreference) => void;
   toggle: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-const STORAGE_KEY = "theme_mode";
+const STORAGE_KEY = "theme_preference";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
-  const [mode, setModeState] = useState<ThemeMode>("dark");
+  const [preference, setPrefState] = useState<ThemePreference>("system");
   const [hydrated, setHydrated] = useState(false);
-  // Kullanici manuel secim yaptiysa sistem temasini takip etme
-  const userChoseRef = useRef(false);
 
-  // Kayitli tercihi yukle (manuel secim sistem temasini ezmez)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!cancelled && (saved === "light" || saved === "dark")) {
-          userChoseRef.current = true;
-          setModeState(saved);
-        } else if (!cancelled && (systemScheme === "light" || systemScheme === "dark")) {
-          setModeState(systemScheme);
+        if (!cancelled && (saved === "system" || saved === "light" || saved === "dark")) {
+          setPrefState(saved);
         }
       } catch {}
       if (!cancelled) setHydrated(true);
@@ -39,31 +34,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Sistem temasi degisince — yalnizca kullanici manuel secim yapmadiysa takip et
-  useEffect(() => {
-    if (!hydrated) return;
-    if (userChoseRef.current) return;
-    if (systemScheme === "light" || systemScheme === "dark") {
-      setModeState(systemScheme);
-    }
-  }, [systemScheme, hydrated]);
+  const resolvedMode: ThemeMode =
+    preference === "system"
+      ? (systemScheme === "light" ? "light" : "dark")
+      : preference;
 
-  const setMode = (m: ThemeMode) => {
-    userChoseRef.current = true;
-    setModeState(m);
-    AsyncStorage.setItem(STORAGE_KEY, m).catch(() => {});
+  const setPreference = (p: ThemePreference) => {
+    setPrefState(p);
+    AsyncStorage.setItem(STORAGE_KEY, p).catch(() => {});
   };
 
-  const theme = useMemo(() => buildTheme(mode), [mode]);
+  const theme = useMemo(() => buildTheme(resolvedMode), [resolvedMode]);
 
   const value = useMemo(
     () => ({
       theme,
-      mode,
-      setMode,
-      toggle: () => setMode(mode === "dark" ? "light" : "dark"),
+      mode: resolvedMode,
+      preference,
+      setPreference,
+      toggle: () => setPreference(resolvedMode === "dark" ? "light" : "dark"),
     }),
-    [theme, mode]
+    [theme, resolvedMode, preference]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

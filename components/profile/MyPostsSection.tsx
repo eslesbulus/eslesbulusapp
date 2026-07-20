@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import type { Post } from "@/hooks/usePosts";
 import { formatTimeAgo } from "@/constants/mockPosts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const SCREEN_W = Dimensions.get("window").width;
 const GRID_PAD = 16;
@@ -32,6 +33,7 @@ type Props = {
 };
 
 export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }: Props) {
+  const { t } = useLanguage();
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [editModal, setEditModal] = useState<{ id: string; text: string } | null>(null);
   const [editText, setEditText] = useState("");
@@ -53,9 +55,9 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
   }
 
   function confirmDelete(id: string) {
-    showAlert("Gönderiyi Sil", "Bu gönderi kalıcı olarak silinecek. Emin misin?", [
-      { text: "İptal", style: "cancel" },
-      { text: "Sil", style: "destructive", onPress: () => onDelete(id) },
+    showAlert(t("my_posts_delete_title"), t("my_posts_delete_confirm"), [
+      { text: t("common_cancel"), style: "cancel" },
+      { text: t("common_delete"), style: "destructive", onPress: () => onDelete(id) },
     ]);
   }
 
@@ -65,7 +67,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
     <View>
       {/* Section header with tabs */}
       <View style={styles.headerRow}>
-        <Text style={[styles.sectionTitle, { color: c.textMuted }]}>GONDERİLERİM</Text>
+        <Text style={[styles.sectionTitle, { color: c.textMuted }]}>{t("my_posts_title")}</Text>
       </View>
 
       <View style={[styles.tabBar, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -75,7 +77,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
         >
           <Ionicons name="grid-outline" size={16} color={tab === "active" ? c.primary : c.textMuted} />
           <Text style={[styles.tabLabel, { color: tab === "active" ? c.primary : c.textMuted }]}>
-            Aktif ({activePosts.length})
+            {t("my_posts_active")} ({activePosts.length})
           </Text>
         </Pressable>
         <Pressable
@@ -84,7 +86,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
         >
           <Ionicons name="archive-outline" size={16} color={tab === "archived" ? c.primary : c.textMuted} />
           <Text style={[styles.tabLabel, { color: tab === "archived" ? c.primary : c.textMuted }]}>
-            Arşiv ({archivedPosts.length})
+            {t("my_posts_archive")} ({archivedPosts.length})
           </Text>
         </Pressable>
       </View>
@@ -94,7 +96,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
         <View style={[styles.emptyWrap, { backgroundColor: c.card, borderColor: c.border }]}>
           <Ionicons name={tab === "active" ? "images-outline" : "archive-outline"} size={28} color={c.textMuted} />
           <Text style={[styles.emptyText, { color: c.textMuted }]}>
-            {tab === "active" ? "Henuz gonderi yok" : "Arsivde gonderi yok"}
+            {tab === "active" ? t("my_posts_empty") : t("my_posts_archive_empty")}
           </Text>
         </View>
       ) : (
@@ -154,7 +156,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
                 <View style={styles.detailMeta}>
                   <Ionicons name="heart" size={13} color={c.primary} />
                   <Text style={[styles.detailMetaText, { color: c.textMuted }]}>
-                    {detailPost.likesCount} begeni
+                    {t("posts_likes", { count: detailPost.likesCount })}
                   </Text>
                   <Text style={[styles.detailMetaText, { color: c.textMuted }]}>·</Text>
                   <Text style={[styles.detailMetaText, { color: c.textMuted }]}>
@@ -170,7 +172,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
                   style={[styles.actionBtn, { backgroundColor: `${c.primary}14` }]}
                 >
                   <Ionicons name="create-outline" size={18} color={c.primary} />
-                  <Text style={[styles.actionLabel, { color: c.primary }]}>Duzenle</Text>
+                  <Text style={[styles.actionLabel, { color: c.primary }]}>{t("my_posts_edit")}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -185,7 +187,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
                     color={c.textMuted}
                   />
                   <Text style={[styles.actionLabel, { color: c.textMuted }]}>
-                    {detailPost.archived ? "Geri Al" : "Arsivle"}
+                    {detailPost.archived ? t("my_posts_unarchive") : t("my_posts_archive_action")}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -193,7 +195,7 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
                   style={[styles.actionBtn, { backgroundColor: "rgba(229,57,53,0.08)" }]}
                 >
                   <Ionicons name="trash-outline" size={18} color="#E53935" />
-                  <Text style={[styles.actionLabel, { color: "#E53935" }]}>Sil</Text>
+                  <Text style={[styles.actionLabel, { color: "#E53935" }]}>{t("common_delete")}</Text>
                 </Pressable>
               </View>
 
@@ -230,14 +232,14 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
             entering={FadeIn.duration(200)}
             style={[styles.editCard, { backgroundColor: c.card }]}
           >
-            <Text style={[styles.editTitle, { color: c.text }]}>Gonderiyi Duzenle</Text>
+            <Text style={[styles.editTitle, { color: c.text }]}>{t("my_posts_edit_title")}</Text>
             <TextInput
               style={[styles.editInput, { color: c.text, backgroundColor: c.surface, borderColor: c.border }]}
               value={editText}
               onChangeText={setEditText}
               multiline
               maxLength={500}
-              placeholder="Gonderi metni..."
+              placeholder={t("my_posts_edit_placeholder")}
               placeholderTextColor={c.textMuted}
               autoFocus
             />
@@ -249,13 +251,13 @@ export function MyPostsSection({ posts, onEdit, onArchive, onDelete, colors: c }
                 onPress={() => setEditModal(null)}
                 style={[styles.editCancelBtn, { borderColor: c.border }]}
               >
-                <Text style={[styles.editCancelText, { color: c.text }]}>Iptal</Text>
+                <Text style={[styles.editCancelText, { color: c.text }]}>{t("common_cancel")}</Text>
               </Pressable>
               <Pressable
                 onPress={saveEdit}
                 style={[styles.editSaveBtn, { backgroundColor: c.primary }]}
               >
-                <Text style={styles.editSaveText}>Kaydet</Text>
+                <Text style={styles.editSaveText}>{t("common_save")}</Text>
               </Pressable>
             </View>
           </Animated.View>

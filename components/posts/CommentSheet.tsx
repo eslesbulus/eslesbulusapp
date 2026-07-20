@@ -28,6 +28,7 @@ import Animated, {
 import { useAuth } from "@/context/AuthContext";
 import { usePostComments, type PostComment } from "@/hooks/usePosts";
 import { formatTimeAgo } from "@/constants/mockPosts";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { height: H } = Dimensions.get("window");
 const SHEET_HEIGHT = H * 0.65; // Sabit yukseklik — ekranin %65'i
@@ -42,6 +43,7 @@ type Props = {
 
 export function CommentSheet({ postId, postUserName, visible, onClose, colors: c }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const { profile } = useAuth();
   const { comments, addComment } = usePostComments(visible ? postId : null);
   const [text, setText] = useState("");
@@ -159,7 +161,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
           <View style={[styles.sheetHeader, { borderBottomColor: c.border }]}>
             <View style={{ width: 22 }} />
             <Text style={[styles.sheetTitle, { color: c.text }]}>
-              Yorumlar{comments.length > 0 ? ` (${comments.length})` : ""}
+              {comments.length > 0 ? t("comments_count", { count: comments.length }) : t("comments_count", { count: 0 })}
             </Text>
             <Pressable onPress={handleClose} hitSlop={10}>
               <Ionicons name="close" size={22} color={c.textMuted} />
@@ -179,8 +181,8 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
                 <View style={[styles.emptyIcon, { backgroundColor: c.surface, borderColor: c.border }]}>
                   <Ionicons name="chatbubble-ellipses-outline" size={30} color={c.textMuted} />
                 </View>
-                <Text style={[styles.emptyTitle, { color: c.text }]}>Henüz yorum yok</Text>
-                <Text style={[styles.emptyHint, { color: c.textMuted }]}>İlk yorum yapan sen ol</Text>
+                <Text style={[styles.emptyTitle, { color: c.text }]}>{t("comments_empty")}</Text>
+                <Text style={[styles.emptyHint, { color: c.textMuted }]}>{t("comments_empty_hint")}</Text>
               </Animated.View>
             }
             renderItem={({ item }) => (
@@ -201,7 +203,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
                 <Ionicons name="arrow-undo" size={14} color={c.primary} />
                 <Text style={[styles.replyBannerText, { color: c.textMuted }]} numberOfLines={1}>
                   <Text style={{ fontWeight: "700", color: c.text }}>{replyingTo.userName}</Text>
-                  {" "}adlı kişiye yanıt veriyorsun
+                  {" "}{t("comments_replying_to")}
                 </Text>
               </View>
               <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
@@ -216,7 +218,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
               <TextInput
                 ref={inputRef}
                 style={[styles.input, { color: c.text }]}
-                placeholder={replyingTo ? `@${replyingTo.userName} yanıtla...` : `${postUserName ?? ""} gönderisine yorum yaz...`}
+                placeholder={replyingTo ? t("comments_reply_placeholder", { name: replyingTo.userName }) : t("comments_post_placeholder", { name: postUserName ?? "" })}
                 placeholderTextColor={c.textMuted}
                 value={text}
                 onChangeText={setText}
@@ -225,7 +227,7 @@ export function CommentSheet({ postId, postUserName, visible, onClose, colors: c
               />
               {text.trim().length > 0 && (
                 <Pressable onPress={handleSend} hitSlop={8} style={styles.sendBtn}>
-                  <Text style={[styles.sendText, { color: c.primary }]}>Paylaş</Text>
+                  <Text style={[styles.sendText, { color: c.primary }]}>{t("comments_share")}</Text>
                 </Pressable>
               )}
             </View>
@@ -249,6 +251,7 @@ function CommentRow({
   onReply: () => void;
   colors: any;
 }) {
+  const { t } = useLanguage();
   const heartScale = useSharedValue(1);
   const heartStyle = useAnimatedStyle(() => ({
     transform: [{ scale: heartScale.value }],
@@ -283,9 +286,9 @@ function CommentRow({
           <Text style={[styles.metaText, { color: c.textMuted }]}>
             {formatTimeAgo(item.createdAt)}
           </Text>
-          {liked && <Text style={[styles.metaText, { color: c.textMuted }]}>1 beğeni</Text>}
+          {liked && <Text style={[styles.metaText, { color: c.textMuted }]}>{t("comments_likes", { count: 1 })}</Text>}
           <Pressable onPress={onReply} hitSlop={8}>
-            <Text style={[styles.metaText, { color: c.textMuted, fontWeight: "700" }]}>Yanıtla</Text>
+            <Text style={[styles.metaText, { color: c.textMuted, fontWeight: "700" }]}>{t("comments_reply")}</Text>
           </Pressable>
         </View>
       </View>

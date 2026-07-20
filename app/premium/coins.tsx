@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const COIN = "#F59E0B";
@@ -24,15 +25,15 @@ const COIN_LIGHT = "#FCD34D";
 const COIN_DARK = "#B45309";
 
 // ── Jeton paketleri ───────────────────────────────────────────
-const COIN_PACKAGES = [
+const COIN_PACKAGES_KEYS = [
   {
     id: "pack_100",
     tokens: 100,
     price: "₺9,99",
     messages: 10,
-    badge: null,
+    badgeKey: null as string | null,
     popular: false,
-    bonus: null,
+    bonus: null as string | null,
     coinCount: 1 as 1 | 3 | "chest",
   },
   {
@@ -40,7 +41,7 @@ const COIN_PACKAGES = [
     tokens: 500,
     price: "₺39,99",
     messages: 50,
-    badge: "En Popüler",
+    badgeKey: "premium_badge_popular",
     popular: true,
     bonus: "%20 Bonus",
     coinCount: 3 as 1 | 3 | "chest",
@@ -50,7 +51,7 @@ const COIN_PACKAGES = [
     tokens: 1000,
     price: "₺69,99",
     messages: 100,
-    badge: "En İyi Değer",
+    badgeKey: "premium_badge_best_value",
     popular: false,
     bonus: "%30 Bonus",
     coinCount: "chest" as 1 | 3 | "chest",
@@ -58,23 +59,26 @@ const COIN_PACKAGES = [
 ];
 
 // ── Kullanım açıklamaları ─────────────────────────────────────
-const HOW_TO = [
+const HOW_TO_KEYS = [
   {
     icon: "chatbubble-ellipses" as const,
-    label: "Mesaj Gönder",
-    desc: `Her mesaj ${TOKENS_PER_MESSAGE} jeton harcar`,
+    labelKey: "coins_howto_send_message",
+    descKey: "coins_howto_send_message_desc",
+    descParams: { count: String(TOKENS_PER_MESSAGE) },
     color: "#6366F1",
   },
   {
     icon: "gift" as const,
-    label: "Hediye Gönder",
-    desc: "Özel hediyeler jeton ile satın alınır",
+    labelKey: "coins_howto_send_gift",
+    descKey: "coins_howto_send_gift_desc",
+    descParams: undefined as Record<string, string> | undefined,
     color: "#EC4899",
   },
   {
     icon: "flash" as const,
-    label: "Öne Çık",
-    desc: "Profilini boost'la, daha fazla görün",
+    labelKey: "coins_howto_boost",
+    descKey: "coins_howto_boost_desc",
+    descParams: undefined as Record<string, string> | undefined,
     color: COIN,
   },
 ];
@@ -127,6 +131,7 @@ const iconStyles = StyleSheet.create({
 export default function CoinsScreen() {
   const { balance, add } = useCoins();
   const { theme } = useTheme();
+  const { t, lang } = useLanguage();
   const c = theme.colors;
   const isDark = theme.mode === "dark";
   const router = useRouter();
@@ -137,40 +142,51 @@ export default function CoinsScreen() {
 
   // Paketler admin panelden yönetilir; boşsa yerel varsayılana düş
   const packages = useMemo(() => {
-    if (!cfgCoins || cfgCoins.length === 0) return COIN_PACKAGES;
+    if (!cfgCoins || cfgCoins.length === 0) {
+      return COIN_PACKAGES_KEYS.map((pk) => ({
+        id: pk.id,
+        tokens: pk.tokens,
+        price: pk.price,
+        messages: pk.messages,
+        badge: pk.badgeKey ? t(pk.badgeKey as any) : null,
+        popular: pk.popular,
+        bonus: pk.bonus,
+        coinCount: pk.coinCount,
+      }));
+    }
     return cfgCoins.map((p, i) => ({
       id: p.id,
       tokens: p.tokens,
       price: p.price,
       messages: p.messages ?? Math.round((p.tokens || 0) / (TOKENS_PER_MESSAGE || 10)),
-      badge: p.popular ? "En Popüler" : p.bonus ? "En İyi Değer" : null,
+      badge: p.popular ? t("premium_badge_popular") : p.bonus ? t("premium_badge_best_value") : null,
       popular: !!p.popular,
       bonus: p.bonus || null,
       coinCount: (i === 0 ? 1 : i === 1 ? 3 : "chest") as 1 | 3 | "chest",
     }));
-  }, [cfgCoins]);
+  }, [cfgCoins, t]);
 
   const selectedPkg = packages.find((p) => p.id === selected) ?? packages[0];
 
   async function handlePurchase() {
     showAlert(
-      "Jeton Satın Al 🪙",
-      `${selectedPkg.tokens} jeton ${selectedPkg.price} karşılığında satın almak istiyor musun?`,
+      t("coins_confirm_title"),
+      t("coins_confirm_message", { tokens: String(selectedPkg.tokens), price: selectedPkg.price }),
       [
-        { text: "İptal", style: "cancel" },
+        { text: t("common_cancel"), style: "cancel" },
         {
-          text: "Satın Al",
+          text: t("coins_buy"),
           onPress: async () => {
             setLoading(true);
             try {
               await add(selectedPkg.tokens);
               showAlert(
-                "🎉 Jeton Eklendi!",
-                `${selectedPkg.tokens} jeton hesabına eklendi. Şimdi sohbet başlatabilirsin!`,
-                [{ text: "Harika!", onPress: () => router.back() }]
+                t("coins_added_title"),
+                t("coins_added_message", { tokens: String(selectedPkg.tokens) }),
+                [{ text: t("coins_added_ok"), onPress: () => router.back() }]
               );
             } catch {
-              showAlert("Hata", "Satın alma başarısız. Lütfen tekrar dene.");
+              showAlert(t("common_error"), t("common_purchase_error"));
             } finally {
               setLoading(false);
             }
@@ -217,18 +233,17 @@ export default function CoinsScreen() {
             <Text style={styles.coinEmoji}>🪙</Text>
           </LinearGradient>
 
-          <Text style={[styles.heroTitle, { color: COIN }]}>Jeton Satın Al</Text>
+          <Text style={[styles.heroTitle, { color: COIN }]}>{t("coins_hero_title")}</Text>
           <Text style={[styles.heroSub, { color: c.textMuted }]}>
-            Mesaj gönder, hediye ver, öne çık.{"\n"}
-            Her şey jetonla daha kolay.
+            {t("coins_hero_subtitle")}
           </Text>
 
           {/* Mevcut bakiye */}
           <Animated.View entering={FadeInDown.delay(200).duration(300)} style={[styles.balancePill, { backgroundColor: `${COIN}15`, borderColor: `${COIN}35` }]}>
             <Ionicons name="wallet" size={14} color={COIN} />
             <Text style={[styles.balanceText, { color: c.textMuted }]}>
-              Mevcut Bakiye:{" "}
-              <Text style={[styles.balanceAmount, { color: COIN }]}>{balance} Jeton</Text>
+              {t("coins_current_balance")}{" "}
+              <Text style={[styles.balanceAmount, { color: COIN }]}>{t("coins_balance_amount", { balance: String(balance) })}</Text>
             </Text>
           </Animated.View>
         </Animated.View>
@@ -242,17 +257,17 @@ export default function CoinsScreen() {
             <View style={[styles.howToIconWrap, { backgroundColor: `${COIN}18` }]}>
               <Ionicons name="information-circle" size={16} color={COIN} />
             </View>
-            <Text style={[styles.howToTitle, { color: c.text }]}>Jetonlar Nasıl Kullanılır?</Text>
+            <Text style={[styles.howToTitle, { color: c.text }]}>{t("coins_how_to_use")}</Text>
           </View>
 
           <View style={styles.howToRow}>
-            {HOW_TO.map((item) => (
-              <View key={item.label} style={styles.howToItem}>
+            {HOW_TO_KEYS.map((item) => (
+              <View key={item.labelKey} style={styles.howToItem}>
                 <View style={[styles.howToItemIcon, { backgroundColor: `${item.color}18` }]}>
                   <Ionicons name={item.icon} size={18} color={item.color} />
                 </View>
-                <Text style={[styles.howToItemLabel, { color: c.text }]}>{item.label}</Text>
-                <Text style={[styles.howToItemDesc, { color: c.textMuted }]}>{item.desc}</Text>
+                <Text style={[styles.howToItemLabel, { color: c.text }]}>{t(item.labelKey as any)}</Text>
+                <Text style={[styles.howToItemDesc, { color: c.textMuted }]}>{t(item.descKey as any, item.descParams)}</Text>
               </View>
             ))}
           </View>
@@ -263,7 +278,7 @@ export default function CoinsScreen() {
           entering={FadeInDown.delay(240).duration(400)}
           style={styles.packagesSection}
         >
-          <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>Paket Seç</Text>
+          <Text style={[styles.packagesSectionTitle, { color: c.textMuted }]}>{t("coins_select_package")}</Text>
 
           {packages.map((pkg) => {
             const isSelected = selected === pkg.id;
@@ -296,7 +311,7 @@ export default function CoinsScreen() {
                           { color: c.text },
                         ]}
                       >
-                        {pkg.tokens} Jeton
+                        {t("coins_token_count", { count: String(pkg.tokens) })}
                       </Text>
                       {pkg.badge && (
                         <View
@@ -319,7 +334,7 @@ export default function CoinsScreen() {
                       )}
                     </View>
                     <Text style={[styles.pkgMessages, { color: c.textMuted }]}>
-                      ≈ {pkg.messages} mesaj gönder
+                      {t("coins_approx_messages", { count: String(pkg.messages) })}
                     </Text>
                     {pkg.bonus && (
                       <Text style={[styles.pkgBonus, { color: COIN }]}>
@@ -359,7 +374,7 @@ export default function CoinsScreen() {
         >
           <Ionicons name="lock-closed" size={12} color={c.textMuted} />
           <Text style={[styles.safePayText, { color: c.textMuted }]}>
-            Güvenli ödeme · SSL şifreli
+            {t("coins_safe_payment")}
           </Text>
         </Animated.View>
       </ScrollView>
@@ -388,7 +403,7 @@ export default function CoinsScreen() {
               <>
                 <Text style={{ fontSize: 18 }}>🪙</Text>
                 <Text style={styles.ctaBtnText}>
-                  {selectedPkg.tokens} Jeton — {selectedPkg.price}
+                  {t("coins_cta_text", { tokens: String(selectedPkg.tokens), price: selectedPkg.price })}
                 </Text>
               </>
             )}
@@ -396,7 +411,7 @@ export default function CoinsScreen() {
         </Pressable>
 
         <Text style={[styles.ctaNote, { color: c.textMuted }]}>
-          Jetonlar hesabınıza anında yüklenir
+          {t("coins_instant_load")}
         </Text>
       </Animated.View>
     </View>

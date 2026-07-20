@@ -22,6 +22,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import type { UserProfile } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
@@ -35,6 +36,7 @@ import { VipName } from "@/components/common/VipName";
 
 export default function PostsScreen() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -75,7 +77,7 @@ export default function PostsScreen() {
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert(t("posts_permission_title"), t("posts_permission_gallery"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -89,7 +91,7 @@ export default function PostsScreen() {
   async function handlePickVideo() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert(t("posts_permission_title"), t("posts_permission_gallery"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -102,7 +104,7 @@ export default function PostsScreen() {
 
   async function handleAddPost() {
     if (!newText.trim() && !newImage) {
-      showAlert("Hata", "Gönderi boş olamaz.");
+      showAlert(t("common_error"), t("posts_error_empty"));
       return;
     }
     setPosting(true);
@@ -112,7 +114,7 @@ export default function PostsScreen() {
       setNewImage(null);
       setNewPostModal(false);
     } catch (e: any) {
-      showAlert("Hata", e.message ?? "Gönderi paylaşılamadı.");
+      showAlert(t("common_error"), e.message ?? t("posts_error_share"));
     }
     setPosting(false);
   }
@@ -122,15 +124,15 @@ export default function PostsScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: c.border }]}>
         <View>
-          <Text style={[styles.title, { color: c.text }]}>Gönderi</Text>
-          <Text style={[styles.sub, { color: c.textMuted }]}>Anını paylaş</Text>
+          <Text style={[styles.title, { color: c.text }]}>{t("posts_title")}</Text>
+          <Text style={[styles.sub, { color: c.textMuted }]}>{t("posts_share_moment")}</Text>
         </View>
         <Pressable
           style={[styles.addBtn, { backgroundColor: c.primary }]}
           onPress={() => setNewPostModal(true)}
         >
           <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Paylaş</Text>
+          <Text style={styles.addBtnText}>{t("posts_share")}</Text>
         </Pressable>
       </View>
 
@@ -142,8 +144,8 @@ export default function PostsScreen() {
       ) : displayPosts.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="document-text-outline" size={40} color={c.textMuted} />
-          <Text style={[styles.emptyText, { color: c.textMuted }]}>Henüz gönderi yok</Text>
-          <Text style={[styles.emptyHint, { color: c.textMuted }]}>İlk gönderiyi sen paylaş!</Text>
+          <Text style={[styles.emptyText, { color: c.textMuted }]}>{t("posts_empty")}</Text>
+          <Text style={[styles.emptyHint, { color: c.textMuted }]}>{t("posts_empty_hint")}</Text>
         </View>
       ) : (
         <FlatList
@@ -183,7 +185,7 @@ export default function PostsScreen() {
                       </View>
                     </LinearGradient>
                     <Text style={[styles.storyName, { color: c.textMuted }]} numberOfLines={1}>
-                      Hikayen
+                      {t("posts_my_story")}
                     </Text>
                   </Pressable>
                 )}
@@ -282,9 +284,9 @@ export default function PostsScreen() {
 
             <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
               <Pressable onPress={() => { setNewPostModal(false); setNewImage(null); }}>
-                <Text style={[styles.cancelText, { color: c.textMuted }]}>İptal</Text>
+                <Text style={[styles.cancelText, { color: c.textMuted }]}>{t("posts_cancel")}</Text>
               </Pressable>
-              <Text style={[styles.modalTitle, { color: c.text }]}>Yeni Gönderi</Text>
+              <Text style={[styles.modalTitle, { color: c.text }]}>{t("posts_new")}</Text>
               <Pressable
                 onPress={handleAddPost}
                 disabled={posting}
@@ -302,7 +304,7 @@ export default function PostsScreen() {
                       { color: (newText.trim() || newImage) ? "#fff" : c.textMuted },
                     ]}
                   >
-                    Paylaş
+                    {t("posts_share")}
                   </Text>
                 )}
               </Pressable>
@@ -315,7 +317,7 @@ export default function PostsScreen() {
               />
               <TextInput
                 style={[styles.newPostInput, { color: c.text }]}
-                placeholder="Ne düşünüyorsun?"
+                placeholder={t("posts_placeholder")}
                 placeholderTextColor={c.textMuted}
                 value={newText}
                 onChangeText={setNewText}
@@ -341,11 +343,11 @@ export default function PostsScreen() {
             <View style={[styles.mediaRow, { borderTopColor: c.border }]}>
               <Pressable style={styles.mediaBtn} onPress={handlePickImage}>
                 <Ionicons name="image-outline" size={22} color={c.primary} />
-                <Text style={[styles.mediaBtnText, { color: c.primary }]}>Fotoğraf</Text>
+                <Text style={[styles.mediaBtnText, { color: c.primary }]}>{t("posts_photo")}</Text>
               </Pressable>
               <Pressable style={styles.mediaBtn} onPress={handlePickVideo}>
                 <Ionicons name="videocam-outline" size={22} color={c.primary} />
-                <Text style={[styles.mediaBtnText, { color: c.primary }]}>Video</Text>
+                <Text style={[styles.mediaBtnText, { color: c.primary }]}>{t("posts_video")}</Text>
               </Pressable>
             </View>
           </Pressable>

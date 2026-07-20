@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
-import { initializeAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { initializeAuth, getAuth } from "firebase/auth";
 // @ts-ignore — getReactNativePersistence v12 type def'te yok ama RN runtime'da var (Metro "react-native" condition)
 import { getReactNativePersistence } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,7 +15,15 @@ const firebaseConfig = {
   measurementId: "G-BNJPM5DVZX",
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const db = getFirestore(app);
+
+let auth: ReturnType<typeof initializeAuth>;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch {
+  auth = getAuth(app) as any;
+}
+export { auth };

@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Props = {
   show: boolean;
@@ -21,6 +22,7 @@ type Props = {
 
 export function SentToast({ show, userName, userPhoto, message, emoji, topInset = 0 }: Props) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
   const y = useSharedValue(-140);
   const op = useSharedValue(0);
@@ -65,7 +67,7 @@ export function SentToast({ show, userName, userPhoto, message, emoji, topInset 
         <View style={styles.titleRow}>
           <Ionicons name="checkmark-circle" size={14} color={c.online} />
           <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
-            {userName}'e selam gönderildi
+            {t("sent_toast_title", { name: userName })}
           </Text>
         </View>
         <Text style={[styles.msg, { color: c.textMuted }]} numberOfLines={1}>

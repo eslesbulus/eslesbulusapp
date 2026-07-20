@@ -22,6 +22,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/context/ThemeContext";
 import { useStories } from "@/hooks/useStories";
 import { showAlert } from "@/components/common/CustomAlert";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { height: H } = Dimensions.get("window");
 
@@ -29,6 +30,7 @@ export default function StoryCreateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const c = theme.colors;
 
   const { createStory } = useStories();
@@ -39,7 +41,7 @@ export default function StoryCreateScreen() {
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Galeri erişim izni verilmedi.");
+      showAlert(t("setup_permission_title"), t("story_create_permission"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -56,7 +58,7 @@ export default function StoryCreateScreen() {
   async function openCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      showAlert("İzin Gerekli", "Kamera erişim izni verilmedi.");
+      showAlert(t("setup_permission_title"), t("chat_permission_camera"));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -71,19 +73,19 @@ export default function StoryCreateScreen() {
 
   async function handlePost() {
     if (!photo) {
-      showAlert("Fotoğraf Ekle", "Hikaye için önce bir fotoğraf seç.");
+      showAlert(t("setup_photo_required_title"), t("setup_photo_required_desc"));
       return;
     }
     setPosting(true);
     try {
       await createStory(photo, caption.trim() || undefined);
       setPosting(false);
-      showAlert("Hikaye Paylaşıldı!", "Hikayen 24 saat boyunca görünecek.", [
-        { text: "Tamam", onPress: () => router.back() },
+      showAlert(t("story_create_title"), t("story_create_share"), [
+        { text: t("common_ok"), onPress: () => router.back() },
       ]);
     } catch (e: any) {
       setPosting(false);
-      showAlert("Hata", e.message ?? "Hikaye paylaşılamadı.");
+      showAlert(t("common_error"), e.message ?? t("common_error"));
     }
   }
 
@@ -101,7 +103,7 @@ export default function StoryCreateScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.closeBtn}>
           <Ionicons name="close" size={26} color={c.text} />
         </Pressable>
-        <Text style={[styles.title, { color: c.text }]}>Hikaye Ekle</Text>
+        <Text style={[styles.title, { color: c.text }]}>{t("story_create_title")}</Text>
         <Pressable
           onPress={handlePost}
           disabled={posting || !photo}
@@ -114,7 +116,7 @@ export default function StoryCreateScreen() {
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text style={[styles.shareBtnText, { color: photo ? "#fff" : c.textMuted }]}>
-              Paylaş
+              {t("story_create_share")}
             </Text>
           )}
         </Pressable>
@@ -139,7 +141,7 @@ export default function StoryCreateScreen() {
               {/* Caption */}
               <TextInput
                 style={styles.captionInput}
-                placeholder="Bir şeyler yaz..."
+                placeholder={t("story_create_text_placeholder")}
                 placeholderTextColor="rgba(255,255,255,0.55)"
                 value={caption}
                 onChangeText={setCaption}
@@ -159,7 +161,7 @@ export default function StoryCreateScreen() {
               {/* Story tip */}
               <View style={styles.storyTipWrap}>
                 <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.storyTip}>24 saat sonra otomatik silinir</Text>
+                <Text style={styles.storyTip}>{t("story_create_auto_delete")}</Text>
               </View>
             </Animated.View>
           </TouchableWithoutFeedback>
@@ -174,9 +176,9 @@ export default function StoryCreateScreen() {
             ]}
           >
             <Ionicons name="image-outline" size={54} color={c.textMuted} />
-            <Text style={[styles.placeTitle, { color: c.text }]}>Fotoğraf Seç</Text>
+            <Text style={[styles.placeTitle, { color: c.text }]}>{t("story_create_pick_photo")}</Text>
             <Text style={[styles.placeHint, { color: c.textMuted }]}>
-              9:16 oranında en iyi görünür
+              {t("story_create_aspect_hint")}
             </Text>
           </View>
 
@@ -188,8 +190,8 @@ export default function StoryCreateScreen() {
               <View style={[styles.pickBtnIcon, { backgroundColor: c.primary + "22" }]}>
                 <Ionicons name="images-outline" size={26} color={c.primary} />
               </View>
-              <Text style={[styles.pickBtnLabel, { color: c.text }]}>Galeri</Text>
-              <Text style={[styles.pickBtnHint, { color: c.textMuted }]}>Fotoğraf seç</Text>
+              <Text style={[styles.pickBtnLabel, { color: c.text }]}>{t("chat_gallery")}</Text>
+              <Text style={[styles.pickBtnHint, { color: c.textMuted }]}>{t("setup_photo_add")}</Text>
             </Pressable>
 
             <Pressable
@@ -199,8 +201,8 @@ export default function StoryCreateScreen() {
               <View style={[styles.pickBtnIcon, { backgroundColor: c.primary + "22" }]}>
                 <Ionicons name="camera-outline" size={26} color={c.primary} />
               </View>
-              <Text style={[styles.pickBtnLabel, { color: c.text }]}>Kamera</Text>
-              <Text style={[styles.pickBtnHint, { color: c.textMuted }]}>Anında çek</Text>
+              <Text style={[styles.pickBtnLabel, { color: c.text }]}>{t("chat_camera")}</Text>
+              <Text style={[styles.pickBtnHint, { color: c.textMuted }]}>{t("chat_camera")}</Text>
             </Pressable>
           </View>
         </Animated.View>
