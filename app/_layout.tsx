@@ -160,7 +160,8 @@ function RootNavigator() {
     } else if (!profile.profileComplete) {
       if (!inOnboarding) router.replace("/(onboarding)/profile-setup");
     } else if (!introSeen) {
-      if (!inOnboarding) router.replace("/(onboarding)/intro");
+      const onIntro = inOnboarding && segments[1] === "intro";
+      if (!onIntro) router.replace("/(onboarding)/intro");
     } else {
       if (inAuth || inOnboarding) router.replace("/(tabs)");
     }
