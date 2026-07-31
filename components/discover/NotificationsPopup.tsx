@@ -148,7 +148,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
           ItemSeparatorComponent={() => <View style={[styles.sep, { backgroundColor: c.border }]} />}
           contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
-            const lbl = notifLabel(item.type);
+            const lbl = notifLabel(item.type, t);
             const blurred = shouldBlurPhoto(item);
 
             return (
@@ -210,7 +210,7 @@ export function NotificationsPopup({ visible, onClose, topInset = 0 }: Props) {
                       </Text>
                     ) : null}
                     <Text style={[styles.time, { color: c.textMuted }]}>
-                      {formatNotifTime(item.createdAt)}
+                      {formatNotifTime(item.createdAt, t)}
                     </Text>
                   </View>
 

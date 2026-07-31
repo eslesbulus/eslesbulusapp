@@ -52,6 +52,7 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   updateProfile: (fields: Partial<Omit<UserProfile, "uid" | "email">>) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  patchProfile: (fields: Partial<UserProfile>) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -63,6 +64,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   updateProfile: async () => {},
   refreshProfile: async () => {},
+  patchProfile: () => {},
 });
 
 const DEV_ADMIN_USER = {
@@ -258,9 +260,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }
 
+  function patchProfile(fields: Partial<UserProfile>) {
+    setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile, refreshProfile }}
+      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile, refreshProfile, patchProfile }}
     >
       {children}
     </AuthContext.Provider>

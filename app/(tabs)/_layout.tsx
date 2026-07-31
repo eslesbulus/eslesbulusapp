@@ -2,15 +2,21 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform, StyleSheet, View, Text } from "react-native";
 import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useChats } from "@/hooks/useChats";
+
+const TAB_BAR_CONTENT_HEIGHT = 56;
 
 export default function TabsLayout() {
   const { theme, mode } = useTheme();
   const { t } = useLanguage();
   const c = theme.colors;
   const { totalUnreadChats } = useChats();
+  const insets = useSafeAreaInsets();
+
+  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + insets.bottom;
 
   return (
     <Tabs
@@ -26,8 +32,9 @@ export default function TabsLayout() {
           elevation: 0,
           backgroundColor:
             Platform.OS === "android" ? c.surface : "transparent",
-          height: Platform.OS === "ios" ? 84 : 64,
-          paddingTop: 6,
+          height: tabBarHeight,
+          paddingTop: 8,
+          paddingBottom: insets.bottom,
         },
         tabBarBackground:
           Platform.OS === "ios"

@@ -126,9 +126,9 @@ export default function StoryCreateScreen() {
       {photo ? (
         /* ── Preview mode ── */
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior="padding"
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 56 : 0}
+          keyboardVerticalOffset={insets.top + 56}
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <Animated.View entering={FadeIn.duration(300)} style={styles.previewWrap}>

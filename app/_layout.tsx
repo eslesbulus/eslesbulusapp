@@ -78,6 +78,14 @@ function useMaintenancePolling() {
 
 WebBrowser.maybeCompleteAuthSession();
 
+// intro.tsx intro tamamlandığında bu fonksiyonu çağırır.
+// router.replace("/(tabs)") yerine sadece state güncellenir;
+// nav guard zaten tabs'a yönlendirir.
+let _onIntroCompleted: (() => void) | null = null;
+export function signalIntroCompleted() {
+  _onIntroCompleted?.();
+}
+
 // Socket reconnect ve push notification uyarılarını gizle
 LogBox.ignoreLogs([
   "Socket",
@@ -95,6 +103,12 @@ function RootNavigator() {
   const navState = useRootNavigationState();
   const [introChecked, setIntroChecked] = useState(false);
   const [introSeen, setIntroSeen] = useState(true);
+
+  // intro.tsx'in signalIntroCompleted() çağrısını dinle
+  useEffect(() => {
+    _onIntroCompleted = () => setIntroSeen(true);
+    return () => { _onIntroCompleted = null; };
+  }, []);
 
   // Intro görülmüş mü kontrol et
   useEffect(() => {

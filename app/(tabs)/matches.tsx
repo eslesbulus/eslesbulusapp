@@ -8,7 +8,7 @@ import {
   Platform,
   Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -27,13 +27,14 @@ const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 16 * 2 - 12) / 2;
 const CARD_H = CARD_W * 1.4;
 
-// Standart kullanıcıda sadece ilk 1'i net görünsün
-const FREE_VISIBLE_VIEWERS = 1;
+// Premium özellik — standart kullanıcıda kimse net görünmesin
+const FREE_VISIBLE_VIEWERS = 0;
 const FREE_VISIBLE_LIKED = 1;
 
 export default function MatchesScreen() {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const c = theme.colors;
   const router = useRouter();
   const { profile } = useAuth();
@@ -71,7 +72,7 @@ export default function MatchesScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
+        contentContainerStyle={{ paddingBottom: 64 + insets.bottom }}
       >
         {/* ── Header ── */}
         <View style={styles.header}>

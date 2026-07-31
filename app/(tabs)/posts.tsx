@@ -88,20 +88,6 @@ export default function PostsScreen() {
     if (!result.canceled && result.assets[0]) setNewImage(result.assets[0].uri);
   }
 
-  async function handlePickVideo() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showAlert(t("posts_permission_title"), t("posts_permission_gallery"));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["videos"],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) setNewImage(result.assets[0].uri);
-  }
-
   async function handleAddPost() {
     if (!newText.trim() && !newImage) {
       showAlert(t("common_error"), t("posts_error_empty"));
@@ -113,6 +99,7 @@ export default function PostsScreen() {
       setNewText("");
       setNewImage(null);
       setNewPostModal(false);
+      showAlert(t("posts_pending_title"), t("posts_pending_desc"));
     } catch (e: any) {
       showAlert(t("common_error"), e.message ?? t("posts_error_share"));
     }
@@ -154,7 +141,7 @@ export default function PostsScreen() {
           contentContainerStyle={{
             paddingHorizontal: 14,
             paddingTop: 12,
-            paddingBottom: Platform.OS === "ios" ? 110 : 90,
+            paddingBottom: 64 + insets.bottom,
           }}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -267,7 +254,7 @@ export default function PostsScreen() {
           onPress={() => setNewPostModal(false)}
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior="padding"
           style={styles.modalOverlay}
           pointerEvents="box-none"
         >
@@ -344,10 +331,6 @@ export default function PostsScreen() {
               <Pressable style={styles.mediaBtn} onPress={handlePickImage}>
                 <Ionicons name="image-outline" size={22} color={c.primary} />
                 <Text style={[styles.mediaBtnText, { color: c.primary }]}>{t("posts_photo")}</Text>
-              </Pressable>
-              <Pressable style={styles.mediaBtn} onPress={handlePickVideo}>
-                <Ionicons name="videocam-outline" size={22} color={c.primary} />
-                <Text style={[styles.mediaBtnText, { color: c.primary }]}>{t("posts_video")}</Text>
               </Pressable>
             </View>
           </Pressable>

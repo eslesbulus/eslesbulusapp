@@ -53,7 +53,7 @@ const MAX_DATE = (() => {
 })();
 const DEFAULT_PICKER_DATE = (() => {
   const d = new Date();
-  d.setFullYear(d.getFullYear() - 25);
+  d.setFullYear(d.getFullYear() - MIN_AGE);
   return d;
 })();
 

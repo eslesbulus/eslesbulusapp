@@ -51,6 +51,7 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { api } from "@/config/api";
 import { useChat, type ChatMessage, type ReplyToData } from "@/hooks/useChat";
 import { useChats, setActiveChat } from "@/hooks/useChats";
+import { setActiveChatForNotif } from "@/hooks/usePushNotifications";
 import type { UserProfile } from "@/context/AuthContext";
 import { getSharedPosts, clearSharedPosts } from "@/constants/sharedPostsStore";
 import { Gift } from "@/constants/gifts";
@@ -349,8 +350,12 @@ export default function ChatDetailScreen() {
     if (id) {
       markRead(id);
       setActiveChat(id);
+      setActiveChatForNotif(id);
     }
-    return () => { setActiveChat(null); };
+    return () => {
+      setActiveChat(null);
+      setActiveChatForNotif(null);
+    };
   }, [id]);
 
   // Sesli mesajlar sessiz modda da çalsın
@@ -547,9 +552,9 @@ export default function ChatDetailScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
       >
         {/* Messages */}
         <FlatList
@@ -654,7 +659,7 @@ export default function ChatDetailScreen() {
         )}
 
         {/* Input */}
-        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom - 6, 8) }]}>
+        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom, 16) }]}>
           <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setPanelTab(null); setAttachOpen(true); }}>
             <Ionicons name="add-circle" size={28} color={c.primary} />
           </Pressable>
@@ -690,7 +695,7 @@ export default function ChatDetailScreen() {
         {panelOpen && (
           <Animated.View
             entering={FadeIn.duration(160)}
-            style={[styles.panel, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: 0 }]}
+            style={[styles.panel, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: insets.bottom }]}
           >
             <View style={[styles.panelTabs, { borderBottomColor: c.border }]}>
               <Pressable onPress={() => switchTab("emoji")} style={styles.panelTabBtn}>

@@ -10,7 +10,7 @@ import {
   BackHandler,
 } from "react-native";
 import { showAlert } from "@/components/common/CustomAlert";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInRight, FadeIn, FadeOut, SlideInUp, SlideOutUp } from "react-native-reanimated";
 import { useRouter } from "expo-router";
@@ -44,6 +44,7 @@ type ViewMode = "active" | "archived";
 export default function ChatScreen() {
   const { theme } = useTheme();
   const { t, lang } = useLanguage();
+  const insets = useSafeAreaInsets();
   const c = theme.colors;
   const router = useRouter();
   const {
@@ -212,7 +213,7 @@ export default function ChatScreen() {
       <FlatList
         data={currentChats}
         keyExtractor={(it) => it.chatId}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: 64 + insets.bottom }]}
         ListEmptyComponent={
           loading ? (
             <View style={styles.empty}>
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
   },
   tabText: { fontSize: 14, fontWeight: "600" },
 
-  list: { paddingHorizontal: 16, paddingBottom: 100, paddingTop: 8 },
+  list: { paddingHorizontal: 16, paddingTop: 8 },
   empty: { alignItems: "center", padding: 32, gap: 10 },
   emptyText: { fontSize: 13, textAlign: "center", maxWidth: 280 },
   item: {

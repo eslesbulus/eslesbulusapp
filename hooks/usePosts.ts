@@ -9,6 +9,7 @@ export type Post = {
   imageUrl?: string;
   createdAt: Date;
   archived: boolean;
+  status: "pending" | "approved" | "rejected";
   likesCount: number;
   commentsCount: number;
 };
@@ -42,6 +43,7 @@ export function usePosts(userId?: string) {
         imageUrl: d.imageUrl ?? undefined,
         createdAt: new Date(d.createdAt),
         archived: d.archived ?? false,
+        status: d.status ?? "approved",
         likesCount: d.likesCount ?? 0,
         commentsCount: d.commentsCount ?? (d.comments ? d.comments.length : 0),
       }));

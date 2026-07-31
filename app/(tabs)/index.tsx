@@ -143,7 +143,7 @@ export default function DiscoverScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
+        contentContainerStyle={{ paddingBottom: 64 + insets.bottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
         }

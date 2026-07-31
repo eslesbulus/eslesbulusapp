@@ -235,7 +235,7 @@ const en: Record<TranslationKeys, string> = {
   discover_reset_filter: "Reset filters",
   discover_daily_limit_title: "Daily Limit Reached",
   discover_daily_limit_desc: "You've used all {limit} hi messages today. Go premium for unlimited!",
-  discover_get_premium: "Get Premium 👑",
+  discover_get_premium: "Get Premium",
   discover_online: "Online",
   discover_offline: "Offline",
   discover_sent: "Sent",
@@ -288,6 +288,8 @@ const en: Record<TranslationKeys, string> = {
   posts_video: "Video",
   posts_error_empty: "Post cannot be empty.",
   posts_error_share: "Could not share the post.",
+  posts_pending_title: "Post Submitted",
+  posts_pending_desc: "Your post is under review. It will be published after our team approves it.",
   posts_permission_title: "Permission Required",
   posts_permission_gallery: "Gallery access permission was denied.",
   posts_my_story: "Your story",
@@ -311,7 +313,7 @@ const en: Record<TranslationKeys, string> = {
   my_posts_edit_placeholder: "Post text...",
 
   // User Posts Section
-  user_posts_title: "POSTS ({count})",
+  user_posts_title: "POSTS",
 
   // Comments
   comments_title: "Comments",

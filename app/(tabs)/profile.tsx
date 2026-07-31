@@ -17,7 +17,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -45,6 +45,7 @@ const PHOTO_ITEM_W = Math.floor((SCREEN_W - PHOTO_PADDING * 2 - PHOTO_GAP * 2) /
 export default function ProfileScreen() {
   const { user, profile, isDevAdmin, signOut } = useAuth();
   const { theme, mode, preference, setPreference } = useTheme();
+  const insets = useSafeAreaInsets();
   const { lang, setLang, t } = useLanguage();
   const { blockedUsers } = useBlockedUsers();
   const { isPremium, premiumExpiry, dailyLikesUsed, dailyHisUsed } = usePremium();
@@ -84,7 +85,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: Platform.OS === "ios" ? 110 : 90 }}
+        contentContainerStyle={{ paddingBottom: 64 + insets.bottom }}
       >
         {/* ── Hero Header ── */}
         <LinearGradient

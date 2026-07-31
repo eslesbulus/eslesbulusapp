@@ -10,8 +10,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { signalIntroCompleted } from "../_layout";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -71,7 +71,6 @@ export async function markIntroSeen(): Promise<void> {
 
 export default function IntroScreen() {
   const { t } = useLanguage();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -83,7 +82,9 @@ export default function IntroScreen() {
 
   async function handleFinish() {
     await markIntroSeen();
-    router.replace("/(tabs)");
+    // router.replace yerine state sinyali — nav guard tabs'a yönlendirir.
+    // Aksi hâlde introSeen state false kalır, guard tekrar intro'ya atar.
+    signalIntroCompleted();
   }
 
   function handleNext() {

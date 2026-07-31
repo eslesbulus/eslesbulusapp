@@ -1,17 +1,4 @@
 import { useEffect, useCallback } from "react";
-import {
-  initConnection,
-  endConnection,
-  getProducts,
-  getSubscriptions,
-  requestPurchase,
-  requestSubscription,
-  purchaseUpdatedListener,
-  purchaseErrorListener,
-  finishTransaction,
-  ProductPurchase,
-  SubscriptionPurchase,
-} from "react-native-iap";
 
 export const COIN_SKUS = [
   "com.eslesbulus.coins100",
@@ -25,6 +12,15 @@ export const PREMIUM_SKUS = [
   "com.eslesbulus.premium.month",
 ];
 
+// react-native-iap v16 uses Nitro native modules — not available in Expo Go.
+// We lazy-require so the app doesn't crash; IAP simply won't work in Expo Go.
+let iap: any = null;
+try {
+  iap = require("react-native-iap");
+} catch {
+  // Expo Go — native modules unavailable
+}
+
 type Options = {
   onCoinsPurchased: (productId: string) => void;
   onPremiumPurchased: (productId: string) => void;
@@ -33,14 +29,16 @@ type Options = {
 
 export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Options) {
   useEffect(() => {
-    let purchaseListener: ReturnType<typeof purchaseUpdatedListener>;
-    let errorListener: ReturnType<typeof purchaseErrorListener>;
+    if (!iap) return;
 
-    initConnection()
+    let purchaseListener: any;
+    let errorListener: any;
+
+    iap.initConnection()
       .then(() => {
-        purchaseListener = purchaseUpdatedListener(async (purchase: ProductPurchase | SubscriptionPurchase) => {
+        purchaseListener = iap.purchaseUpdatedListener(async (purchase: any) => {
           if (purchase.transactionReceipt) {
-            await finishTransaction({ purchase, isConsumable: COIN_SKUS.includes(purchase.productId) });
+            await iap.finishTransaction({ purchase, isConsumable: COIN_SKUS.includes(purchase.productId) });
             if (COIN_SKUS.includes(purchase.productId)) {
               onCoinsPurchased(purchase.productId);
             } else if (PREMIUM_SKUS.includes(purchase.productId)) {
@@ -49,8 +47,8 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
           }
         });
 
-        errorListener = purchaseErrorListener((err) => {
-          if ((err as any).code !== "E_USER_CANCELLED") {
+        errorListener = iap.purchaseErrorListener((err: any) => {
+          if (err?.code !== "E_USER_CANCELLED") {
             onError(err.message || "Satın alma başarısız.");
           }
         });
@@ -60,23 +58,25 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
     return () => {
       purchaseListener?.remove();
       errorListener?.remove();
-      endConnection();
+      iap.endConnection();
     };
   }, []);
 
   const buyCoins = useCallback(async (productId: string) => {
+    if (!iap) return onError("Satın alma bu ortamda desteklenmiyor.");
     try {
-      await getProducts({ skus: COIN_SKUS });
-      await requestPurchase({ skus: [productId], andDangerouslyFinishTransactionAutomaticallyIOS: false });
+      await iap.getProducts({ skus: COIN_SKUS });
+      await iap.requestPurchase({ skus: [productId], andDangerouslyFinishTransactionAutomaticallyIOS: false });
     } catch (err: any) {
       if (err?.code !== "E_USER_CANCELLED") onError(err?.message || "Satın alma başarısız.");
     }
   }, []);
 
   const buyPremium = useCallback(async (productId: string) => {
+    if (!iap) return onError("Satın alma bu ortamda desteklenmiyor.");
     try {
-      await getSubscriptions({ skus: PREMIUM_SKUS });
-      await requestSubscription({ sku: productId, andDangerouslyFinishTransactionAutomaticallyIOS: false });
+      await iap.getSubscriptions({ skus: PREMIUM_SKUS });
+      await iap.requestSubscription({ sku: productId, andDangerouslyFinishTransactionAutomaticallyIOS: false });
     } catch (err: any) {
       if (err?.code !== "E_USER_CANCELLED") onError(err?.message || "Satın alma başarısız.");
     }

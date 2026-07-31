@@ -11,16 +11,29 @@ import { api } from "@/config/api";
 // Expo Go'da push notification yok (SDK 53+), dev build gerekli
 const isExpoGo = Constants.appOwnership === "expo";
 
-// Foreground'da bildirim göster (sadece dev build'de)
+// Active chat UID'ini dışarıdan okumak için — useChats'teki _activeChatOtherUid ile senkron
+let _activeChatUidForNotif: string | null = null;
+export function setActiveChatForNotif(uid: string | null) {
+  _activeChatUidForNotif = uid;
+}
+
+// Foreground'da bildirim göster — ama kullanıcı zaten o chat'deyse gösterme
 if (!isExpoGo) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const data = notification.request.content.data as any;
+      const isMessageFromActiveChat =
+        (data?.type === "message" || data?.type === "storyReply") &&
+        data?.senderId === _activeChatUidForNotif;
+
+      return {
+        shouldShowAlert: !isMessageFromActiveChat,
+        shouldPlaySound: !isMessageFromActiveChat,
+        shouldSetBadge: !isMessageFromActiveChat,
+        shouldShowBanner: !isMessageFromActiveChat,
+        shouldShowList: !isMessageFromActiveChat,
+      };
+    },
   });
 }
 

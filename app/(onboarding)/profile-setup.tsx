@@ -38,7 +38,7 @@ type GenderKey = typeof GENDER_KEYS[number];
 type Step = "photo" | "info" | "about";
 
 export default function ProfileSetupScreen() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, patchProfile } = useAuth();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
@@ -176,7 +176,10 @@ export default function ProfileSetupScreen() {
         updates.name = currentName.trim();
       }
       await api.put("/api/users/me", updates);
-      await refreshProfile();
+      // State'i hemen güncelle — refreshProfile ağ hatası alsa bile nav guard tetiklenir.
+      patchProfile({ ...(updates as any), profileComplete: true });
+      // Best-effort tam senkron; başarısız olsa da yukarıdaki patch yeterli.
+      refreshProfile().catch(() => {});
     } catch (e: any) {
       showAlert(t("auth_register_failed"), e.message ?? t("common_error"));
     } finally {

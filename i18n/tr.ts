@@ -233,7 +233,7 @@ const tr = {
   discover_reset_filter: "Filtreyi sıfırla",
   discover_daily_limit_title: "Günlük Limit Doldu",
   discover_daily_limit_desc: "Bugün {limit} hi mesajı hakkını kullandın. Premium üyelikle sınırsız gönder!",
-  discover_get_premium: "Premium Al 👑",
+  discover_get_premium: "Premium Al",
   discover_online: "Çevrimiçi",
   discover_offline: "Çevrimdışı",
   discover_sent: "Gönderildi",
@@ -286,6 +286,8 @@ const tr = {
   posts_video: "Video",
   posts_error_empty: "Gönderi boş olamaz.",
   posts_error_share: "Gönderi paylaşılamadı.",
+  posts_pending_title: "Gönderiniz Alındı",
+  posts_pending_desc: "Gönderiniz incelemeye alındı. Ekibimiz onayladıktan sonra yayınlanacak.",
   posts_permission_title: "İzin Gerekli",
   posts_permission_gallery: "Galeri erişim izni verilmedi.",
   posts_my_story: "Hikayen",
@@ -309,7 +311,7 @@ const tr = {
   my_posts_edit_placeholder: "Gönderi metni...",
 
   // User Posts Section
-  user_posts_title: "GÖNDERİLER ({count})",
+  user_posts_title: "GÖNDERİLER",
 
   // Comments
   comments_title: "Yorumlar",

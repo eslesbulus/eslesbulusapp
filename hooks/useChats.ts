@@ -2,6 +2,26 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/config/api";
 import { getSocket } from "@/config/socket";
 import { useAuth } from "@/context/AuthContext";
+import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
+
+const isExpoGo = Constants.appOwnership === "expo";
+
+async function dismissChatNotifications(senderUid: string) {
+  if (isExpoGo) return;
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    for (const notif of presented) {
+      const data = notif.request.content.data as any;
+      if (
+        (data?.type === "message" || data?.type === "storyReply") &&
+        data?.senderId === senderUid
+      ) {
+        await Notifications.dismissNotificationAsync(notif.request.identifier);
+      }
+    }
+  } catch {}
+}
 
 export type ChatPreviewData = {
   chatId: string;
@@ -162,6 +182,7 @@ export function useChats() {
       prev.map((c) => (c.otherUid === otherUid ? { ...c, unreadCount: 0 } : c))
     );
     api.post(`/api/chats/${otherUid}/read`).catch(() => {});
+    dismissChatNotifications(otherUid);
   }, []);
 
   const deleteChat = useCallback(async (otherUid: string) => {
@@ -193,7 +214,10 @@ export function useChats() {
     _setGlobalChats((prev) =>
       prev.map((c) => (set.has(c.otherUid) ? { ...c, unreadCount: 0 } : c))
     );
-    otherUids.forEach((uid) => api.post(`/api/chats/${uid}/read`).catch(() => {}));
+    otherUids.forEach((uid) => {
+      api.post(`/api/chats/${uid}/read`).catch(() => {});
+      dismissChatNotifications(uid);
+    });
   }, []);
 
   const deleteBulk = useCallback(async (otherUids: string[]) => {

@@ -1,6 +1,6 @@
 module.exports = {
   expo: {
-    name: "EslesBulus",
+    name: "Eşleş Buluş - Flört & Sohbet",
     slug: "eslesbulusapp",
     version: "2.0.0",
     orientation: "portrait",
@@ -35,6 +35,7 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      "./plugins/withFixAudioForegroundService",
       // Backend HTTP (cleartext) — APK'da http://IP'ye erişim icin gerekli.
       // Aksi halde Android cleartext trafigi engeller, login sonrasi profil cekilemez.
       [
@@ -46,7 +47,6 @@ module.exports = {
         },
       ],
       "@react-native-google-signin/google-signin",
-      "react-native-iap",
       "expo-video",
       [
         "expo-audio",

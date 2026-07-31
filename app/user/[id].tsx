@@ -182,7 +182,7 @@ export default function UserDetail() {
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
       >
         <View style={styles.hero}>
           <ScrollView
@@ -317,7 +317,7 @@ export default function UserDetail() {
           {
             backgroundColor: c.surface,
             borderTopColor: c.border,
-            paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 14,
+            paddingBottom: insets.bottom + 14,
           },
         ]}
       >
