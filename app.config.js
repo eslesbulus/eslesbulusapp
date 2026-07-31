@@ -46,6 +46,7 @@ module.exports = {
         },
       ],
       "@react-native-google-signin/google-signin",
+      "react-native-iap",
       "expo-video",
       [
         "expo-audio",

@@ -22,6 +22,7 @@ import { usePremium, PremiumPlan } from "@/context/PremiumContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLanguage } from "@/context/LanguageContext";
+import { useIAP, PREMIUM_SKUS } from "@/hooks/useIAP";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const GOLD = "#D4AF37";
@@ -44,7 +45,7 @@ const PACKAGES_KEYS: PackageRow[] = [
     id: "day",
     labelKey: "premium_pkg_day_label",
     durationKey: "premium_pkg_day_duration",
-    price: "₺19,99",
+    price: "₺99,99",
     perDayKey: "premium_pkg_day_perday",
     badgeKey: null,
     popular: false,
@@ -53,7 +54,7 @@ const PACKAGES_KEYS: PackageRow[] = [
     id: "week",
     labelKey: "premium_pkg_week_label",
     durationKey: "premium_pkg_week_duration",
-    price: "₺69,99",
+    price: "₺119,99",
     perDayKey: "premium_pkg_week_perday",
     badgeKey: "premium_badge_popular",
     popular: true,
@@ -62,7 +63,7 @@ const PACKAGES_KEYS: PackageRow[] = [
     id: "month",
     labelKey: "premium_pkg_month_label",
     durationKey: "premium_pkg_month_duration",
-    price: "₺149,99",
+    price: "₺349,99",
     perDayKey: "premium_pkg_month_perday",
     badgeKey: "premium_badge_best_value",
     popular: false,
@@ -91,6 +92,28 @@ export default function PremiumScreen() {
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState("");
   const { premiumPlans: cfgPlans } = useAppConfig();
+
+  const { buyPremium } = useIAP({
+    onCoinsPurchased: () => {},
+    onPremiumPurchased: async (productId) => {
+      // SKU'dan plan tipini çıkar
+      const planMap: Record<string, PremiumPlan> = {
+        "com.eslesbulus.premium.day": "day",
+        "com.eslesbulus.premium.week": "week",
+        "com.eslesbulus.premium.month": "month",
+      };
+      const plan = planMap[productId] ?? selected;
+      await activatePremium(plan);
+      setLoading(false);
+      showAlert(t("premium_congrats_title"), t("premium_congrats_message"), [
+        { text: t("premium_congrats_ok"), onPress: () => router.back() },
+      ]);
+    },
+    onError: (msg) => {
+      setLoading(false);
+      showAlert(t("common_error"), msg || t("common_purchase_error"));
+    },
+  });
 
   // Planlar admin panelden yönetilir; boşsa yerel varsayılana düş
   const packages = useMemo(() => {
@@ -137,32 +160,16 @@ export default function PremiumScreen() {
   }, [isPremium, premiumExpiry, t]);
 
   async function handlePurchase() {
-    const pkg = packages.find((p) => p.id === selected) ?? packages[0];
-    showAlert(
-      t("premium_confirm_title"),
-      t("premium_confirm_message", { label: pkg.label, price: pkg.price }),
-      [
-        { text: t("common_cancel"), style: "cancel" },
-        {
-          text: t("premium_buy"),
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await activatePremium(selected);
-              showAlert(
-                t("premium_congrats_title"),
-                t("premium_congrats_message"),
-                [{ text: t("premium_congrats_ok"), onPress: () => router.back() }]
-              );
-            } catch {
-              showAlert(t("common_error"), t("common_purchase_error"));
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    // Admin panelden gelen productId'yi kullan, yoksa plan id → SKU map
+    const cfgPlan = cfgPlans?.find((p) => p.id === selected);
+    const skuMap: Record<string, string> = {
+      day: "com.eslesbulus.premium.day",
+      week: "com.eslesbulus.premium.week",
+      month: "com.eslesbulus.premium.month",
+    };
+    const productId = cfgPlan?.productId || skuMap[selected] || PREMIUM_SKUS[0];
+    setLoading(true);
+    await buyPremium(productId);
   }
 
   return (

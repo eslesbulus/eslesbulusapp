@@ -18,6 +18,7 @@ import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLanguage } from "@/context/LanguageContext";
+import { useIAP, COIN_SKUS } from "@/hooks/useIAP";
 
 // ── Renk Paleti ──────────────────────────────────────────────
 const COIN = "#F59E0B";
@@ -29,7 +30,7 @@ const COIN_PACKAGES_KEYS = [
   {
     id: "pack_100",
     tokens: 100,
-    price: "₺9,99",
+    price: "₺59,99",
     messages: 10,
     badgeKey: null as string | null,
     popular: false,
@@ -39,7 +40,7 @@ const COIN_PACKAGES_KEYS = [
   {
     id: "pack_500",
     tokens: 500,
-    price: "₺39,99",
+    price: "₺259,99",
     messages: 50,
     badgeKey: "premium_badge_popular",
     popular: true,
@@ -49,7 +50,7 @@ const COIN_PACKAGES_KEYS = [
   {
     id: "pack_1000",
     tokens: 1000,
-    price: "₺69,99",
+    price: "₺499,99",
     messages: 100,
     badgeKey: "premium_badge_best_value",
     popular: false,
@@ -140,6 +141,27 @@ export default function CoinsScreen() {
   const [loading, setLoading] = useState(false);
   const { coinPackages: cfgCoins } = useAppConfig();
 
+  const { buyCoins } = useIAP({
+    onCoinsPurchased: async (productId) => {
+      const tokenMap: Record<string, number> = {
+        "com.eslesbulus.coins100": 100,
+        "com.eslesbulus.coins500": 500,
+        "com.eslesbulus.coins1000": 1000,
+      };
+      const tokens = tokenMap[productId] ?? selectedPkg?.tokens ?? 0;
+      await add(tokens);
+      setLoading(false);
+      showAlert(t("coins_added_title"), t("coins_added_message", { tokens: String(tokens) }), [
+        { text: t("coins_added_ok"), onPress: () => router.back() },
+      ]);
+    },
+    onPremiumPurchased: () => {},
+    onError: (msg) => {
+      setLoading(false);
+      showAlert(t("common_error"), msg || t("common_purchase_error"));
+    },
+  });
+
   // Paketler admin panelden yönetilir; boşsa yerel varsayılana düş
   const packages = useMemo(() => {
     if (!cfgCoins || cfgCoins.length === 0) {
@@ -169,31 +191,12 @@ export default function CoinsScreen() {
   const selectedPkg = packages.find((p) => p.id === selected) ?? packages[0];
 
   async function handlePurchase() {
-    showAlert(
-      t("coins_confirm_title"),
-      t("coins_confirm_message", { tokens: String(selectedPkg.tokens), price: selectedPkg.price }),
-      [
-        { text: t("common_cancel"), style: "cancel" },
-        {
-          text: t("coins_buy"),
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await add(selectedPkg.tokens);
-              showAlert(
-                t("coins_added_title"),
-                t("coins_added_message", { tokens: String(selectedPkg.tokens) }),
-                [{ text: t("coins_added_ok"), onPress: () => router.back() }]
-              );
-            } catch {
-              showAlert(t("common_error"), t("common_purchase_error"));
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    // Admin panelden gelen productId'yi kullan, yoksa sıra bazlı SKU'ya düş
+    const cfgPkg = cfgCoins?.find((p) => p.id === selectedPkg.id);
+    const productId = cfgPkg?.productId || COIN_SKUS[packages.indexOf(selectedPkg)] || COIN_SKUS[0];
+    setLoading(true);
+    await buyCoins(productId);
+    // Sonuç useIAP callback'lerinden gelir; hata olursa loading zaten sıfırlanır
   }
 
   return (
