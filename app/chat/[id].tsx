@@ -161,6 +161,14 @@ export default function ChatDetailScreen() {
   const panelOpen = panelTab !== null;
   const sharedPostsSent = useRef(false);
 
+  // Klavye kapanınca inverted FlatList scroll gap'ini sıfırla
+  useEffect(() => {
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+    return () => hide.remove();
+  }, []);
+
   // WhatsApp tarzı mesaj secimi
   const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set());
   const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(new Set());
@@ -552,7 +560,7 @@ export default function ChatDetailScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
         style={{ flex: 1 }}
       >
         {/* Messages */}
