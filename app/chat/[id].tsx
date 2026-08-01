@@ -161,19 +161,26 @@ export default function ChatDetailScreen() {
   const panelOpen = panelTab !== null;
   const sharedPostsSent = useRef(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  // Klavye kapanınca KAV yükseklik restore olduğunda inverted FlatList gap fix
+  const keyboardVisibleRef = useRef(false);
+  // inverted FlatList gap fix: klavye kapanınca hem anında hem onLayout'ta scroll
   const needsScrollReset = useRef(false);
+  const scrollToBottom = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => {
+      keyboardVisibleRef.current = true;
       setKeyboardVisible(true);
-      needsScrollReset.current = true;
     });
     const hide = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardVisibleRef.current = false;
       setKeyboardVisible(false);
-      // onLayout FlatList büyüyünce needsScrollReset'i okuyacak
+      needsScrollReset.current = true;
+      // Anında dene (keyboardDidHide önce gelirse)
+      scrollToBottom();
     });
     return () => { show.remove(); hide.remove(); };
-  }, []);
+  }, [scrollToBottom]);
 
   // WhatsApp tarzı mesaj secimi
   const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set());
@@ -581,9 +588,10 @@ export default function ChatDetailScreen() {
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.4}
           onLayout={() => {
-            if (needsScrollReset.current && !keyboardVisible) {
+            // onLayout önce gelirse (keyboardDidHide sonra) burada yakala
+            if (needsScrollReset.current && !keyboardVisibleRef.current) {
               needsScrollReset.current = false;
-              listRef.current?.scrollToOffset({ offset: 0, animated: false });
+              scrollToBottom();
             }
           }}
           ListFooterComponent={
