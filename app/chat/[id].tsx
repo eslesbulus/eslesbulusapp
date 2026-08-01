@@ -552,9 +552,8 @@ export default function ChatDetailScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior="padding"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={0}
       >
         {/* Messages */}
         <FlatList
