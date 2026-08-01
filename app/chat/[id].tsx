@@ -160,13 +160,19 @@ export default function ChatDetailScreen() {
   const inputRef = useRef<TextInput>(null);
   const panelOpen = panelTab !== null;
   const sharedPostsSent = useRef(false);
-
-  // Klavye kapanınca inverted FlatList scroll gap'ini sıfırla
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Klavye kapanınca KAV yükseklik restore olduğunda inverted FlatList gap fix
+  const needsScrollReset = useRef(false);
   useEffect(() => {
-    const hide = Keyboard.addListener("keyboardDidHide", () => {
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    const show = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+      needsScrollReset.current = true;
     });
-    return () => hide.remove();
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+      // onLayout FlatList büyüyünce needsScrollReset'i okuyacak
+    });
+    return () => { show.remove(); hide.remove(); };
   }, []);
 
   // WhatsApp tarzı mesaj secimi
@@ -560,8 +566,9 @@ export default function ChatDetailScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
       >
         {/* Messages */}
         <FlatList
@@ -573,6 +580,12 @@ export default function ChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.4}
+          onLayout={() => {
+            if (needsScrollReset.current && !keyboardVisible) {
+              needsScrollReset.current = false;
+              listRef.current?.scrollToOffset({ offset: 0, animated: false });
+            }
+          }}
           ListFooterComponent={
             hasMore ? (
               // Inverted listede footer en ustte (en eski) render olur — eski mesajlar yuklenirken spinner
@@ -666,7 +679,7 @@ export default function ChatDetailScreen() {
         )}
 
         {/* Input */}
-        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen || keyboardVisible ? 8 : Math.max(insets.bottom, 16) }]}>
           <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setPanelTab(null); setAttachOpen(true); }}>
             <Ionicons name="add-circle" size={28} color={c.primary} />
           </Pressable>
