@@ -22,6 +22,7 @@ import { usePremium, PremiumPlan } from "@/context/PremiumContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLanguage } from "@/context/LanguageContext";
+import { api } from "@/config/api";
 import { useIAP, PREMIUM_SKUS } from "@/hooks/useIAP";
 
 // ── Renk Paleti ──────────────────────────────────────────────
@@ -103,7 +104,9 @@ export default function PremiumScreen() {
         "com.eslesbulus.premium.month": "month",
       };
       const plan = planMap[productId] ?? selected;
+      const dayMap: Record<string, number> = { day: 1, week: 7, month: 30 };
       await activatePremium(plan);
+      api.post("/api/users/me/purchase", { type: "premium", productId, amount: dayMap[plan] ?? 30 }).catch(() => {});
       setLoading(false);
       showAlert(t("premium_congrats_title"), t("premium_congrats_message"), [
         { text: t("premium_congrats_ok"), onPress: () => router.back() },

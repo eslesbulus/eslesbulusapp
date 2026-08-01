@@ -5,7 +5,7 @@ module.exports = {
     version: "2.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     newArchEnabled: true,
     scheme: "eslesbulusapp",
     splash: {
@@ -35,6 +35,7 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      "expo-localization",
       "./plugins/withFixAudioForegroundService",
       // Backend HTTP (cleartext) — APK'da http://IP'ye erişim icin gerekli.
       // Aksi halde Android cleartext trafigi engeller, login sonrasi profil cekilemez.

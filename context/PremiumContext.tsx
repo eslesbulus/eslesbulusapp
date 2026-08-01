@@ -59,7 +59,7 @@ function getPremiumExpiry(plan: PremiumPlan): Date {
 }
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
-  const { user, profile, isDevAdmin, refreshProfile } = useAuth();
+  const { user, profile, isDevAdmin, refreshProfile, patchProfile } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
   const [premiumExpiry, setPremiumExpiry] = useState<Date | null>(null);
   const [dailyLikesUsed, setDailyLikesUsed] = useState(0);
@@ -77,8 +77,9 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
     setIsPremium(active);
     setPremiumExpiry(expiry);
 
-    // Sync vip if expired
+    // Sync vip if expired — hem local state'i hem API'yi güncelle
     if (!active && profile.vip === true) {
+      patchProfile({ vip: false });
       api.put("/api/users/me", { vip: false }).catch(() => {});
     }
 

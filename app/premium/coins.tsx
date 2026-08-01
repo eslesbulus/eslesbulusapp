@@ -18,6 +18,7 @@ import { useCoins, TOKENS_PER_MESSAGE } from "@/context/CoinsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLanguage } from "@/context/LanguageContext";
+import { api } from "@/config/api";
 import { useIAP, COIN_SKUS } from "@/hooks/useIAP";
 
 // ── Renk Paleti ──────────────────────────────────────────────
@@ -150,6 +151,7 @@ export default function CoinsScreen() {
       };
       const tokens = tokenMap[productId] ?? selectedPkg?.tokens ?? 0;
       await add(tokens);
+      api.post("/api/users/me/purchase", { type: "coins", productId, amount: tokens }).catch(() => {});
       setLoading(false);
       showAlert(t("coins_added_title"), t("coins_added_message", { tokens: String(tokens) }), [
         { text: t("coins_added_ok"), onPress: () => router.back() },

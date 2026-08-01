@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLocales } from "expo-localization";
 import { translate, Language, TranslationKeys } from "@/i18n";
 
 type LanguageContextType = {
@@ -13,7 +14,15 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 const STORAGE_KEY = "app_language";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Language>("tr");
+  // Sistem dili — AsyncStorage'da kayıt yoksa kullan
+  const systemLang: Language = (() => {
+    try {
+      const tag = getLocales()[0]?.languageTag ?? "tr";
+      return tag.startsWith("en") ? "en" : "tr";
+    } catch { return "tr"; }
+  })();
+
+  const [lang, setLangState] = useState<Language>(systemLang);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,6 +32,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled && (saved === "tr" || saved === "en")) {
           setLangState(saved);
         }
+        // Kayıt yoksa sistem dilini kullan (varsayılan zaten systemLang)
       } catch {}
     })();
     return () => { cancelled = true; };
