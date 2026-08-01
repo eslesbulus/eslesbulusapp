@@ -323,7 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         [{ text: "Tamam", onPress: () => signOut() }]
       );
     } catch {
-      showAlert(t("common_error"), t("common_purchase_error"));
+      showAlert(t("common_error"), "Hesap silme talebi gönderilemedi. Lütfen tekrar deneyin.");
     }
   }
 
