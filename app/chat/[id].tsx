@@ -126,6 +126,16 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// iOS'ta klavyeyi KAV yonetir. Android'de KAV HIC render edilmez — duz View,
+// kaydirmayi Reanimated translateY yapar.
+const KbWrap: any = Platform.OS === "ios" ? KeyboardAvoidingView : View;
+// overflow:hidden — translateY govdeyi yukari tasirken ust kenari header'in
+// uzerine tasiyor; tasan kisim burada kirpiliyor.
+const kbWrapProps: any =
+  Platform.OS === "ios"
+    ? { behavior: "padding", keyboardVerticalOffset: 0, style: { flex: 1 } }
+    : { style: { flex: 1, overflow: "hidden" } };
+
 export default function ChatDetailScreen() {
   const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { t, lang } = useLanguage();
@@ -160,27 +170,41 @@ export default function ChatDetailScreen() {
   const inputRef = useRef<TextInput>(null);
   const panelOpen = panelTab !== null;
   const sharedPostsSent = useRef(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const keyboardVisibleRef = useRef(false);
-  // inverted FlatList gap fix: klavye kapanınca hem anında hem onLayout'ta scroll
-  const needsScrollReset = useRef(false);
-  const scrollToBottom = useCallback(() => {
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, []);
+  // Android edge-to-edge: KAV yok, padding/margin yok. Tum sohbet govdesi
+  // Reanimated translateY ile fiziksel olarak yukari kaydiriliyor.
+  const kbOffset = useSharedValue(0);
+  const [kbHeight, setKbHeight] = useState(0);
+  const keyboardVisible = kbHeight > 0;
+  const kbAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -kbOffset.value }],
+  }));
+  // Govde edge-to-edge'de fiziksel ekran dibine kadar uzaniyor, klavye ise nav
+  // bar'in ustunde bitiyor — endCoordinates.height bu farki icermiyor. Nav bar
+  // insetini klavye KAPALIYKEN sakla (acikken sistem 0'a cekebiliyor).
+  const navInsetRef = useRef(insets.bottom);
+  if (kbHeight === 0) navInsetRef.current = insets.bottom;
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => {
-      keyboardVisibleRef.current = true;
-      setKeyboardVisible(true);
+    // Ekran yeniden acildiginda onceki oturumdan kalan kayma degerini temizle
+    kbOffset.value = 0;
+    const show = Keyboard.addListener("keyboardDidShow", (e) => {
+      const h = e.endCoordinates.height;
+      setKbHeight(h);
+      if (Platform.OS === "android") {
+        kbOffset.value = withTiming(h + navInsetRef.current, { duration: 220 });
+      }
     });
     const hide = Keyboard.addListener("keyboardDidHide", () => {
-      keyboardVisibleRef.current = false;
-      setKeyboardVisible(false);
-      needsScrollReset.current = true;
-      // Anında dene (keyboardDidHide önce gelirse)
-      scrollToBottom();
+      setKbHeight(0);
+      kbOffset.value = withTiming(0, { duration: 220 });
     });
-    return () => { show.remove(); hide.remove(); };
-  }, [scrollToBottom]);
+    return () => {
+      show.remove();
+      hide.remove();
+      // Unmount: navigasyonla cikarken keyboardDidHide her zaman atesenmiyor,
+      // deger hafizada asili kalmasin diye zorla sifirla.
+      kbOffset.value = 0;
+    };
+  }, []);
 
   // WhatsApp tarzı mesaj secimi
   const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set());
@@ -572,11 +596,8 @@ export default function ChatDetailScreen() {
         </View>
       )}
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={0}
-      >
+      <KbWrap {...kbWrapProps}>
+      <Animated.View style={[{ flex: 1 }, kbAnimStyle]}>
         {/* Messages */}
         <FlatList
           ref={listRef}
@@ -587,13 +608,6 @@ export default function ChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.4}
-          onLayout={() => {
-            // onLayout önce gelirse (keyboardDidHide sonra) burada yakala
-            if (needsScrollReset.current && !keyboardVisibleRef.current) {
-              needsScrollReset.current = false;
-              scrollToBottom();
-            }
-          }}
           ListFooterComponent={
             hasMore ? (
               // Inverted listede footer en ustte (en eski) render olur — eski mesajlar yuklenirken spinner
@@ -781,7 +795,8 @@ export default function ChatDetailScreen() {
             </View>
           </Animated.View>
         )}
-      </KeyboardAvoidingView>
+      </Animated.View>
+      </KbWrap>
 
       {/* Attachment Sheet */}
       <Modal
