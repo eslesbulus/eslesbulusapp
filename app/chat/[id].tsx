@@ -154,12 +154,6 @@ export default function ChatDetailScreen() {
     if (val.length > 0) emitTyping();
   }, [emitTyping]);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
-    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | "vip" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
   const [giftAnimKey, setGiftAnimKey] = useState(0);
@@ -558,7 +552,7 @@ export default function ChatDetailScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >
@@ -665,7 +659,7 @@ export default function ChatDetailScreen() {
         )}
 
         {/* Input */}
-        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen || keyboardVisible ? 8 : Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.inputBar, { borderTopColor: c.border, backgroundColor: c.card, paddingBottom: panelOpen ? 8 : Math.max(insets.bottom, 16) }]}>
           <Pressable hitSlop={6} style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setPanelTab(null); setAttachOpen(true); }}>
             <Ionicons name="add-circle" size={28} color={c.primary} />
           </Pressable>

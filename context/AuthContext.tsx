@@ -41,6 +41,9 @@ export type UserProfile = {
   dailyHisUsed?: number;
   dailyStoryLikesUsed?: number;
   dailyResetDate?: string;
+  // Hesap silme
+  deletionStatus?: "none" | "pending" | "cancelled" | "approved" | "deleted";
+  deletionScheduledFor?: string | null;
 };
 
 type AuthContextType = {
@@ -53,6 +56,7 @@ type AuthContextType = {
   updateProfile: (fields: Partial<Omit<UserProfile, "uid" | "email">>) => Promise<void>;
   refreshProfile: () => Promise<void>;
   patchProfile: (fields: Partial<UserProfile>) => void;
+  requestAccountDeletion: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -62,6 +66,7 @@ const AuthContext = createContext<AuthContextType>({
   isDevAdmin: false,
   signInAsDevAdmin: () => {},
   signOut: async () => {},
+  requestAccountDeletion: async () => {},
   updateProfile: async () => {},
   refreshProfile: async () => {},
   patchProfile: () => {},
@@ -147,6 +152,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const data = await api.post<{ uid: string; profile: UserProfile }>("/api/auth/verify");
           if (!cancelled) {
+            // Hesap silme talebi kontrol et — kullanıcıya sor
+            if (data.profile.deletionStatus === "pending" && data.profile.deletionScheduledFor) {
+              const scheduledDate = new Date(data.profile.deletionScheduledFor);
+              const daysLeft = Math.max(0, Math.ceil((scheduledDate.getTime() - Date.now()) / 86400000));
+              // Alert göstermek için önce yüklenmiş gibi hissettirelim
+              setLoading(false);
+              // Kullanıcı yanıtını bekle — evet → iptal et & devam, hayır → çıkış
+              await new Promise<void>((resolve) => {
+                showAlert(
+                  t("delete_account_pending_title"),
+                  t("delete_account_pending_msg", { days: String(daysLeft) }),
+                  [
+                    {
+                      text: t("delete_account_pending_no"),
+                      style: "cancel",
+                      onPress: async () => {
+                        await fbSignOut(auth).catch(() => {});
+                        hasReceivedUserRef.current = false;
+                        setUser(null);
+                        setProfile(null);
+                        disconnectSocket();
+                        resolve();
+                      },
+                    },
+                    {
+                      text: t("delete_account_pending_yes"),
+                      onPress: async () => {
+                        try {
+                          await api.post("/api/users/me/cancel-delete");
+                          data.profile.deletionStatus = "cancelled";
+                          data.profile.deletionScheduledFor = null;
+                        } catch {}
+                        setProfile(data.profile);
+                        connectSocket().catch(() => {});
+                        resolve();
+                      },
+                    },
+                  ]
+                );
+              });
+              return;
+            }
             setProfile(data.profile);
             setLoading(false);
             // Connect Socket.IO
@@ -264,9 +311,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
   }
 
+  async function requestAccountDeletion() {
+    if (!user) return;
+    try {
+      const res = await api.post<{ ok: boolean; scheduledFor: string }>("/api/users/me/delete-request");
+      patchProfile({ deletionStatus: "pending", deletionScheduledFor: res.scheduledFor });
+      const date = new Date(res.scheduledFor).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+      showAlert(
+        t("delete_account_confirm_title"),
+        t("delete_account_scheduled", { date }),
+        [{ text: "Tamam", onPress: () => signOut() }]
+      );
+    } catch {
+      showAlert(t("common_error"), t("common_purchase_error"));
+    }
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile, refreshProfile, patchProfile }}
+      value={{ user, profile, loading, isDevAdmin, signInAsDevAdmin, signOut, updateProfile, refreshProfile, patchProfile, requestAccountDeletion }}
     >
       {children}
     </AuthContext.Provider>

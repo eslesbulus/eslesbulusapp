@@ -43,7 +43,7 @@ const PHOTO_PADDING = 16;
 const PHOTO_ITEM_W = Math.floor((SCREEN_W - PHOTO_PADDING * 2 - PHOTO_GAP * 2) / 3);
 
 export default function ProfileScreen() {
-  const { user, profile, isDevAdmin, signOut } = useAuth();
+  const { user, profile, isDevAdmin, signOut, requestAccountDeletion } = useAuth();
   const { theme, mode, preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
   const { lang, setLang, t } = useLanguage();
@@ -72,6 +72,17 @@ export default function ProfileScreen() {
     showAlert(t("profile_logout_title"), t("profile_logout_confirm"), [
       { text: t("common_cancel"), style: "cancel" },
       { text: t("profile_logout_title"), style: "destructive", onPress: () => signOut() },
+    ]);
+  }
+
+  function handleDeleteAccount() {
+    showAlert(t("delete_account_confirm_title"), t("delete_account_confirm_msg"), [
+      { text: t("common_cancel"), style: "cancel" },
+      {
+        text: t("delete_account_confirm_yes"),
+        style: "destructive",
+        onPress: () => requestAccountDeletion(),
+      },
     ]);
   }
 
@@ -457,6 +468,13 @@ export default function ProfileScreen() {
           >
             <Ionicons name="log-out-outline" size={18} color="#E53935" />
             <Text style={[styles.logoutText, { color: "#E53935" }]}>{t("settings_logout")}</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleDeleteAccount}
+            style={[styles.logoutBtn, { borderColor: c.textMuted, marginTop: 10 }]}
+          >
+            <Ionicons name="trash-outline" size={18} color={c.textMuted} />
+            <Text style={[styles.logoutText, { color: c.textMuted }]}>{t("settings_delete_account")}</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>

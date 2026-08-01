@@ -128,6 +128,15 @@ const tr = {
   settings_about: "Uygulama Hakkında",
 
   settings_logout: "Çıkış Yap",
+  settings_delete_account: "Hesabımı Sil",
+  delete_account_confirm_title: "Hesabı Sil",
+  delete_account_confirm_msg: "Hesabınız 7 gün içinde silinecektir. Bu süre içinde giriş yaparsanız talebiniz otomatik iptal edilir. Devam etmek istiyor musunuz?",
+  delete_account_confirm_yes: "Evet, Hesabımı Sil",
+  delete_account_scheduled: "Hesabınız {date} tarihinde silinecek. Giriş yaparak iptal edebilirsiniz.",
+  delete_account_pending_title: "Hesap Silme Talebi",
+  delete_account_pending_msg: "Bu hesap {days} gün içinde silinecektir. Giriş yaparsanız silme talebiniz iptal edilecektir. Giriş yapmak istiyor musunuz?",
+  delete_account_pending_yes: "Evet, Giriş Yap (Talebi İptal Et)",
+  delete_account_pending_no: "Hayır, Giriş Yapma",
 
   // Report Issue Modal
   report_title: "Sorun Bildir",

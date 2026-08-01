@@ -130,6 +130,15 @@ const en: Record<TranslationKeys, string> = {
   settings_about: "About the App",
 
   settings_logout: "Log Out",
+  settings_delete_account: "Delete My Account",
+  delete_account_confirm_title: "Delete Account",
+  delete_account_confirm_msg: "Your account will be deleted within 7 days. If you log in during this period, your request will be automatically cancelled. Do you want to continue?",
+  delete_account_confirm_yes: "Yes, Delete My Account",
+  delete_account_scheduled: "Your account will be deleted on {date}. You can cancel by logging in.",
+  delete_account_pending_title: "Account Deletion Pending",
+  delete_account_pending_msg: "This account will be deleted in {days} days. Logging in will cancel the deletion request. Do you want to log in?",
+  delete_account_pending_yes: "Yes, Log In (Cancel Deletion)",
+  delete_account_pending_no: "No, Don't Log In",
 
   // Report Issue Modal
   report_title: "Report an Issue",
