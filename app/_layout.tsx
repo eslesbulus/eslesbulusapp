@@ -17,6 +17,7 @@ import { CustomAlertProvider } from "@/components/common/CustomAlert";
 import { NotificationsProvider } from "@/context/NotificationsContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { BASE_URL } from "@/config/api";
+import { initFacebookSdk } from "@/config/facebook";
 import MaintenanceScreen from "@/components/MaintenanceScreen";
 
 // ── Global bakım state — hem RootLayout hem RootNavigator erişir ──
@@ -78,6 +79,9 @@ function useMaintenancePolling() {
 }
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Facebook App Events — yukleme/satin alim takibi. Uygulama acilisinda bir kez.
+initFacebookSdk();
 
 // intro.tsx intro tamamlandığında bu fonksiyonu çağırır.
 // router.replace("/(tabs)") yerine sadece state güncellenir;

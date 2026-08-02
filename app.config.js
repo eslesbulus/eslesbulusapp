@@ -37,6 +37,24 @@ module.exports = {
       "expo-router",
       "expo-localization",
       "./plugins/withFixAudioForegroundService",
+      // Facebook SDK — yukleme ve satin alim (App Events) takibi icin.
+      // strings.xml / AndroidManifest / Info.plist duzenlemelerini bu plugin
+      // prebuild sirasinda otomatik yapar, elle dosya duzenlemeye gerek yok.
+      // NOT: App Secret ASLA buraya yazilmaz, o sunucu tarafi bir sirdir.
+      [
+        "react-native-fbsdk-next",
+        {
+          appID: "1323949806483991",
+          clientToken: "98dfb80125026747575035b1d86b4561",
+          displayName: "Eşleş Buluş",
+          scheme: "fb1323949806483991",
+          isAutoInitEnabled: true,
+          autoLogAppEventsEnabled: true,
+          advertiserIDCollectionEnabled: true,
+          iosUserTrackingPermission:
+            "Sana daha uygun içerik ve kampanyalar gösterebilmek için kullanılır.",
+        },
+      ],
       // Backend HTTP (cleartext) — APK'da http://IP'ye erişim icin gerekli.
       // Aksi halde Android cleartext trafigi engeller, login sonrasi profil cekilemez.
       [
