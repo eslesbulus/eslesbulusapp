@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { showAlert } from "@/components/common/CustomAlert";
 import * as ImagePicker from "expo-image-picker";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -87,6 +87,11 @@ function formatLastSeen(
   return d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
+// Backend sistem mesajlarini bu senderId ile kaydediyor (admin panel
+// "VIP Mesaj" butonu ve asSystem gonderimleri). Kimseye ait olmadigi icin
+// balon degil, ortada ayri bir bilgi seridi olarak gosterilir.
+const SYSTEM_SENDER = "system";
+
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
@@ -148,8 +153,11 @@ export default function ChatDetailScreen() {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const { balance: tokenBalance, spend: spendTokens } = useCoins();
   const { isPremium } = usePremium();
-  const { callsEnabled } = useAppConfig();
-  const { profile } = useAuth();
+  const { callsEnabled, photoTokenCost } = useAppConfig();
+  const { profile, refreshProfile } = useAuth();
+  // Jeton istegi karsilandiginda kartlari guncellemek icin: msgId -> tutar.
+  // Sunucudan gelen mesaj listesi yenilenene kadar ekranda dogru gorunsun.
+  const [coinFilled, setCoinFilled] = useState<Map<string, number>>(new Map());
   const myVip = isPremium; // profile.vip değil — PremiumContext expiry'yi kontrol eder
   const otherVip = user?.vip ?? false;
   const c = theme.colors;
@@ -164,6 +172,8 @@ export default function ChatDetailScreen() {
     if (val.length > 0) emitTyping();
   }, [emitTyping]);
   const [attachOpen, setAttachOpen] = useState(false);
+  // Tam ekran fotograf goruntuleyici — balona dokununca acilir
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<"emoji" | "gift" | "vip" | null>(null);
   const [activeGiftAnim, setActiveGiftAnim] = useState<Gift | null>(null);
   const [giftAnimKey, setGiftAnimKey] = useState(0);
@@ -221,6 +231,7 @@ export default function ChatDetailScreen() {
   // Satirlari olustur: gun ayraclari + gruplama bilgisi (inverted liste icin ters)
   type Row =
     | { type: "sep"; id: string; label: string }
+    | { type: "sys"; id: string; msg: ChatMessage }
     | { type: "msg"; id: string; msg: ChatMessage; isFirstOfGroup: boolean; isLastOfGroup: boolean };
   const rows: Row[] = [];
   let lastDayKey = "";
@@ -232,8 +243,23 @@ export default function ChatDetailScreen() {
       rows.push({ type: "sep", id: `sep_${dayKey}`, label: dateSeparatorLabel(d, t, lang) });
       lastDayKey = dayKey;
     }
-    const prev = displayMessages[i - 1];
-    const next = displayMessages[i + 1];
+    // Sistem mesaji kimseye ait degil — ortada, ayri bicimde gosterilir.
+    // Gruplama hesabina da girmemeli, yoksa etrafindaki balonlarin kose
+    // yuvarlakliklarini bozar.
+    if (m.senderId === SYSTEM_SENDER) {
+      rows.push({ type: "sys", id: m.id, msg: m });
+      continue;
+    }
+    // Gruplama komsulari aranirken sistem mesajlari atlanir — araya giren bir
+    // sistem mesaji ardisik balonlarin grubunu bolmemeli.
+    let prev: ChatMessage | undefined;
+    for (let k = i - 1; k >= 0; k--) {
+      if (displayMessages[k].senderId !== SYSTEM_SENDER) { prev = displayMessages[k]; break; }
+    }
+    let next: ChatMessage | undefined;
+    for (let k = i + 1; k < displayMessages.length; k++) {
+      if (displayMessages[k].senderId !== SYSTEM_SENDER) { next = displayMessages[k]; break; }
+    }
     const fromMe = m.senderId === myUid;
     const prevSameDay = prev ? sameDay(prev.createdAt, m.createdAt) : false;
     const nextSameDay = next ? sameDay(next.createdAt, m.createdAt) : false;
@@ -281,6 +307,77 @@ export default function ChatDetailScreen() {
     setReplyingTo(msg);
     inputRef.current?.focus();
   }, []);
+
+  // Fotograf gonderiminin jeton maliyeti — Genel Ayarlar'dan yonetiliyor.
+  // Bakiye yetmiyorsa gonderim yapilmaz, jeton satin almaya yonlendirilir.
+  const chargeForPhoto = useCallback(async (): Promise<boolean> => {
+    if (!photoTokenCost || photoTokenCost <= 0) return true;
+    if (tokenBalance < photoTokenCost) {
+      showAlert(
+        t("coins_insufficient"),
+        t("coins_insufficient_desc", { price: photoTokenCost, balance: tokenBalance }),
+        [
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("coins_buy"), onPress: () => router.push("/premium/coins") },
+        ]
+      );
+      return false;
+    }
+    return await spendTokens(photoTokenCost);
+  }, [photoTokenCost, tokenBalance, t, router, spendTokens]);
+
+  // Jeton istegini karsila. Bakiye dusumu ve istegin "karsilandi" olarak
+  // isaretlenmesi SUNUCUDA yapiliyor; burada yalnizca onay aliyor ve sonucu
+  // ekrana yansitiyoruz.
+  const handleSendCoins = useCallback((msgId: string, amount: number) => {
+    if (tokenBalance < amount) {
+      showAlert(
+        t("coins_insufficient"),
+        t("coins_insufficient_desc", { price: amount, balance: tokenBalance }),
+        [
+          { text: t("common_cancel"), style: "cancel" },
+          { text: t("coins_buy"), onPress: () => router.push("/premium/coins") },
+        ]
+      );
+      return;
+    }
+    showAlert(
+      t("chat_coin_request"),
+      t("chat_coin_confirm", { amount, name: user?.name ?? "" }),
+      [
+        { text: t("common_cancel"), style: "cancel" },
+        {
+          text: t("chat_coin_send"),
+          onPress: async () => {
+            try {
+              const res = await api.post<{ amount: number; balance: number }>(
+                `/api/chats/${id}/send-coins`,
+                { messageId: msgId, amount }
+              );
+              // Karti "karsilandi" durumuna gecir
+              setCoinFilled((prev) => new Map(prev).set(msgId, res.amount));
+              // CoinsContext bakiyeyi profilden okuyor — profili tazele
+              refreshProfile();
+            } catch (e: any) {
+              showAlert(t("common_error"), e?.message || t("chat_coin_failed"));
+            }
+          },
+        },
+      ]
+    );
+  }, [tokenBalance, t, id, user?.name, router, refreshProfile]);
+
+  // Kilitli fotografa dokunuldugunda VIP yonlendirmesi
+  const handleLockedPress = useCallback(() => {
+    showAlert(
+      t("chat_locked_photo"),
+      t("chat_locked_photo_desc"),
+      [
+        { text: t("common_cancel"), style: "cancel" },
+        { text: t("matches_go_premium"), onPress: () => router.push("/premium") },
+      ]
+    );
+  }, [t, router]);
 
   // Back handler
   useEffect(() => {
@@ -640,12 +737,18 @@ export default function ChatDetailScreen() {
             if (item.type === "sep") {
               return <DateSeparator label={item.label} colors={c} />;
             }
+            if (item.type === "sys") {
+              return <SystemMessage text={item.msg.text} colors={c} />;
+            }
             const msg = item.msg;
             const fromMe = msg.senderId === myUid;
             const isDeleted = msg.deleted || deletedForAllIds.has(msg.id);
+            const justFilled = coinFilled.get(msg.id);
             const displayMsg = isDeleted
               ? { ...msg, text: t("chat_message_deleted"), type: "text" as const, deleted: true, gift: undefined, storyReply: undefined, sharedPost: undefined, reactions: [] }
-              : msg;
+              : justFilled && msg.coinRequest
+                ? { ...msg, coinRequest: { ...msg.coinRequest, sentAmount: justFilled } }
+                : msg;
             return (
               <BubbleWrapper
                 item={displayMsg}
@@ -666,6 +769,10 @@ export default function ChatDetailScreen() {
                 showReactionBar={activeReactionMsgId === msg.id}
                 onToggleReaction={handleToggleReaction}
                 onSwipeReply={handleSwipeReply}
+                viewerVip={myVip}
+                onLockedPress={handleLockedPress}
+                onImagePress={setViewerUri}
+                onSendCoins={handleSendCoins}
               />
             );
           }}
@@ -815,12 +922,19 @@ export default function ChatDetailScreen() {
             style={[styles.attachSheet, { backgroundColor: c.card, paddingBottom: Math.max(insets.bottom + 12, 28) }]}
           >
             <View style={[styles.attachHandle, { backgroundColor: c.border }]} />
-            <Text style={[styles.attachTitle, { color: c.text }]}>{t("posts_share")}</Text>
+            <Text style={[styles.attachTitle, { color: c.text }]}>
+              {t("posts_share")}
+              {photoTokenCost > 0 && (
+                <Text style={{ fontSize: 12.5, fontWeight: "600", color: c.textMuted }}>
+                  {"   "}🪙 {t("chat_photo_cost", { price: photoTokenCost })}
+                </Text>
+              )}
+            </Text>
             <View style={styles.attachGrid}>
+              {/* Video gonderimi kaldirildi — sohbette yalnizca fotograf */}
               {[
                 { icon: "camera", label: t("chat_camera"), color: "#7C3AED" },
                 { icon: "images", label: t("chat_gallery"), color: "#2563EB" },
-                { icon: "videocam", label: t("posts_video"), color: "#DC2626" },
               ].map((item) => (
                 <Pressable
                   key={item.label}
@@ -832,6 +946,7 @@ export default function ChatDetailScreen() {
                       if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_camera")); return; }
                       const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
+                        if (!(await chargeForPhoto())) return;
                         await sendImage(res.assets[0].uri, "image");
                       }
                     } else if (item.icon === "images") {
@@ -839,14 +954,8 @@ export default function ChatDetailScreen() {
                       if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_gallery")); return; }
                       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
                       if (!res.canceled && res.assets[0]) {
+                        if (!(await chargeForPhoto())) return;
                         await sendImage(res.assets[0].uri, "image");
-                      }
-                    } else if (item.icon === "videocam") {
-                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { showAlert(t("setup_permission_title"), t("chat_permission_gallery")); return; }
-                      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], quality: 0.8 });
-                      if (!res.canceled && res.assets[0]) {
-                        await sendImage(res.assets[0].uri, "video");
                       }
                     }
                   }}
@@ -861,6 +970,9 @@ export default function ChatDetailScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Tam ekran fotograf goruntuleyici */}
+      <ImageViewer uri={viewerUri} onClose={() => setViewerUri(null)} insets={insets} />
 
       {/* Gift Animation Overlay */}
       {activeGiftAnim && (
@@ -893,6 +1005,10 @@ const BubbleWrapper = memo(function BubbleWrapper({
   showReactionBar,
   onToggleReaction,
   onSwipeReply,
+  viewerVip,
+  onLockedPress,
+  onImagePress,
+  onSendCoins,
 }: {
   item: ChatMessage;
   fromMe: boolean;
@@ -912,6 +1028,10 @@ const BubbleWrapper = memo(function BubbleWrapper({
   showReactionBar: boolean;
   onToggleReaction: (id: string) => void;
   onSwipeReply: (msg: ChatMessage) => void;
+  viewerVip: boolean;
+  onLockedPress: () => void;
+  onImagePress: (uri: string) => void;
+  onSendCoins: (msgId: string, amount: number) => void;
 }) {
   const handlePress = useCallback(() => onMsgPress(item.id), [item.id, onMsgPress]);
   const handleLongPress = useCallback(() => onMsgLongPress(item.id), [item.id, onMsgLongPress]);
@@ -973,6 +1093,10 @@ const BubbleWrapper = memo(function BubbleWrapper({
             myUid={myUid}
             showReactionBar={showReactionBar}
             onToggleReactionBar={handleToggle}
+            viewerVip={viewerVip}
+            onLockedPress={onLockedPress}
+            onImagePress={onImagePress}
+            onSendCoins={onSendCoins}
           />
         </Animated.View>
       </GestureDetector>
@@ -998,6 +1122,10 @@ const Bubble = memo(function Bubble({
   myUid,
   showReactionBar = false,
   onToggleReactionBar,
+  viewerVip = false,
+  onLockedPress,
+  onImagePress,
+  onSendCoins,
 }: {
   msg: ChatMessage;
   fromMe: boolean;
@@ -1016,11 +1144,20 @@ const Bubble = memo(function Bubble({
   myUid?: string;
   showReactionBar?: boolean;
   onToggleReactionBar?: () => void;
+  /** Mesaji GOREN kisinin VIP durumu — kilitli fotograf icin */
+  viewerVip?: boolean;
+  onLockedPress?: () => void;
+  onImagePress?: (uri: string) => void;
+  onSendCoins?: (msgId: string, amount: number) => void;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
   const tailRadius = 6;
   const fullRadius = 18;
+
+  // Kilit yalnizca KARSI TARAFIN gonderdigi fotograflarda ve alici VIP degilse
+  // uygulanir. Kendi gonderdigini her zaman net gorur.
+  const showLocked = !!msg.locked && !fromMe && !viewerVip && !isDeleted;
 
   const bubbleRadius = fromMe
     ? {
@@ -1187,12 +1324,33 @@ const Bubble = memo(function Bubble({
         </Pressable>
       ) : (msg.type === "image" || msg.type === "video") && msg.imageUrl ? (
         <View style={[styles.imageBubble, bubbleRadius, fromMe ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" }]}>
-          <Image
-            source={{ uri: msg.imageUrl }}
-            style={styles.imageBubbleImg}
-            resizeMode="cover"
-          />
-          {msg.type === "video" && (
+          <Pressable
+            onPress={() => {
+              // Secim modundayken dokunus secimi degistirsin, buyutmesin
+              if (isSelecting) return onPress?.();
+              if (showLocked) return onLockedPress?.();
+              if (msg.imageUrl) onImagePress?.(msg.imageUrl);
+            }}
+            onLongPress={onLongPress}
+            delayLongPress={400}
+          >
+            <Image
+              source={{ uri: msg.imageUrl }}
+              style={styles.imageBubbleImg}
+              resizeMode="cover"
+              blurRadius={showLocked ? 28 : 0}
+            />
+          </Pressable>
+          {showLocked && (
+            <Pressable style={styles.lockedOverlay} onPress={onLockedPress}>
+              <View style={styles.lockedBadge}>
+                <Ionicons name="lock-closed" size={22} color="#fff" />
+              </View>
+              <Text style={styles.lockedTitle}>{t("chat_locked_photo")}</Text>
+              <Text style={styles.lockedHint}>{t("chat_locked_photo_hint")}</Text>
+            </Pressable>
+          )}
+          {msg.type === "video" && !showLocked && (
             <View style={styles.videoPlayOverlay}>
               <Ionicons name="play-circle" size={44} color="rgba(255,255,255,0.85)" />
             </View>
@@ -1226,6 +1384,43 @@ const Bubble = memo(function Bubble({
             ) : null
           }
         />
+      ) : msg.type === "coinRequest" ? (
+        <View style={[styles.coinReqCard, { backgroundColor: c.surface, borderColor: "rgba(245,158,11,0.45)" }]}>
+          <View style={styles.coinReqHead}>
+            <Text style={{ fontSize: 20 }}>🪙</Text>
+            <Text style={[styles.coinReqTitle, { color: c.text }]}>{t("chat_coin_request")}</Text>
+          </View>
+          <Text style={[styles.coinReqText, { color: c.textMuted }]}>{msg.text}</Text>
+
+          {msg.coinRequest && msg.coinRequest.sentAmount > 0 ? (
+            <View style={styles.coinReqDone}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.coinReqDoneText}>
+                {t("chat_coin_sent", { amount: msg.coinRequest.sentAmount })}
+              </Text>
+            </View>
+          ) : fromMe ? (
+            <Text style={[styles.coinReqText, { color: c.textMuted, fontStyle: "italic" }]}>
+              {t("chat_coin_waiting")}
+            </Text>
+          ) : (
+            <View style={styles.coinReqBtns}>
+              {(msg.coinRequest?.amounts ?? [100, 250, 500]).map((amt) => (
+                <Pressable
+                  key={amt}
+                  onPress={() => onSendCoins?.(msg.id, amt)}
+                  style={({ pressed }) => [styles.coinReqBtn, pressed && { opacity: 0.6 }]}
+                >
+                  <Text style={styles.coinReqBtnText}>🪙 {amt}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.metaRow}>
+            <Text style={[styles.bubbleTime, { color: c.textMuted }]}>{timeStr}</Text>
+          </View>
+        </View>
       ) : msg.gift ? (
         <View style={[styles.giftBubble, { backgroundColor: hexToRgba(msg.gift.color, 0.13), borderColor: msg.gift.color }]}>
           <Text style={styles.giftBubbleEmoji}>{msg.gift.emoji}</Text>
@@ -1405,6 +1600,138 @@ function ChatSkeleton({ colors: c }: { colors: any }) {
   );
 }
 
+/* Tam ekran fotograf goruntuleyici.
+   Pinch ile yakinlastirma, iki parmakla kaydirma, cift dokunusla sifirlama.
+   Arkaplana veya kapat butonuna dokununca kapanir. */
+function ImageViewer({
+  uri,
+  onClose,
+  insets,
+}: {
+  uri: string | null;
+  onClose: () => void;
+  insets: { top: number; bottom: number };
+}) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedTx = useSharedValue(0);
+  const savedTy = useSharedValue(0);
+
+  const reset = () => {
+    scale.value = withTiming(1, { duration: 180 });
+    savedScale.value = 1;
+    tx.value = withTiming(0, { duration: 180 });
+    ty.value = withTiming(0, { duration: 180 });
+    savedTx.value = 0;
+    savedTy.value = 0;
+  };
+
+  // Her yeni fotografta sifirdan basla
+  useEffect(() => {
+    if (uri) {
+      scale.value = 1; savedScale.value = 1;
+      tx.value = 0; ty.value = 0; savedTx.value = 0; savedTy.value = 0;
+    }
+  }, [uri]);
+
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(savedScale.value * e.scale, 1), 5);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      // Tam uzaklasinca konumu da ortala
+      if (scale.value <= 1.02) {
+        scale.value = withTiming(1); savedScale.value = 1;
+        tx.value = withTiming(0); ty.value = withTiming(0);
+        savedTx.value = 0; savedTy.value = 0;
+      }
+    });
+
+  // Kaydirma yalnizca yakinlastirilmisken anlamli
+  const pan = Gesture.Pan()
+    .averageTouches(true)
+    .onUpdate((e) => {
+      if (savedScale.value <= 1) return;
+      tx.value = savedTx.value + e.translationX;
+      ty.value = savedTy.value + e.translationY;
+    })
+    .onEnd(() => {
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (savedScale.value > 1) {
+        runOnJS(reset)();
+      } else {
+        scale.value = withTiming(2.5, { duration: 180 });
+        savedScale.value = 2.5;
+      }
+    });
+
+  const composed = Gesture.Simultaneous(pinch, pan, doubleTap);
+
+  const imgStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: tx.value },
+      { translateY: ty.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      {/* Modal ayri bir native gorunum agacinda render ediliyor; koktedeki
+          GestureHandlerRootView buraya miras kalmaz, jestler icin gerekli. */}
+      <GestureHandlerRootView style={styles.viewerRoot}>
+        {/* Arkaplana dokunus kapatir — zoom yaparken kazara kapanmamasi icin
+            jest algilayici bunun uzerinde duruyor. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+        <GestureDetector gesture={composed}>
+          <Animated.View style={styles.viewerImgWrap}>
+            {uri && (
+              <Animated.Image
+                source={{ uri }}
+                style={[styles.viewerImg, imgStyle]}
+                resizeMode="contain"
+              />
+            )}
+          </Animated.View>
+        </GestureDetector>
+
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={[styles.viewerClose, { top: insets.top + 10 }]}
+        >
+          <Ionicons name="close" size={26} color="#fff" />
+        </Pressable>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+}
+
+// Sistem mesaji — kimseye ait olmadigi icin ortada, balonsuz.
+// Gun ayracina benzer ama daha belirgin: tam genislik, sol kenarda vurgu
+// cizgisi ve bilgi ikonu ile normal sohbetten ayrisiyor.
+function SystemMessage({ text, colors: c }: { text: string; colors: any }) {
+  if (!text) return null;
+  return (
+    <View style={styles.sysWrap}>
+      <View style={[styles.sysBox, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Ionicons name="information-circle-outline" size={15} color={c.textMuted} style={{ marginTop: 1 }} />
+        <Text style={[styles.sysText, { color: c.textMuted }]}>{text}</Text>
+      </View>
+    </View>
+  );
+}
+
 function DateSeparator({ label, colors: c }: { label: string; colors: any }) {
   return (
     <View style={styles.dateSepWrap}>
@@ -1573,6 +1900,19 @@ const styles = StyleSheet.create({
   tokenPillText: { fontSize: 12, fontWeight: "700", color: "#F59E0B" },
 
   list: { paddingHorizontal: 10, paddingVertical: 12 },
+
+  sysWrap: { alignItems: "center", marginVertical: 10, paddingHorizontal: 12 },
+  sysBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    maxWidth: "92%",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  sysText: { flex: 1, fontSize: 12.5, lineHeight: 17.5, textAlign: "center" },
 
   dateSepWrap: { alignItems: "center", marginVertical: 10 },
   dateSepPill: {
@@ -1800,6 +2140,37 @@ const styles = StyleSheet.create({
   },
   sharedPostTapHintText: { fontSize: 11 },
 
+  // Jeton istegi karti
+  coinReqCard: {
+    maxWidth: "82%",
+    marginHorizontal: 4,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  coinReqHead: { flexDirection: "row", alignItems: "center", gap: 7 },
+  coinReqTitle: { fontSize: 14.5, fontWeight: "800" },
+  coinReqText: { fontSize: 13, lineHeight: 18.5 },
+  coinReqBtns: { flexDirection: "row", gap: 7, marginTop: 2 },
+  coinReqBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "rgba(245,158,11,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.5)",
+  },
+  coinReqBtnText: { fontSize: 13.5, fontWeight: "800", color: "#F59E0B" },
+  coinReqDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+  },
+  coinReqDoneText: { fontSize: 13, fontWeight: "700", color: "#10B981" },
+
   // Gift bubble
   giftBubble: {
     maxWidth: "78%",
@@ -1896,6 +2267,45 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 16,
   },
+  // Tam ekran fotograf goruntuleyici
+  viewerRoot: { flex: 1, backgroundColor: "rgba(0,0,0,0.96)" },
+  viewerImgWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  viewerImg: { width: "100%", height: "100%" },
+  viewerClose: {
+    position: "absolute",
+    right: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+
+  // Kilitli fotograf ortusu — bulanik goruntunun uzerine biner
+  lockedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderRadius: 16,
+  },
+  lockedBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    marginBottom: 3,
+  },
+  lockedTitle: { color: "#fff", fontSize: 13.5, fontWeight: "800", textAlign: "center" },
+  lockedHint: { color: "rgba(255,255,255,0.85)", fontSize: 11.5, textAlign: "center", lineHeight: 15 },
+
   videoPlayOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

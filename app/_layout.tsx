@@ -19,6 +19,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { BASE_URL } from "@/config/api";
 import { initFacebookSdk } from "@/config/facebook";
 import MaintenanceScreen from "@/components/MaintenanceScreen";
+import { IncomingCallOverlay } from "@/components/call/IncomingCallOverlay";
 
 // ── Global bakım state — hem RootLayout hem RootNavigator erişir ──
 let _maintenanceListeners: Array<(data: { maintenance: boolean; message: string; endDate: string | null }) => void> = [];
@@ -256,6 +257,9 @@ function MaintenanceGate() {
               <CustomAlertProvider>
                 <NotificationsProvider>
                   <RootNavigator />
+                  {/* Gelen arama ekrani — hangi sayfada olursak olalim gorunur.
+                      PremiumProvider icinde olmali, VIP kontrolu icin gerekli. */}
+                  <IncomingCallOverlay />
                 </NotificationsProvider>
               </CustomAlertProvider>
             </CoinsProvider>

@@ -29,12 +29,18 @@ export type ChatMessage = {
   _id?: string;
   senderId: string;
   text: string;
-  type: "text" | "gift" | "image" | "video" | "audio" | "sharedPost" | "storyReply";
+  type: "text" | "gift" | "image" | "video" | "audio" | "sharedPost" | "storyReply" | "coinRequest";
   createdAt: string | null;
   status: "sent" | "delivered" | "read";
   deleted?: boolean;
   reactions?: MessageReaction[];
   imageUrl?: string | null;
+  // Kilitli fotograf — VIP olmayan alicida bulanik gosterilir, dokununca
+  // VIP yonlendirmesi cikar. Admin panelden kilit ikonuyla gonderilir.
+  locked?: boolean;
+  // Jeton istegi — tutar butonlari olan kart olarak gosterilir.
+  // sentAmount > 0 ise istek karsilanmis, butonlar pasiflesir.
+  coinRequest?: { amounts: number[]; sentAmount: number; sentAt?: string | null } | null;
   audioUrl?: string | null;
   audioDuration?: number; // milisaniye
   replyTo?: ReplyToData | null;
@@ -84,6 +90,8 @@ export function useChat(otherUid: string) {
       deleted: m.deleted ?? false,
       reactions: m.reactions ?? [],
       imageUrl: m.imageUrl ?? null,
+      locked: m.locked ?? false,
+      coinRequest: m.coinRequest ?? null,
       audioUrl: m.audioUrl ?? null,
       audioDuration: m.audioDuration ?? 0,
       replyTo: m.replyTo ?? null,
@@ -154,6 +162,8 @@ export function useChat(otherUid: string) {
         deleted: m.deleted ?? false,
         reactions: m.reactions ?? [],
         imageUrl: m.imageUrl ?? null,
+        locked: m.locked ?? false,
+      coinRequest: m.coinRequest ?? null,
         audioUrl: m.audioUrl ?? null,
         audioDuration: m.audioDuration ?? 0,
         replyTo: m.replyTo ?? null,

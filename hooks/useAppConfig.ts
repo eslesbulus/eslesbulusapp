@@ -29,6 +29,8 @@ export type AppConfig = {
   coinPackages: CoinPackage[];
   premiumPlans: PremiumPlanConfig[];
   messageTokenCost: number;
+  /** Kullanicinin fotograf gonderme maliyeti. 0 = ucretsiz. */
+  photoTokenCost: number;
 };
 
 const DEFAULTS: AppConfig = {
@@ -39,6 +41,7 @@ const DEFAULTS: AppConfig = {
   coinPackages: [],
   premiumPlans: [],
   messageTokenCost: 0,
+  photoTokenCost: 0,
 };
 
 // Modül seviyesinde önbellek — /api/config public (auth gerektirmez)
