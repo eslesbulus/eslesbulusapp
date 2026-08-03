@@ -14,8 +14,10 @@ export const PREMIUM_SKUS = [
 ];
 
 let iap: any = null;
+let isUserCancelledError: ((err: any) => boolean) | null = null;
 try {
   iap = require("react-native-iap");
+  isUserCancelledError = require("react-native-iap/lib/module/utils/error").isUserCancelledError;
 } catch {}
 
 type Options = {
@@ -31,6 +33,19 @@ function extractPrice(p: any): PriceInfo | null {
     return { price: p.price, currency: p.currency };
   }
   return null;
+}
+
+function isCancelled(err: any): boolean {
+  if (isUserCancelledError) {
+    try { return isUserCancelledError(err); } catch {}
+  }
+  const code = err?.code ?? "";
+  return (
+    code === "E_USER_CANCELLED" ||
+    code === "E_USER_CANCELED" ||
+    code === "user-cancelled" ||
+    err?.responseCode === 1
+  );
 }
 
 export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Options) {
@@ -60,30 +75,35 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
         } catch {}
 
         purchaseListener = iap.purchaseUpdatedListener(async (purchase: any) => {
-          if (purchase.transactionReceipt) {
+          try {
+            const productId = purchase?.productId;
+            if (!productId) return;
+
             await iap.finishTransaction({ purchase, isConsumable: true });
 
-            const txId = purchase.id ?? purchase.transactionId ?? `${purchase.productId}_${purchase.transactionDate}`;
-            const info = pricesRef.current[purchase.productId];
+            const txId = purchase.id ?? purchase.transactionId ?? `${productId}_${purchase.transactionDate}`;
+            const info = pricesRef.current[productId];
             if (info && !loggedRef.current.has(txId)) {
               loggedRef.current.add(txId);
               logPurchase(info.price, info.currency, {
-                fb_content_id: purchase.productId,
-                fb_content_type: COIN_SKUS.includes(purchase.productId) ? "coins" : "premium",
+                fb_content_id: productId,
+                fb_content_type: COIN_SKUS.includes(productId) ? "coins" : "premium",
               });
             }
 
-            if (COIN_SKUS.includes(purchase.productId)) {
-              onCoinsPurchased(purchase.productId);
-            } else if (PREMIUM_SKUS.includes(purchase.productId)) {
-              onPremiumPurchased(purchase.productId);
+            if (COIN_SKUS.includes(productId)) {
+              onCoinsPurchased(productId);
+            } else if (PREMIUM_SKUS.includes(productId)) {
+              onPremiumPurchased(productId);
             }
+          } catch (e: any) {
+            onError(e?.message || "İşlem tamamlanamadı.");
           }
         });
 
         errorListener = iap.purchaseErrorListener((err: any) => {
-          if (err?.code !== "E_USER_CANCELLED") {
-            onError(err.message || "Satın alma başarısız.");
+          if (!isCancelled(err)) {
+            onError(err?.message || "Satın alma başarısız.");
           }
         });
       })
@@ -106,7 +126,7 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
         type: "in-app",
       });
     } catch (err: any) {
-      if (err?.code !== "E_USER_CANCELLED") onError(err?.message || "Satın alma başarısız.");
+      if (!isCancelled(err)) onError(err?.message || "Satın alma başarısız.");
     }
   }, []);
 
@@ -120,7 +140,7 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
         type: "in-app",
       });
     } catch (err: any) {
-      if (err?.code !== "E_USER_CANCELLED") onError(err?.message || "Satın alma başarısız.");
+      if (!isCancelled(err)) onError(err?.message || "Satın alma başarısız.");
     }
   }, []);
 

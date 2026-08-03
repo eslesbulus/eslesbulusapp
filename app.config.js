@@ -25,7 +25,7 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.eslesbulus.eslesbulusapp",
-      versionCode: 4,
+      versionCode: 5,
       // FCM / push bildirim — cihazin push token alabilmesi icin gerekli
       googleServicesFile: "./google-services.json",
     },
