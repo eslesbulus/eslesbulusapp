@@ -14,10 +14,8 @@ export const PREMIUM_SKUS = [
 ];
 
 let iap: any = null;
-let isUserCancelledError: ((err: any) => boolean) | null = null;
 try {
   iap = require("react-native-iap");
-  isUserCancelledError = require("react-native-iap/lib/module/utils/error").isUserCancelledError;
 } catch {}
 
 type Options = {
@@ -35,10 +33,10 @@ function extractPrice(p: any): PriceInfo | null {
   return null;
 }
 
+// Kullanici satin almayi iptal etti mi? Kutuphane surumune gore farkli kod
+// donebiliyor, hepsini kapsiyoruz. (isUserCancelledError public API'de export
+// edilmiyor, derin import package exports'a takiliyor — koda bakmak yeterli.)
 function isCancelled(err: any): boolean {
-  if (isUserCancelledError) {
-    try { return isUserCancelledError(err); } catch {}
-  }
   const code = err?.code ?? "";
   return (
     code === "E_USER_CANCELLED" ||
@@ -78,6 +76,12 @@ export function useIAP({ onCoinsPurchased, onPremiumPurchased, onError }: Option
           try {
             const productId = purchase?.productId;
             if (!productId) return;
+
+            // Odeme KESINLESMEDEN jeton/premium verilmemeli. Android'de yavas
+            // odeme yontemleri (bakkal/kiosk) once "pending" durumda event
+            // firlatir; o asamada para tahsil edilmemistir. Yalnizca
+            // "purchased" olanlari isliyoruz.
+            if (purchase.purchaseState !== "purchased") return;
 
             await iap.finishTransaction({ purchase, isConsumable: true });
 
