@@ -2,7 +2,7 @@ module.exports = {
   expo: {
     name: "Eşleş Buluş - Flört & Sohbet",
     slug: "eslesbulusapp",
-    version: "2.0.0",
+    version: "2.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -25,7 +25,7 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.eslesbulus.eslesbulusapp",
-      versionCode: 3,
+      versionCode: 4,
       // FCM / push bildirim — cihazin push token alabilmesi icin gerekli
       googleServicesFile: "./google-services.json",
     },
