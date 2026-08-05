@@ -25,7 +25,7 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.eslesbulus.eslesbulusapp",
-      versionCode: 5,
+      versionCode: 8,
       // FCM / push bildirim — cihazin push token alabilmesi icin gerekli
       googleServicesFile: "./google-services.json",
     },
@@ -37,6 +37,7 @@ module.exports = {
       "expo-router",
       "expo-localization",
       "./plugins/withFixAudioForegroundService",
+      "./plugins/withAdId",
       // Facebook SDK — yukleme ve satin alim (App Events) takibi icin.
       // strings.xml / AndroidManifest / Info.plist duzenlemelerini bu plugin
       // prebuild sirasinda otomatik yapar, elle dosya duzenlemeye gerek yok.
